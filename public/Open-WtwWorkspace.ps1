@@ -1,12 +1,22 @@
 function Open-WtwWorkspace {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory, Position = 0)]
+        [Parameter(Position = 0)]
         [string] $Name,
 
         [string] $Repo,
         [string] $Editor
     )
+
+    # If no name given, detect from cwd
+    if (-not $Name) {
+        $Name = Resolve-WtwCurrentTarget
+        if (-not $Name) {
+            Write-Error "Not inside a registered repo. Specify a target or cd into a repo."
+            return
+        }
+        Write-Host "  Detected: $Name" -ForegroundColor DarkGray
+    }
 
     $registry = Get-WtwRegistry
     $config = Get-WtwConfig

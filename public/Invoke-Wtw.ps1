@@ -54,7 +54,10 @@ function Invoke-Wtw {
         Write-Host '    create <task>     Create worktree + workspace'
         Write-Host '    list              List registered worktrees'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
-        Write-Host '    open <name>       Open workspace in editor'
+        Write-Host '    open [name]       Open workspace in editor (default: current)'
+        Write-Host '    cursor [name]     Open in Cursor   (alias: cur)'
+        Write-Host '    code [name]       Open in VS Code  (alias: co)'
+        Write-Host '    antigravity [name] Open in Antigravity (alias: anti)'
         Write-Host '    remove <task>     Remove worktree + workspace'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'
@@ -93,8 +96,16 @@ function Invoke-Wtw {
         'update'    { Install-Wtw @splat }
         'help'    { Invoke-Wtw }
         default   {
-            # Default: treat unknown command as "go <name>"
-            Enter-WtwWorktree -Name $Command
+            # Check if command is an editor shortcut (cursor, cur, code, co, anti, etc.)
+            $resolvedEditor = Resolve-WtwEditorCommand $Command
+            if ($resolvedEditor) {
+                $splat['Editor'] = $resolvedEditor
+                if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }
+                Open-WtwWorkspace @splat
+            } else {
+                # Fallback: treat unknown command as "go <name>"
+                Enter-WtwWorktree -Name $Command
+            }
         }
     }
 }
