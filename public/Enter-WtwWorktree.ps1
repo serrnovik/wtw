@@ -18,7 +18,7 @@ function Enter-WtwWorktree {
     # 1. Check if it's a repo alias (go to main)
     foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
         $repo = $registry.repos.$repoName
-        if ($repo.alias -eq $Name -or $repoName -eq $Name) {
+        if ((Test-WtwAliasMatch $repo $Name) -or $repoName -eq $Name) {
             $targetPath = $repo.mainPath
             $sessionScript = $repo.sessionScript
             break
@@ -31,8 +31,8 @@ function Enter-WtwWorktree {
         $taskName = $Matches[2]
         foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
             $repo = $registry.repos.$repoName
-            if (($repo.alias -eq $aliasOrName -or $repoName -eq $aliasOrName) -and
-                $repo.worktrees.PSObject.Properties.Name -contains $taskName) {
+            if (((Test-WtwAliasMatch $repo $aliasOrName) -or $repoName -eq $aliasOrName) -and
+                $repo.worktrees -and $repo.worktrees.PSObject.Properties.Name -contains $taskName) {
                 $wt = $repo.worktrees.$taskName
                 $targetPath = $wt.path
                 $sessionScript = $repo.sessionScript
@@ -43,17 +43,17 @@ function Enter-WtwWorktree {
 
     # 3. Search all repos for task name
     if (-not $targetPath) {
-        $matches = @()
+        $found = @()
         foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
             $repo = $registry.repos.$repoName
-            if ($repo.worktrees.PSObject.Properties.Name -contains $Name) {
-                $matches += @{ repo = $repo; task = $Name }
+            if ($repo.worktrees -and $repo.worktrees.PSObject.Properties.Name -contains $Name) {
+                $found += @{ repo = $repo; task = $Name }
             }
         }
-        if ($matches.Count -eq 1) {
-            $targetPath = $matches[0].repo.worktrees.($matches[0].task).path
-            $sessionScript = $matches[0].repo.sessionScript
-        } elseif ($matches.Count -gt 1) {
+        if ($found.Count -eq 1) {
+            $targetPath = $found[0].repo.worktrees.($found[0].task).path
+            $sessionScript = $found[0].repo.sessionScript
+        } elseif ($found.Count -gt 1) {
             Write-Error "Ambiguous task name '$Name'. Found in multiple repos. Use 'alias-task' format."
             return
         }

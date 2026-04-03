@@ -40,9 +40,12 @@ function Initialize-WtwConfig {
             # Take first 2-3 consonants or just first 2-3 chars
             $repoBaseName.Substring(0, [Math]::Min(3, $repoBaseName.Length))
         }
-        $Alias = Read-Host "  Alias [$defaultAlias]"
+        $Alias = Read-Host "  Aliases (comma-separated) [$defaultAlias]"
         if (-not $Alias) { $Alias = $defaultAlias }
     }
+
+    # Parse comma-separated aliases into array
+    $aliasArray = @($Alias -split '[,\s]+' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 
     # Ensure config exists
     $config = Get-WtwConfig
@@ -83,7 +86,7 @@ function Initialize-WtwConfig {
         worktreeParent    = $worktreeParent
         sessionScript     = $sessionScript
         templateWorkspace = $templateWs
-        alias             = $Alias
+        aliases           = $aliasArray
         worktrees         = [PSCustomObject]@{}
     }
 
@@ -111,6 +114,6 @@ function Initialize-WtwConfig {
     }
 
     Write-Host ''
-    Write-Host "  Registered '$repoBaseName' (alias: $Alias)" -ForegroundColor Green
+    Write-Host "  Registered '$repoBaseName' (aliases: $($aliasArray -join ', '))" -ForegroundColor Green
     Write-Host "  Run 'wtw create <task>' to create your first worktree." -ForegroundColor DarkGray
 }

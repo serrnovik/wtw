@@ -24,6 +24,24 @@ function Save-WtwRegistry {
     $Registry | ConvertTo-Json -Depth 10 | Set-Content -Path $script:WtwRegistryPath -Encoding utf8
 }
 
+function Get-WtwRepoAliases {
+    # Returns array of aliases, handles both old "alias" (string) and new "aliases" (array)
+    param([PSObject] $Repo)
+    $result = @()
+    if ($Repo.aliases) {
+        $result = @($Repo.aliases)
+    } elseif ($Repo.alias) {
+        $result = @($Repo.alias)
+    }
+    return $result
+}
+
+function Test-WtwAliasMatch {
+    param([PSObject] $Repo, [string] $Name)
+    $aliases = Get-WtwRepoAliases $Repo
+    return ($Name -in $aliases)
+}
+
 function Get-WtwRepoFromCwd {
     [CmdletBinding()]
     param()
@@ -40,11 +58,13 @@ function Get-WtwRepoFromCwd {
             return $name, $repo
         }
         # Check if we're inside a worktree of this repo
-        foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
-            $wt = $repo.worktrees.$taskName
-            $wtResolved = [System.IO.Path]::GetFullPath($wt.path)
-            if ($wtResolved -eq [System.IO.Path]::GetFullPath($root)) {
-                return $name, $repo
+        if ($repo.worktrees) {
+            foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+                $wt = $repo.worktrees.$taskName
+                $wtResolved = [System.IO.Path]::GetFullPath($wt.path)
+                if ($wtResolved -eq [System.IO.Path]::GetFullPath($root)) {
+                    return $name, $repo
+                }
             }
         }
     }
@@ -59,17 +79,15 @@ function Resolve-WtwRepo {
 
     $registry = Get-WtwRegistry
     if ($RepoAlias) {
-        # Search by alias
         foreach ($name in $registry.repos.PSObject.Properties.Name) {
             $repo = $registry.repos.$name
-            if ($repo.alias -eq $RepoAlias -or $name -eq $RepoAlias) {
+            if ((Test-WtwAliasMatch $repo $RepoAlias) -or $name -eq $RepoAlias) {
                 return $name, $repo
             }
         }
         Write-Error "Repo '$RepoAlias' not found in registry. Run 'wtw init' first."
         return $null, $null
     }
-    # Detect from cwd
     $name, $repo = Get-WtwRepoFromCwd
     if (-not $name) {
         Write-Error "Not inside a registered repo. Run 'wtw init' or use --repo."

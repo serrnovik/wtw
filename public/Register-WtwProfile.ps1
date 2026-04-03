@@ -12,10 +12,9 @@ function Register-WtwProfile {
 
     foreach ($repoName in $repoNames) {
         $repo = $registry.repos.$repoName
-        $alias = $repo.alias
-        if (-not $alias) { continue }
+        $aliases = Get-WtwRepoAliases $repo
+        if (-not $aliases -or $aliases.Count -eq 0) { continue }
 
-        # Main repo alias: e.g., "sn3" -> go to snowmain main
         $mainPath = $repo.mainPath
         $sessionScript = $repo.sessionScript
 
@@ -31,25 +30,31 @@ function Register-WtwProfile {
             }
         }.GetNewClosure()
 
-        # Create function and alias for main repo
-        $fnName = "WtwGo-$alias"
+        # Create function + aliases for main repo (one function, multiple aliases)
+        $primaryAlias = $aliases[0]
+        $fnName = "WtwGo-$primaryAlias"
         Set-Item -Path "function:global:$fnName" -Value {
             $goMainBlock.Invoke($mainPath, $sessionScript)
         }.GetNewClosure()
-        Set-Alias -Name $alias -Value $fnName -Scope Global -Force
 
-        # Per-worktree aliases
+        foreach ($a in $aliases) {
+            Set-Alias -Name $a -Value $fnName -Scope Global -Force
+        }
+
+        # Per-worktree aliases: create for each repo alias
         if ($repo.worktrees) {
             foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
                 $wt = $repo.worktrees.$taskName
                 $wtPath = $wt.path
-                $wtAlias = "$alias-$taskName"
-                $wtFnName = "WtwGo-$wtAlias"
+                $wtFnName = "WtwGo-$primaryAlias-$taskName"
 
                 Set-Item -Path "function:global:$wtFnName" -Value {
                     $goMainBlock.Invoke($wtPath, $sessionScript)
                 }.GetNewClosure()
-                Set-Alias -Name $wtAlias -Value $wtFnName -Scope Global -Force
+
+                foreach ($a in $aliases) {
+                    Set-Alias -Name "$a-$taskName" -Value $wtFnName -Scope Global -Force
+                }
             }
         }
     }

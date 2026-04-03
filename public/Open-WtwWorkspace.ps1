@@ -16,19 +16,18 @@ function Open-WtwWorkspace {
     # Find workspace file
     $wsFile = $null
 
-    # Check if it's a task in a specific or any repo
     foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
         $repoEntry = $registry.repos.$repoName
-        if ($Repo -and $repoEntry.alias -ne $Repo -and $repoName -ne $Repo) { continue }
+        if ($Repo -and -not (Test-WtwAliasMatch $repoEntry $Repo) -and $repoName -ne $Repo) { continue }
 
         # Main repo?
-        if ($repoEntry.alias -eq $Name -or $repoName -eq $Name) {
+        if ((Test-WtwAliasMatch $repoEntry $Name) -or $repoName -eq $Name) {
             $wsFile = $repoEntry.templateWorkspace
             break
         }
 
         # Worktree?
-        if ($repoEntry.worktrees.PSObject.Properties.Name -contains $Name) {
+        if ($repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $Name) {
             $wsFile = $repoEntry.worktrees.$Name.workspace
             break
         }
@@ -36,8 +35,8 @@ function Open-WtwWorkspace {
         # alias-task format
         if ($Name -match '^(.+?)-(.+)$') {
             $a = $Matches[1]; $t = $Matches[2]
-            if (($repoEntry.alias -eq $a -or $repoName -eq $a) -and
-                $repoEntry.worktrees.PSObject.Properties.Name -contains $t) {
+            if (((Test-WtwAliasMatch $repoEntry $a) -or $repoName -eq $a) -and
+                $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $t) {
                 $wsFile = $repoEntry.worktrees.$t.workspace
                 break
             }

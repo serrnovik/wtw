@@ -56,6 +56,9 @@ function Invoke-Wtw {
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
         Write-Host '    open <name>       Open workspace in editor'
         Write-Host '    remove <task>     Remove worktree + workspace'
+        Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
+        Write-Host '    copy <name>       Standalone copy of workspace from template'
+        Write-Host '    sync [file|--all] Re-apply template to managed workspaces'
         Write-Host '    clean             Clean stale AI worktrees'
         Write-Host '    install           Install/update wtw globally (~/.wtw/module/)'
         Write-Host ''
@@ -81,13 +84,17 @@ function Invoke-Wtw {
         'open'    { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Open-WtwWorkspace @splat }
         'remove'  { if ($pos.Count -gt 0) { $splat['Task'] = $pos[0] }; Remove-WtwWorktree @splat }
         'rm'      { if ($pos.Count -gt 0) { $splat['Task'] = $pos[0] }; Remove-WtwWorktree @splat }
-        'clean'   { Invoke-WtwClean @splat }
-        'install' { Install-Wtw @splat }
-        'update'  { Install-Wtw @splat }
+        'workspace' { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
+        'ws'        { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
+        'copy'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Copy-WtwWorkspace @splat }
+        'sync'      { if ($pos.Count -gt 0) { $splat['Target'] = $pos[0] }; Sync-WtwWorkspace @splat }
+        'clean'     { Invoke-WtwClean @splat }
+        'install'   { Install-Wtw @splat }
+        'update'    { Install-Wtw @splat }
         'help'    { Invoke-Wtw }
         default   {
-            Write-Host "Unknown command: $Command" -ForegroundColor Red
-            Write-Host "Run 'wtw' for usage." -ForegroundColor DarkGray
+            # Default: treat unknown command as "go <name>"
+            Enter-WtwWorktree -Name $Command
         }
     }
 }

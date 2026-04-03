@@ -16,12 +16,13 @@ function Get-WtwList {
 
     foreach ($name in $repoNames) {
         $repoEntry = $registry.repos.$name
-        if ($Repo -and $repoEntry.alias -ne $Repo -and $name -ne $Repo) { continue }
+        $aliases = Get-WtwRepoAliases $repoEntry
+        if ($Repo -and $Repo -notin $aliases -and $name -ne $Repo) { continue }
 
         # Main entry
         $items += [PSCustomObject]@{
             Repo      = $name
-            Alias     = $repoEntry.alias
+            Aliases   = ($aliases -join ', ')
             Task      = '(main)'
             Branch    = (git -C $repoEntry.mainPath branch --show-current 2>$null) ?? '?'
             Path      = $repoEntry.mainPath
@@ -36,7 +37,7 @@ function Get-WtwList {
                 $exists = Test-Path $wt.path
                 $items += [PSCustomObject]@{
                     Repo      = ''
-                    Alias     = ''
+                    Aliases   = ''
                     Task      = $taskName
                     Branch    = $wt.branch
                     Path      = if ($exists) { $wt.path } else { "$($wt.path) (MISSING)" }
@@ -48,6 +49,6 @@ function Get-WtwList {
     }
 
     Write-Host ''
-    Format-WtwTable $items @('Repo', 'Alias', 'Task', 'Branch', 'Color', 'Workspace')
+    Format-WtwTable $items @('Repo', 'Aliases', 'Task', 'Branch', 'Color', 'Workspace')
     Write-Host ''
 }
