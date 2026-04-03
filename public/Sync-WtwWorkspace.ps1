@@ -6,7 +6,9 @@ function Sync-WtwWorkspace {
 
         [switch] $All,
         [switch] $DryRun,
-        [switch] $Force
+        [switch] $Force,
+        [string] $Template,  # override template source for this sync
+        [string] $Repo       # limit --all to a specific repo
     )
 
     $config = Get-WtwConfig
@@ -19,35 +21,95 @@ function Sync-WtwWorkspace {
     $wsDir = $config.workspacesDir.Replace('~', $HOME)
     $wsDir = [System.IO.Path]::GetFullPath($wsDir)
 
-    # Collect workspace files to sync
+    # Resolve template override
+    $templateOverride = $null
+    if ($Template) {
+        $templateOverride = [System.IO.Path]::GetFullPath($Template)
+        if (-not (Test-Path $templateOverride)) {
+            Write-Error "Template not found: $templateOverride"
+            return
+        }
+    }
+
+    # Collect sync targets: { wsFile, repoName, codeFolderPath, color, branch, worktreePath, wsName, templatePath }
     $syncTargets = @()
 
     if ($Target) {
         # Specific file
-        $targetPath = if ([System.IO.Path]::IsPathRooted($Target)) {
-            $Target
-        } else {
-            Join-Path $wsDir $Target
-        }
+        $targetPath = if ([System.IO.Path]::IsPathRooted($Target)) { $Target } else { Join-Path $wsDir $Target }
         if (-not (Test-Path $targetPath)) {
             Write-Error "Workspace file not found: $targetPath"
             return
         }
-        $syncTargets += $targetPath
+        $wsContent = Read-JsoncFile $targetPath
+        if ($wsContent) {
+            $rn = $wsContent.settings.'wtw.repo'
+            $syncTargets += [PSCustomObject]@{
+                wsFile         = $targetPath
+                repoName       = $rn
+                wsName         = $wsContent.settings.'wtw.task' ?? [System.IO.Path]::GetFileNameWithoutExtension($targetPath)
+                codeFolderPath = $wsContent.settings.'wtw.worktreePath' ?? ($wsContent.folders[0].path)
+                color          = $wsContent.settings.'peacock.color'
+                branch         = $wsContent.settings.'wtw.branch'
+                worktreePath   = $wsContent.settings.'wtw.worktreePath'
+                templatePath   = $templateOverride ?? $wsContent.settings.'wtw.templateSource'
+                isManaged      = [bool]$wsContent.settings.'wtw.managed'
+            }
+        }
     } elseif ($All) {
-        # All managed workspaces from registry
+        # All registered repos — main workspace + worktree workspaces
         foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
-            $repo = $registry.repos.$repoName
-            if (-not $repo.worktrees) { continue }
-            foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
-                $wt = $repo.worktrees.$taskName
-                if ($wt.workspace -and (Test-Path $wt.workspace)) {
-                    $syncTargets += $wt.workspace
+            $repoEntry = $registry.repos.$repoName
+            if ($Repo -and -not (Test-WtwAliasMatch $repoEntry $Repo) -and $repoName -ne $Repo) { continue }
+
+            $tpl = $templateOverride ?? $repoEntry.template ?? $repoEntry.templateWorkspace
+            $repoDir = Split-Path $repoEntry.mainPath -Leaf
+
+            # Main workspace
+            if ($repoEntry.templateWorkspace -and (Test-Path $repoEntry.templateWorkspace)) {
+                $colors = Get-WtwColors
+                $mainColor = $colors.assignments."$repoName/main"
+                $syncTargets += [PSCustomObject]@{
+                    wsFile         = $repoEntry.templateWorkspace
+                    repoName       = $repoName
+                    wsName         = $repoDir
+                    codeFolderPath = $repoEntry.mainPath
+                    color          = $mainColor
+                    branch         = $null
+                    worktreePath   = $null
+                    templatePath   = $tpl
+                    isManaged      = $true
+                }
+            }
+
+            # Worktree workspaces
+            if ($repoEntry.worktrees) {
+                foreach ($taskName in $repoEntry.worktrees.PSObject.Properties.Name) {
+                    $wt = $repoEntry.worktrees.$taskName
+                    if ($wt.workspace -and (Test-Path $wt.workspace)) {
+                        $syncTargets += [PSCustomObject]@{
+                            wsFile         = $wt.workspace
+                            repoName       = $repoName
+                            wsName         = "${repoName}_${taskName}"
+                            codeFolderPath = $wt.path
+                            color          = $wt.color
+                            branch         = $wt.branch
+                            worktreePath   = $wt.path
+                            templatePath   = $tpl
+                            isManaged      = $true
+                        }
+                    }
                 }
             }
         }
     } else {
-        Write-Host '  Usage: wtw sync <workspace-file> or wtw sync --all' -ForegroundColor Yellow
+        Write-Host ''
+        Write-Host '  Usage:' -ForegroundColor Yellow
+        Write-Host '    wtw sync --all [--dry-run]              Sync all managed workspaces'
+        Write-Host '    wtw sync --all --repo sn3               Sync one repo only'
+        Write-Host '    wtw sync --all --template <path>        Sync all with a new template'
+        Write-Host '    wtw sync <workspace-file> [--dry-run]   Sync a specific file'
+        Write-Host ''
         return
     }
 
@@ -60,70 +122,41 @@ function Sync-WtwWorkspace {
     Write-Host "  Syncing $($syncTargets.Count) workspace(s)..." -ForegroundColor Cyan
     $synced = 0
 
-    foreach ($wsFile in $syncTargets) {
-        $wsContent = Read-JsoncFile $wsFile
-        if (-not $wsContent) {
-            Write-Host "  SKIP: Cannot read $wsFile" -ForegroundColor Yellow
+    foreach ($item in $syncTargets) {
+        if (-not $item.isManaged -and -not $Force) {
+            Write-Host "  SKIP: $($item.wsFile) (not wtw-managed, use --force)" -ForegroundColor Yellow
             continue
         }
 
-        # Check if managed
-        $isManaged = $wsContent.settings.'wtw.managed'
-        if (-not $isManaged -and -not $Force) {
-            Write-Host "  SKIP: $wsFile (not wtw-managed, use --force to override)" -ForegroundColor Yellow
+        $tpl = $item.templatePath
+        if (-not $tpl -or -not (Test-Path $tpl)) {
+            Write-Host "  SKIP: $(Split-Path $item.wsFile -Leaf) (template not found)" -ForegroundColor Yellow
             continue
         }
 
-        # Read instance-specific values to preserve
-        $repoName = $wsContent.settings.'wtw.repo'
-        $taskName = $wsContent.settings.'wtw.task'
-        $branch = $wsContent.settings.'wtw.branch'
-        $worktreePath = $wsContent.settings.'wtw.worktreePath'
-        $templateSource = $wsContent.settings.'wtw.templateSource'
-        $color = $wsContent.settings.'peacock.color'
-
-        # Resolve template
-        if (-not $templateSource -or -not (Test-Path $templateSource)) {
-            # Try from registry
-            if ($repoName -and $registry.repos.PSObject.Properties.Name -contains $repoName) {
-                $templateSource = $registry.repos.$repoName.templateWorkspace
-            }
-        }
-
-        if (-not $templateSource -or -not (Test-Path $templateSource)) {
-            Write-Host "  SKIP: $wsFile (template not found)" -ForegroundColor Yellow
+        if (-not $item.codeFolderPath) {
+            Write-Host "  SKIP: $(Split-Path $item.wsFile -Leaf) (cannot determine code folder)" -ForegroundColor Yellow
             continue
         }
-
-        # Determine code folder path (preserve from current workspace)
-        $codeFolderPath = if ($worktreePath) { $worktreePath } elseif ($wsContent.folders -and $wsContent.folders.Count -gt 0) { $wsContent.folders[0].path } else { $null }
-
-        if (-not $codeFolderPath) {
-            Write-Host "  SKIP: $wsFile (cannot determine code folder)" -ForegroundColor Yellow
-            continue
-        }
-
-        $wsName = if ($taskName -and $repoName) { "${repoName}_${taskName}" } else { [System.IO.Path]::GetFileNameWithoutExtension($wsFile) }
 
         if ($DryRun) {
-            Write-Host "  WOULD SYNC: $wsFile (template: $(Split-Path $templateSource -Leaf))" -ForegroundColor DarkGray
+            Write-Host "  WOULD SYNC: $(Split-Path $item.wsFile -Leaf) (template: $(Split-Path $tpl -Leaf))" -ForegroundColor DarkGray
             continue
         }
 
-        # Regenerate from template, preserving instance values
         New-WtwWorkspaceFile `
-            -RepoName ($repoName ?? 'unknown') `
-            -Name $wsName `
-            -CodeFolderPath $codeFolderPath `
-            -TemplatePath $templateSource `
-            -OutputPath $wsFile `
-            -Color $color `
-            -Branch $branch `
-            -WorktreePath $worktreePath `
+            -RepoName ($item.repoName ?? 'unknown') `
+            -Name $item.wsName `
+            -CodeFolderPath $item.codeFolderPath `
+            -TemplatePath $tpl `
+            -OutputPath $item.wsFile `
+            -Color $item.color `
+            -Branch $item.branch `
+            -WorktreePath $item.worktreePath `
             -Managed | Out-Null
 
         $synced++
-        Write-Host "  SYNCED: $(Split-Path $wsFile -Leaf)" -ForegroundColor Green
+        Write-Host "  SYNCED: $(Split-Path $item.wsFile -Leaf)" -ForegroundColor Green
     }
 
     Write-Host ''

@@ -4,7 +4,9 @@ function Initialize-WtwConfig {
         [Parameter(Position = 0)]
         [string] $Alias,
 
-        [string] $WorkspacesDir
+        [string] $WorkspacesDir,
+        [string] $Name,
+        [string] $Template  # alias or registry key of repo, or path to .template file
     )
 
     # Detect repo root
@@ -15,12 +17,10 @@ function Initialize-WtwConfig {
     }
 
     $repoDir = Split-Path $repoRoot -Leaf
-    # Strip trailing digits to get base name: snowmain3 -> snowmain
-    $repoBaseName = $repoDir -replace '\d+$', ''
-    if (-not $repoBaseName) { $repoBaseName = $repoDir }
+    $registryKey = if ($Name) { $Name } else { $repoDir }
 
     Write-Host "  Detected repo: $repoDir" -ForegroundColor Cyan
-    Write-Host "  Base name:     $repoBaseName" -ForegroundColor Cyan
+    Write-Host "  Registry key:  $registryKey" -ForegroundColor Cyan
     Write-Host "  Path:          $repoRoot" -ForegroundColor Cyan
 
     # Session script
@@ -33,18 +33,11 @@ function Initialize-WtwConfig {
 
     # Alias
     if (-not $Alias) {
-        # Generate short alias: snowmain -> sn, everix -> evx
-        $defaultAlias = if ($repoBaseName.Length -le 3) {
-            $repoBaseName
-        } else {
-            # Take first 2-3 consonants or just first 2-3 chars
-            $repoBaseName.Substring(0, [Math]::Min(3, $repoBaseName.Length))
-        }
+        $defaultAlias = $repoDir
         $Alias = Read-Host "  Aliases (comma-separated) [$defaultAlias]"
         if (-not $Alias) { $Alias = $defaultAlias }
     }
 
-    # Parse comma-separated aliases into array
     $aliasArray = @($Alias -split '[,\s]+' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 
     # Ensure config exists
@@ -58,62 +51,156 @@ function Initialize-WtwConfig {
         Write-Host "  Created config: $(Join-Path $HOME '.wtw' 'config.json')" -ForegroundColor Green
     }
 
-    # Find template workspace
+    # Alias collision check
+    $registry = Get-WtwRegistry
+    foreach ($existingName in $registry.repos.PSObject.Properties.Name) {
+        if ($existingName -eq $registryKey) { continue }
+        $existingRepo = $registry.repos.$existingName
+        $existingAliases = Get-WtwRepoAliases $existingRepo
+        foreach ($newAlias in $aliasArray) {
+            if ($newAlias -in $existingAliases) {
+                Write-Error "Alias '$newAlias' is already used by repo '$existingName'. Choose different aliases."
+                return
+            }
+        }
+        if ($registryKey -in $existingAliases) {
+            Write-Error "Registry key '$registryKey' collides with an alias of repo '$existingName'."
+            return
+        }
+    }
+
+    # Resolve template source (the .template or .code-workspace file used for generation)
     $wsDir = $config.workspacesDir.Replace('~', $HOME)
     $wsDir = [System.IO.Path]::GetFullPath($wsDir)
-    $templateWs = $null
-    if (Test-Path $wsDir) {
+    $templateSource = $null
+
+    if ($Template) {
+        # From another repo's template
+        foreach ($rn in $registry.repos.PSObject.Properties.Name) {
+            $r = $registry.repos.$rn
+            if ($rn -eq $Template -or (Test-WtwAliasMatch $r $Template)) {
+                $src = $r.template ?? $r.templateWorkspace
+                if ($src -and (Test-Path $src)) {
+                    $templateSource = $src
+                    Write-Host "  Template from repo: $rn" -ForegroundColor Cyan
+                }
+                break
+            }
+        }
+        # Or a direct file path
+        if (-not $templateSource) {
+            $candidatePath = [System.IO.Path]::GetFullPath($Template)
+            if (Test-Path $candidatePath) {
+                $templateSource = $candidatePath
+            } else {
+                Write-Warning "Could not resolve template '$Template'."
+            }
+        }
+    }
+
+    # Fallback: look for existing .code-workspace in workspacesDir
+    if (-not $templateSource -and (Test-Path $wsDir)) {
         $candidates = Get-ChildItem -Path $wsDir -Filter '*.code-workspace' | Where-Object {
-            $_.BaseName -eq $repoDir -or $_.BaseName -eq $repoBaseName
+            $_.BaseName -eq $repoDir
         }
         if ($candidates) {
-            $templateWs = $candidates[0].FullName
-            Write-Host "  Template workspace: $templateWs" -ForegroundColor Cyan
+            $templateSource = $candidates[0].FullName
         }
     }
 
-    if (-not $templateWs) {
-        Write-Host "  No workspace file found for '$repoDir' in $wsDir" -ForegroundColor Yellow
-        Write-Host "  You can set templateWorkspace later in ~/.wtw/registry.json" -ForegroundColor DarkGray
+    if ($templateSource) {
+        Write-Host "  Template source: $templateSource" -ForegroundColor Cyan
+    } else {
+        Write-Host "  No template found — workspace generation skipped." -ForegroundColor Yellow
+        Write-Host "  You can set it later: wtw init --template <path>" -ForegroundColor DarkGray
     }
 
-    # Register in registry
-    $registry = Get-WtwRegistry
-    $worktreeParent = Split-Path $repoRoot -Parent
-
-    $repoEntry = [PSCustomObject]@{
-        mainPath          = $repoRoot
-        worktreeParent    = $worktreeParent
-        sessionScript     = $sessionScript
-        templateWorkspace = $templateWs
-        aliases           = $aliasArray
-        worktrees         = [PSCustomObject]@{}
-    }
-
-    # Preserve existing worktrees if re-initing
-    if ($registry.repos.PSObject.Properties.Name -contains $repoBaseName) {
-        $existing = $registry.repos.$repoBaseName
-        if ($existing.worktrees) {
-            $repoEntry.worktrees = $existing.worktrees
+    # Pick/record main color
+    $mainColor = New-WtwColor -RepoName $registryKey -TaskName 'main'
+    # If existing workspace has a Peacock color, prefer that
+    if ($templateSource -and (Test-Path $templateSource)) {
+        $templateContent = Read-JsoncFile $templateSource
+        if ($templateContent -and $templateContent.settings -and $templateContent.settings.'peacock.color') {
+            $existingColor = $templateContent.settings.'peacock.color'
+            # Only use it if this is the repo's own workspace (not a shared template)
+            if (-not $Template) {
+                $mainColor = $existingColor
+                $colors = Get-WtwColors
+                $colors.assignments | Add-Member -NotePropertyName "$registryKey/main" -NotePropertyValue $mainColor -Force
+                Save-WtwColors $colors
+            }
         }
     }
+    Write-Host "  Color:         $mainColor" -ForegroundColor Cyan
 
-    $registry.repos | Add-Member -NotePropertyName $repoBaseName -NotePropertyValue $repoEntry -Force
-    Save-WtwRegistry $registry
-
-    # Record main color
-    if ($templateWs -and (Test-Path $templateWs)) {
-        $wsContent = Read-JsoncFile $templateWs
-        if ($wsContent.settings.'peacock.color') {
-            $mainColor = $wsContent.settings.'peacock.color'
-            $colors = Get-WtwColors
-            $colors.assignments | Add-Member -NotePropertyName "$repoBaseName/main" -NotePropertyValue $mainColor -Force
-            Save-WtwColors $colors
-            Write-Host "  Recorded main color: $mainColor" -ForegroundColor Cyan
+    # Generate main workspace file from template
+    $mainWorkspaceFile = $null
+    if ($templateSource) {
+        if (-not (Test-Path $wsDir)) {
+            New-Item -Path $wsDir -ItemType Directory -Force | Out-Null
         }
+        $mainWorkspaceFile = Join-Path $wsDir "${repoDir}.code-workspace"
+
+        # Save registry first so New-WtwWorkspaceFile can resolve the repo
+        $worktreeParent = Split-Path $repoRoot -Parent
+        $repoEntry = [PSCustomObject]@{
+            mainPath          = $repoRoot
+            worktreeParent    = $worktreeParent
+            sessionScript     = $sessionScript
+            template          = $templateSource
+            templateWorkspace = $mainWorkspaceFile
+            aliases           = $aliasArray
+            worktrees         = [PSCustomObject]@{}
+        }
+        if ($registry.repos.PSObject.Properties.Name -contains $registryKey) {
+            $existing = $registry.repos.$registryKey
+            if ($existing.worktrees) { $repoEntry.worktrees = $existing.worktrees }
+        }
+        $registry.repos | Add-Member -NotePropertyName $registryKey -NotePropertyValue $repoEntry -Force
+        Save-WtwRegistry $registry
+
+        New-WtwWorkspaceFile `
+            -RepoName $registryKey `
+            -Name $repoDir `
+            -CodeFolderPath $repoRoot `
+            -TemplatePath $templateSource `
+            -OutputPath $mainWorkspaceFile `
+            -Color $mainColor `
+            -Managed | Out-Null
+
+        Write-Host "  Workspace:     $mainWorkspaceFile" -ForegroundColor Green
+    } else {
+        # No template — just register without workspace
+        $worktreeParent = Split-Path $repoRoot -Parent
+        $repoEntry = [PSCustomObject]@{
+            mainPath          = $repoRoot
+            worktreeParent    = $worktreeParent
+            sessionScript     = $sessionScript
+            template          = $null
+            templateWorkspace = $null
+            aliases           = $aliasArray
+            worktrees         = [PSCustomObject]@{}
+        }
+        if ($registry.repos.PSObject.Properties.Name -contains $registryKey) {
+            $existing = $registry.repos.$registryKey
+            if ($existing.worktrees) { $repoEntry.worktrees = $existing.worktrees }
+        }
+        $registry.repos | Add-Member -NotePropertyName $registryKey -NotePropertyValue $repoEntry -Force
+        Save-WtwRegistry $registry
+    }
+
+    # Sync to Superset
+    if (Test-WtwSupersetInstalled) {
+        $defaultBranch = git -C $repoRoot symbolic-ref refs/remotes/origin/HEAD --short 2>$null
+        if (-not $defaultBranch) { $defaultBranch = 'main' }
+        $defaultBranch = $defaultBranch -replace '^origin/', ''
+        Sync-WtwSupersetProject -RepoPath $repoRoot -Name $repoDir -Color $mainColor -DefaultBranch $defaultBranch
     }
 
     Write-Host ''
-    Write-Host "  Registered '$repoBaseName' (aliases: $($aliasArray -join ', '))" -ForegroundColor Green
+    Write-Host "  Registered '$registryKey' (aliases: $($aliasArray -join ', '))" -ForegroundColor Green
+    if ($Template) {
+        Write-Host "  Template shared from: $Template" -ForegroundColor DarkGray
+    }
     Write-Host "  Run 'wtw create <task>' to create your first worktree." -ForegroundColor DarkGray
 }

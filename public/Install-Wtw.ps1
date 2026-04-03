@@ -7,7 +7,20 @@ function Install-Wtw {
     $installDir = Join-Path $HOME '.wtw' 'module'
     $sourceDir = Join-Path $PSScriptRoot '..'  # parent of public/ = module root
     $sourceDir = [System.IO.Path]::GetFullPath($sourceDir)
+    $installDirResolved = [System.IO.Path]::GetFullPath($installDir)
     $profilePath = if ($PROFILE) { $PROFILE } else { Join-Path $HOME '.config' 'powershell' 'Microsoft.PowerShell_profile.ps1' }
+
+    # Prevent self-install (running from the global install itself)
+    if ($sourceDir -eq $installDirResolved) {
+        Write-Host ''
+        Write-Host '  Cannot install from the global copy — it would delete itself.' -ForegroundColor Red
+        Write-Host '  Run from the repo source instead:' -ForegroundColor Yellow
+        Write-Host ''
+        Write-Host '    cd <repo>/devops/worktree-workspace' -ForegroundColor DarkGray
+        Write-Host '    Import-Module ./wtw.psm1 -Force; wtw install' -ForegroundColor DarkGray
+        Write-Host ''
+        return
+    }
 
     Write-Host ''
     Write-Host '  Installing wtw...' -ForegroundColor Cyan

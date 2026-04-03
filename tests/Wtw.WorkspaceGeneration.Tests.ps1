@@ -145,4 +145,80 @@ Describe 'New-WtwWorkspaceFile' {
         $ws = Get-Content $outPath -Raw | ConvertFrom-Json
         $ws.settings.'wtw.managed' | Should -BeNullOrEmpty
     }
+
+    Context 'Template format with {{WTW_*}} placeholders' {
+        BeforeAll {
+            $script:wtwTemplatePath = Join-Path $script:tempDir 'wtw-template.code-workspace.template'
+            @'
+{
+  "folders": [
+    { "name": "{{WTW_WORKSPACE_NAME}}", "path": "{{WTW_CODE_FOLDER}}" },
+    { "path": "/stable/docs" }
+  ],
+  "settings": {
+    "terminal.integrated.cwd": "${workspaceFolder:{{WTW_WORKSPACE_NAME}}}",
+    "some.setting": true
+  }
+}
+'@ | Set-Content $script:wtwTemplatePath
+        }
+
+        It 'replaces {{WTW_WORKSPACE_NAME}} placeholder' {
+            $outPath = Join-Path $script:tempDir 'tpl-name.code-workspace'
+            New-WtwWorkspaceFile `
+                -RepoName 'testRepo' `
+                -Name 'myRepo_feat' `
+                -CodeFolderPath '/worktree/feat' `
+                -TemplatePath $script:wtwTemplatePath `
+                -OutputPath $outPath `
+                -Color '#007ec6'
+
+            $ws = Get-Content $outPath -Raw | ConvertFrom-Json
+            $ws.folders[0].name | Should -Be 'myRepo_feat'
+            $ws.settings.'terminal.integrated.cwd' | Should -Be '${workspaceFolder:myRepo_feat}'
+        }
+
+        It 'replaces {{WTW_CODE_FOLDER}} placeholder' {
+            $outPath = Join-Path $script:tempDir 'tpl-folder.code-workspace'
+            New-WtwWorkspaceFile `
+                -RepoName 'testRepo' `
+                -Name 'myRepo_billing' `
+                -CodeFolderPath '/data/snogit/myRepo_billing' `
+                -TemplatePath $script:wtwTemplatePath `
+                -OutputPath $outPath `
+                -Color '#44cc11'
+
+            $ws = Get-Content $outPath -Raw | ConvertFrom-Json
+            $ws.folders[0].path | Should -Be '/data/snogit/myRepo_billing'
+        }
+
+        It 'preserves stable folders from template' {
+            $outPath = Join-Path $script:tempDir 'tpl-stable.code-workspace'
+            New-WtwWorkspaceFile `
+                -RepoName 'testRepo' `
+                -Name 'myRepo_test' `
+                -CodeFolderPath '/path' `
+                -TemplatePath $script:wtwTemplatePath `
+                -OutputPath $outPath `
+                -Color '#dfb317'
+
+            $ws = Get-Content $outPath -Raw | ConvertFrom-Json
+            $ws.folders.Count | Should -Be 2
+            $ws.folders[1].path | Should -Be '/stable/docs'
+        }
+
+        It 'preserves non-color settings from template' {
+            $outPath = Join-Path $script:tempDir 'tpl-settings.code-workspace'
+            New-WtwWorkspaceFile `
+                -RepoName 'testRepo' `
+                -Name 'myRepo_cfg' `
+                -CodeFolderPath '/path' `
+                -TemplatePath $script:wtwTemplatePath `
+                -OutputPath $outPath `
+                -Color '#e26d8a'
+
+            $ws = Get-Content $outPath -Raw | ConvertFrom-Json
+            $ws.settings.'some.setting' | Should -BeTrue
+        }
+    }
 }

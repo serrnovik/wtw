@@ -27,22 +27,38 @@ function New-WtwWorkspaceFile {
         return $null
     }
 
-    # Read template
-    $template = Read-JsoncFile $TemplatePath
+    $raw = Get-Content -Path $TemplatePath -Raw -ErrorAction Stop
+    $isTemplate = $raw -match '\{\{WTW_'
 
-    # Replace first folder (the code folder)
-    if ($template.folders -and $template.folders.Count -gt 0) {
-        $template.folders[0].path = $CodeFolderPath
-        $template.folders[0].name = $Name
+    if ($isTemplate) {
+        # New-style template with {{WTW_*}} placeholders
+        $json = $raw
+        $json = $json -replace '\{\{WTW_WORKSPACE_NAME\}\}', $Name
+        $json = $json -replace '\{\{WTW_CODE_FOLDER\}\}', ($CodeFolderPath -replace '\\', '\\')
+        $workspace = $json | ConvertFrom-Json
+    } else {
+        # Legacy: real workspace file — regex replace folder[0] and ${workspaceFolder:X}
+        # Strip JSONC artifacts
+        $cleaned = $raw -replace '(?m)^\s*//.*$', ''
+        $cleaned = $cleaned -replace ',\s*([\}\]])', '$1'
+        $template = $cleaned | ConvertFrom-Json
+
+        if ($template.folders -and $template.folders.Count -gt 0) {
+            $template.folders[0].path = $CodeFolderPath
+            $template.folders[0].name = $Name
+        }
+
+        # Replace ${workspaceFolder:X} references
+        $registry = Get-WtwRegistry
+        $repoEntry = $registry.repos.$RepoName
+        $oldFolderName = if ($repoEntry) { Split-Path $repoEntry.mainPath -Leaf } else { $null }
+
+        $json = $template | ConvertTo-Json -Depth 20
+        if ($oldFolderName) {
+            $json = $json -replace [regex]::Escape("`${workspaceFolder:$oldFolderName}"), "`${workspaceFolder:$Name}"
+        }
+        $workspace = $json | ConvertFrom-Json
     }
-
-    # Replace ${workspaceFolder:X} references in settings
-    $repoDir = Split-Path (Get-WtwRegistry).repos.$RepoName.mainPath -Leaf
-    $json = $template | ConvertTo-Json -Depth 20
-    $json = $json -replace [regex]::Escape("`${workspaceFolder:$repoDir}"), "`${workspaceFolder:$Name}"
-
-    # Re-parse
-    $workspace = $json | ConvertFrom-Json
 
     # Inject Peacock color block if color provided
     if ($Color) {

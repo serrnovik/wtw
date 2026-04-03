@@ -19,15 +19,18 @@ function Get-WtwList {
         $aliases = Get-WtwRepoAliases $repoEntry
         if ($Repo -and $Repo -notin $aliases -and $name -ne $Repo) { continue }
 
+        $wsFile = $repoEntry.templateWorkspace
+        $wsDisplay = if ($wsFile -and (Test-Path $wsFile)) { Split-Path $wsFile -Leaf } else { '-' }
+
         # Main entry
         $items += [PSCustomObject]@{
+            Kind      = 'repo'
             Repo      = $name
             Aliases   = ($aliases -join ', ')
-            Task      = '(main)'
             Branch    = (git -C $repoEntry.mainPath branch --show-current 2>$null) ?? '?'
-            Path      = $repoEntry.mainPath
             Color     = (Get-WtwColors).assignments."$name/main" ?? '-'
-            Workspace = $repoEntry.templateWorkspace ?? '-'
+            Path      = $repoEntry.mainPath
+            Workspace = $wsDisplay
         }
 
         # Worktrees
@@ -35,20 +38,24 @@ function Get-WtwList {
             foreach ($taskName in $repoEntry.worktrees.PSObject.Properties.Name) {
                 $wt = $repoEntry.worktrees.$taskName
                 $exists = Test-Path $wt.path
+                $wtWsDisplay = if ($wt.workspace -and (Test-Path $wt.workspace)) { Split-Path $wt.workspace -Leaf } else { '-' }
+                $wtAliases = ($aliases | ForEach-Object { "$_-$taskName" }) -join ', '
+                $pathDisplay = if ($exists) { $wt.path } else { "$($wt.path) (MISSING)" }
+
                 $items += [PSCustomObject]@{
+                    Kind      = '  wt'
                     Repo      = ''
-                    Aliases   = ''
-                    Task      = $taskName
+                    Aliases   = $wtAliases
                     Branch    = $wt.branch
-                    Path      = if ($exists) { $wt.path } else { "$($wt.path) (MISSING)" }
                     Color     = $wt.color ?? '-'
-                    Workspace = if ($wt.workspace -and (Test-Path $wt.workspace)) { Split-Path $wt.workspace -Leaf } else { '-' }
+                    Path      = $pathDisplay
+                    Workspace = $wtWsDisplay
                 }
             }
         }
     }
 
     Write-Host ''
-    Format-WtwTable $items @('Repo', 'Aliases', 'Task', 'Branch', 'Color', 'Workspace')
+    Format-WtwTable $items @('Kind', 'Repo', 'Aliases', 'Branch', 'Color', 'Path', 'Workspace')
     Write-Host ''
 }

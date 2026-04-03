@@ -52,7 +52,12 @@ function New-WtwWorktree {
     # Generate workspace file
     $wsFile = $null
     $config = Get-WtwConfig
-    if ($config -and $repoEntry.templateWorkspace -and (Test-Path $repoEntry.templateWorkspace)) {
+    # Use template source (.template file) if available, fall back to templateWorkspace
+    $templatePath = if ($repoEntry.template -and (Test-Path $repoEntry.template)) { $repoEntry.template }
+                    elseif ($repoEntry.templateWorkspace -and (Test-Path $repoEntry.templateWorkspace)) { $repoEntry.templateWorkspace }
+                    else { $null }
+
+    if ($config -and $templatePath) {
         $wsDir = $config.workspacesDir.Replace('~', $HOME)
         $wsDir = [System.IO.Path]::GetFullPath($wsDir)
         $wsFile = Join-Path $wsDir "${repoName}_${Task}.code-workspace"
@@ -61,7 +66,7 @@ function New-WtwWorktree {
             -RepoName $repoName `
             -Name "${repoName}_${Task}" `
             -CodeFolderPath $worktreePath `
-            -TemplatePath $repoEntry.templateWorkspace `
+            -TemplatePath $templatePath `
             -OutputPath $wsFile `
             -Color $color `
             -Branch $Branch `
@@ -84,6 +89,11 @@ function New-WtwWorktree {
     }
     $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
+
+    # Sync to Superset
+    if (Test-WtwSupersetInstalled) {
+        Sync-WtwSupersetProject -RepoPath $worktreePath -Name "${repoName}_${Task}" -Color $color
+    }
 
     if ($Open) {
         Open-WtwWorkspace -Name $Task -Repo $repoName

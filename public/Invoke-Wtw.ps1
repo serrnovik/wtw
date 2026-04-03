@@ -50,7 +50,8 @@ function Invoke-Wtw {
         Write-Host '  wtw - Git Worktree + Workspace Manager' -ForegroundColor Cyan
         Write-Host ''
         Write-Host '  Commands:' -ForegroundColor Yellow
-        Write-Host '    init              Register current repo in wtw'
+        Write-Host '    init [aliases]    Register current repo (--template <alias> to share settings)'
+        Write-Host '    add [path]        Add existing repo/worktree to registry'
         Write-Host '    create <task>     Create worktree + workspace'
         Write-Host '    list              List registered worktrees'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
@@ -80,6 +81,7 @@ function Invoke-Wtw {
     # We handle this by manually adding positional params
     switch ($Command) {
         'init'    { if ($pos.Count -gt 0) { $splat['Alias'] = $pos[0] }; Initialize-WtwConfig @splat }
+        'add'     { if ($pos.Count -gt 0) { $splat['Path'] = $pos[0] }; Add-WtwEntry @splat }
         'create'  { if ($pos.Count -gt 0) { $splat['Task'] = $pos[0] }; New-WtwWorktree @splat }
         'list'    { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
         'ls'      { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
