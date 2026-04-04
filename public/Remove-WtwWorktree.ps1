@@ -82,10 +82,10 @@ function Remove-WtwWorktree {
         Save-WtwColors $colors
     }
 
-    # Remove from Superset
-    if (Test-WtwSupersetInstalled -and $wt.path) {
-        Remove-WtwSupersetProject -RepoPath $wt.path
-    }
+    # Superset integration disabled — Superset manages its own worktrees via subtrees
+    # if (Test-WtwSupersetInstalled -and $wt.path) {
+    #     Remove-WtwSupersetProject -RepoPath $wt.path
+    # }
 
     Write-Host ''
     Write-Host "  Removed '$Task' from $repoName." -ForegroundColor Green

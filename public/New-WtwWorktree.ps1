@@ -90,10 +90,10 @@ function New-WtwWorktree {
     $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
 
-    # Sync to Superset
-    if (Test-WtwSupersetInstalled) {
-        Sync-WtwSupersetProject -RepoPath $worktreePath -Name "${repoName}_${Task}" -Color $color
-    }
+    # Superset integration disabled — Superset manages its own worktrees via subtrees
+    # if (Test-WtwSupersetInstalled) {
+    #     Sync-WtwSupersetProject -RepoPath $worktreePath -Name "${repoName}_${Task}" -Color $color
+    # }
 
     if ($Open) {
         Open-WtwWorkspace -Name $Task -Repo $repoName
