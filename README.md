@@ -103,18 +103,20 @@ After importing, the worktree appears in `wtw list` and you can use `wtw go my-f
 
 ## Name Resolution
 
-Name resolution applies to `go`, `open`, editor shortcuts, and the implicit go:
+All commands that accept a target name (`go`, `open`, `remove`, editor shortcuts, and the implicit go) share the same resolution logic via `Resolve-WtwTarget`:
 
-- `sn3` — repo alias, goes to main repo
-- `sn3-auth` — alias-task, goes to worktree
-- `auth` — task name (works if unambiguous across repos)
-- Multiple aliases per repo: `wtw init "sn3, snowmain3"` registers both
+1. **Exact repo alias** — `sn3` goes to main repo
+2. **alias-task format** — `sn3-auth` resolves to repo `sn3` + worktree `auth`
+3. **Bare task name** — `auth` searches all repos (works if unambiguous)
+
+Multiple aliases per repo: `wtw init "sn3, snowmain3"` registers both.
 
 After `wtw create auth`, all these work:
 ```powershell
 wtw auth              # implicit go (task name)
 wtw sn3-auth          # alias-task format
 wtw go auth           # explicit go
+wtw remove sn3-auth   # remove using alias-task format
 wtw cursor sn3-auth   # open in Cursor
 sn3-auth              # shell alias (after terminal restart)
 ```
@@ -276,3 +278,16 @@ Worktrees share hooks with the main repo (`.git` is a file in worktrees, not a d
 ## Cross-Platform
 
 Works on macOS, Windows, and Linux with PowerShell 7+. Uses `Join-Path` everywhere, `du -sk` for fast size scanning on Unix (falls back to `Get-ChildItem` on Windows).
+
+## Changelog
+
+### Unified Name Resolution (2026-04-04)
+
+Extracted the 3-step name resolution logic (exact alias, alias-task format, bare task name) into a shared `Resolve-WtwTarget` helper in `private/`. Previously this logic was duplicated across `Enter-WtwWorktree`, `Open-WtwWorkspace`, and `Remove-WtwWorktree` — with `Remove-WtwWorktree` missing the alias-task parsing entirely, causing `wtw remove sn3-play2` to fail with "not found" even though `wtw list` showed it.
+
+**Changed files:**
+- `private/Resolve-WtwTarget.ps1` — new shared resolution helper
+- `public/Enter-WtwWorktree.ps1` — refactored to use `Resolve-WtwTarget`
+- `public/Open-WtwWorkspace.ps1` — refactored to use `Resolve-WtwTarget`
+- `public/Remove-WtwWorktree.ps1` — refactored to use `Resolve-WtwTarget`, param renamed `$Task` → `$Name`
+- `public/Invoke-Wtw.ps1` — `remove`/`rm` dispatch now passes `Name` instead of `Task`

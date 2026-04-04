@@ -2,21 +2,25 @@ function Remove-WtwWorktree {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
-        [string] $Task,
+        [string] $Name,
 
         [string] $Repo,
         [switch] $Force
     )
 
-    $repoName, $repoEntry = Resolve-WtwRepo -RepoAlias $Repo
-    if (-not $repoName) { return }
+    # Use unified resolution: supports aliases, "alias-task" format, and bare task names
+    $target = Resolve-WtwTarget $Name
+    if (-not $target) { return }
 
-    if ($repoEntry.worktrees.PSObject.Properties.Name -notcontains $Task) {
-        Write-Error "Worktree '$Task' not found for $repoName."
+    if (-not $target.TaskName) {
+        Write-Error "'$Name' resolves to main repo '$($target.RepoName)', not a worktree. Specify a worktree name."
         return
     }
 
-    $wt = $repoEntry.worktrees.$Task
+    $repoName  = $target.RepoName
+    $repoEntry = $target.RepoEntry
+    $Task      = $target.TaskName
+    $wt        = $target.WorktreeEntry
 
     Write-Host ''
     Write-Host "  Removing worktree: $Task" -ForegroundColor Yellow
