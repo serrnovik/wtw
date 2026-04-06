@@ -39,7 +39,11 @@ Describe 'New-WtwWorkspaceFile' {
                 }
             }
         }
-        $fakeRegistry | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $HOME '.wtw' 'registry.json')
+        $wtwDir = Join-Path $HOME '.wtw'
+        if (-not (Test-Path $wtwDir)) {
+            New-Item -Path $wtwDir -ItemType Directory -Force | Out-Null
+        }
+        $fakeRegistry | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $wtwDir 'registry.json')
     }
 
     AfterAll {
