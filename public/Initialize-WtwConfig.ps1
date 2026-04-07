@@ -189,13 +189,13 @@ function Initialize-WtwConfig {
         Save-WtwRegistry $registry
     }
 
-    # Sync to Superset
-    if (Test-WtwSupersetInstalled) {
-        $defaultBranch = git -C $repoRoot symbolic-ref refs/remotes/origin/HEAD --short 2>$null
-        if (-not $defaultBranch) { $defaultBranch = 'main' }
-        $defaultBranch = $defaultBranch -replace '^origin/', ''
-        Sync-WtwSupersetProject -RepoPath $repoRoot -Name $repoDir -Color $mainColor -DefaultBranch $defaultBranch
-    }
+    # Superset integration disabled — Superset manages its own worktrees via subtrees
+    # if (Test-WtwSupersetInstalled) {
+    #     $defaultBranch = git -C $repoRoot symbolic-ref refs/remotes/origin/HEAD --short 2>$null
+    #     if (-not $defaultBranch) { $defaultBranch = 'main' }
+    #     $defaultBranch = $defaultBranch -replace '^origin/', ''
+    #     Sync-WtwSupersetProject -RepoPath $repoRoot -Name $repoDir -Color $mainColor -DefaultBranch $defaultBranch
+    # }
 
     Write-Host ''
     Write-Host "  Registered '$registryKey' (aliases: $($aliasArray -join ', '))" -ForegroundColor Green
