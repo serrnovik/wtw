@@ -81,7 +81,7 @@ function Set-WtwColor {
 
         if ($wsFile -and (Test-Path $wsFile)) {
             Write-Host "  Syncing workspace..." -ForegroundColor DarkGray
-            Sync-WtwWorkspace -Target $wsFile
+            Sync-WtwWorkspace -Target $wsFile -ColorSource Json
         } else {
             Write-Host "  No workspace file to sync." -ForegroundColor DarkGray
         }
