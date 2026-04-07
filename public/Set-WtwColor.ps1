@@ -7,6 +7,7 @@ function Set-WtwColor {
         [Parameter(Position = 1)]
         [string] $Color,
 
+        [Alias('ns')]
         [switch] $NoSync
     )
 
@@ -195,12 +196,12 @@ function Convert-HslToHex {
     $m = $L - $c / 2
 
     $r1 = 0; $g1 = 0; $b1 = 0
-    if     ($H -lt  60) { $r1 = $c; $g1 = $x; $b1 = 0  }
-    elseif ($H -lt 120) { $r1 = $x; $g1 = $c; $b1 = 0  }
-    elseif ($H -lt 180) { $r1 = 0;  $g1 = $c; $b1 = $x }
-    elseif ($H -lt 240) { $r1 = 0;  $g1 = $x; $b1 = $c }
-    elseif ($H -lt 300) { $r1 = $x; $g1 = 0;  $b1 = $c }
-    else                { $r1 = $c; $g1 = 0;  $b1 = $x }
+    if ($H -lt 60) { $r1 = $c; $g1 = $x; $b1 = 0 }
+    elseif ($H -lt 120) { $r1 = $x; $g1 = $c; $b1 = 0 }
+    elseif ($H -lt 180) { $r1 = 0; $g1 = $c; $b1 = $x }
+    elseif ($H -lt 240) { $r1 = 0; $g1 = $x; $b1 = $c }
+    elseif ($H -lt 300) { $r1 = $x; $g1 = 0; $b1 = $c }
+    else { $r1 = $c; $g1 = 0; $b1 = $x }
 
     $r = [int](($r1 + $m) * 255)
     $g = [int](($g1 + $m) * 255)
