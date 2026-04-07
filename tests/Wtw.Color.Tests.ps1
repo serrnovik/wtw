@@ -19,6 +19,11 @@ Describe 'ConvertTo-PeacockColorBlock' {
         $result['titleBar.activeBackground'] | Should -Be '#2285a6'
     }
 
+    It 'uses the base color for tab.activeBackground' {
+        $result = ConvertTo-PeacockColorBlock '#689b59'
+        $result['tab.activeBackground'] | Should -Be '#689b59'
+    }
+
     It 'uses the base color for statusBarItem.remoteBackground' {
         $result = ConvertTo-PeacockColorBlock '#007ec6'
         $result['statusBarItem.remoteBackground'] | Should -Be '#007ec6'

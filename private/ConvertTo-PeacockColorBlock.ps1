@@ -70,9 +70,9 @@ function ConvertTo-PeacockColorBlock {
     $complementHue = Lighten-HexColor (Darken-HexColor $base -Factor 0.3) -Factor 0.1
 
     return [ordered]@{
-        'tab.activeBackground'            = '#0059b3'
-        'tab.activeForeground'            = '#ffffff'
-        'tab.activeBorderTop'             = '#B5EAD7'
+        'tab.activeBackground'            = $base
+        'tab.activeForeground'            = $fg
+        'tab.activeBorderTop'             = $lighter
         'activityBar.activeBackground'    = $lighter
         'activityBar.inactiveForeground'  = "${fg}99"
         'activityBarBadge.background'     = $complementHue

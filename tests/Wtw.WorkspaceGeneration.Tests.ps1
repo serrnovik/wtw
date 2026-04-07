@@ -114,6 +114,7 @@ Describe 'New-WtwWorkspaceFile' {
         $ws = Get-Content $outPath -Raw | ConvertFrom-Json
         $ws.settings.'peacock.color' | Should -Be '#b300b3'
         $ws.settings.'workbench.colorCustomizations'.'titleBar.activeBackground' | Should -Be '#b300b3'
+        $ws.settings.'workbench.colorCustomizations'.'tab.activeBackground' | Should -Be '#b300b3'
     }
 
     It 'adds wtw metadata when -Managed' {

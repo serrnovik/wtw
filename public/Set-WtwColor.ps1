@@ -34,11 +34,12 @@ function Set-WtwColor {
         }
         if ($current) {
             Write-Host ''
-            Write-Host "  $colorKey = " -NoNewline
-            Write-Host "$current" -ForegroundColor Cyan
+            Write-WtwColorSwatch "  $colorKey" $current
+            Write-Host "  Tip: in PowerShell, '#rrggbb' must be quoted. Use 689b59 or '#689b59'." -ForegroundColor DarkGray
             Write-Host ''
         } else {
             Write-Host "  No color assigned for $colorKey" -ForegroundColor DarkGray
+            Write-Host "  Tip: in PowerShell, '#rrggbb' must be quoted. Use 689b59 or '#689b59'." -ForegroundColor DarkGray
         }
         return
     }
@@ -67,8 +68,7 @@ function Set-WtwColor {
     }
 
     Write-Host ''
-    Write-Host "  $colorKey = " -NoNewline
-    Write-Host "$newColor" -ForegroundColor Cyan
+    Write-WtwColorSwatch "  $colorKey" $newColor
 
     # Sync workspace unless --no-sync
     if (-not $NoSync) {
@@ -207,4 +207,21 @@ function Convert-HslToHex {
     $b = [int](($b1 + $m) * 255)
 
     return "#$(ConvertTo-HexComponent $r)$(ConvertTo-HexComponent $g)$(ConvertTo-HexComponent $b)"
+}
+
+function Write-WtwColorSwatch {
+    <#
+    .SYNOPSIS
+        Print a label, hex value, and a colored block swatch using ANSI true-color.
+    #>
+    param(
+        [string] $Label,
+        [string] $Hex
+    )
+    $h = $Hex.TrimStart('#')
+    $r = [convert]::ToInt32($h.Substring(0, 2), 16)
+    $g = [convert]::ToInt32($h.Substring(2, 2), 16)
+    $b = [convert]::ToInt32($h.Substring(4, 2), 16)
+    $swatch = "`e[48;2;${r};${g};${b}m    `e[0m"   # 4-char block with background color
+    Write-Host "${Label} = ${Hex} ${swatch}"
 }

@@ -62,7 +62,7 @@ function Invoke-Wtw {
         Write-Host '    remove <task>     Remove worktree + workspace'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'
-        Write-Host '    color [name] [#hex|random]  Set workspace color (--no-sync to skip sync)'
+        Write-Host '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
         Write-Host '    sync [file|--all] Re-apply template to managed workspaces'
         Write-Host '    clean             Clean stale AI worktrees'
         Write-Host '    install           Install/update wtw globally (~/.wtw/module/)'
