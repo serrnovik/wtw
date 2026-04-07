@@ -1,3 +1,86 @@
+function Resolve-WtwSyncTargetFromFile {
+    <#
+    .SYNOPSIS
+        Build a sync target object from a workspace file path, resolving color source.
+    #>
+    param(
+        [string] $TargetPath,
+        [string] $ColorSource,
+        [string] $TemplateOverride
+    )
+
+    $wsContent = Read-JsoncFile $TargetPath
+    if (-not $wsContent) { return $null }
+
+    $rn = $wsContent.settings.'wtw.repo'
+    $tn = $wsContent.settings.'wtw.task'
+
+    $colors = Get-WtwColors
+    $taskKey = if ($tn -and $rn) {
+        $reg = Get-WtwRegistry
+        $repoEntry = if ($rn -and $reg.repos.PSObject.Properties.Name -contains $rn) { $reg.repos.$rn } else { $null }
+        if ($repoEntry -and $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $tn) { "$rn/$tn" } else { "$rn/main" }
+    } else { $null }
+    $authColor = if ($taskKey -and $colors.assignments.PSObject.Properties.Name -contains $taskKey) { $colors.assignments.$taskKey } else { $null }
+    $workspacePeacockColor = $wsContent.settings.'peacock.color'
+
+    # Determine color source preference
+    $canPrompt = [Environment]::UserInteractive
+    try { $canPrompt = $canPrompt -and [bool]$Host.UI.RawUI } catch { $canPrompt = $false }
+
+    $preferWorkspace = $false
+    if ($ColorSource -eq 'Workspace') {
+        $preferWorkspace = $true
+    } elseif ($ColorSource -eq 'Json') {
+        $preferWorkspace = $false
+    } elseif ($canPrompt) {
+        Write-Host ''
+        Write-Host '  Which color should drive this sync?' -ForegroundColor Cyan
+        Write-Host '    [J] colors.json assignment (default)' -ForegroundColor Gray
+        Write-Host '    [W] peacock.color in the workspace file' -ForegroundColor Gray
+        $reply = Read-Host '  Press J or W (Enter = J)'
+        $preferWorkspace = (($reply ?? '').Trim()) -match '^[Ww]'
+    }
+
+    $resolvedColor = if ($preferWorkspace) { $workspacePeacockColor ?? $authColor } else { $authColor ?? $workspacePeacockColor }
+
+    return [PSCustomObject]@{
+        wsFile         = $TargetPath
+        repoName       = $rn
+        wsName         = $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
+        codeFolderPath = $wsContent.settings.'wtw.worktreePath' ?? ($wsContent.folders[0].path)
+        color          = $resolvedColor
+        branch         = $wsContent.settings.'wtw.branch'
+        worktreePath   = $wsContent.settings.'wtw.worktreePath'
+        templatePath   = $(if ($TemplateOverride) { $TemplateOverride } else { $wsContent.settings.'wtw.templateSource' })
+        isManaged      = [bool]$wsContent.settings.'wtw.managed'
+    }
+}
+
+function Resolve-WtwWorkspaceFile {
+    <#
+    .SYNOPSIS
+        Resolve a name/alias/path to a workspace file path.
+    #>
+    param(
+        [string] $Target,
+        [string] $WsDir
+    )
+
+    # Try as a file path first
+    $path = if ([System.IO.Path]::IsPathRooted($Target)) { $Target } else { Join-Path $WsDir $Target }
+    if (Test-Path $path) { return $path }
+
+    # Resolve as repo/worktree name
+    $resolved = Resolve-WtwTarget $Target
+    if (-not $resolved) { return $null }
+    $wsFile = if ($resolved.WorktreeEntry) { $resolved.WorktreeEntry.workspace } else { $resolved.RepoEntry.templateWorkspace }
+    if ($wsFile -and (Test-Path $wsFile)) { return $wsFile }
+
+    Write-Error "No workspace file found for '$Target'."
+    return $null
+}
+
 function Sync-WtwWorkspace {
     [CmdletBinding()]
     param(
@@ -8,7 +91,11 @@ function Sync-WtwWorkspace {
         [switch] $DryRun,
         [switch] $Force,
         [string] $Template,  # override template source for this sync
-        [string] $Repo       # limit --all to a specific repo
+        [string] $Repo,      # limit --all to a specific repo
+
+        # Single-file sync only: prefer colors.json (default) vs workspace peacock.color. Omit to prompt when interactive.
+        [ValidateSet('Json', 'Workspace', IgnoreCase = $true)]
+        [string] $ColorSource
     )
 
     $config = Get-WtwConfig
@@ -31,31 +118,15 @@ function Sync-WtwWorkspace {
         }
     }
 
-    # Collect sync targets: { wsFile, repoName, codeFolderPath, color, branch, worktreePath, wsName, templatePath }
+    # Collect sync targets
     $syncTargets = @()
 
     if ($Target) {
-        # Specific file
-        $targetPath = if ([System.IO.Path]::IsPathRooted($Target)) { $Target } else { Join-Path $wsDir $Target }
-        if (-not (Test-Path $targetPath)) {
-            Write-Error "Workspace file not found: $targetPath"
-            return
-        }
-        $wsContent = Read-JsoncFile $targetPath
-        if ($wsContent) {
-            $rn = $wsContent.settings.'wtw.repo'
-            $syncTargets += [PSCustomObject]@{
-                wsFile         = $targetPath
-                repoName       = $rn
-                wsName         = $wsContent.settings.'wtw.task' ?? [System.IO.Path]::GetFileNameWithoutExtension($targetPath)
-                codeFolderPath = $wsContent.settings.'wtw.worktreePath' ?? ($wsContent.folders[0].path)
-                color          = $wsContent.settings.'peacock.color'
-                branch         = $wsContent.settings.'wtw.branch'
-                worktreePath   = $wsContent.settings.'wtw.worktreePath'
-                templatePath   = $templateOverride ?? $wsContent.settings.'wtw.templateSource'
-                isManaged      = [bool]$wsContent.settings.'wtw.managed'
-            }
-        }
+        $targetPath = Resolve-WtwWorkspaceFile $Target $wsDir
+        if (-not $targetPath) { return }
+        $item = Resolve-WtwSyncTargetFromFile $targetPath $ColorSource $templateOverride
+        if ($item) { $syncTargets += $item }
+
     } elseif ($All) {
         # All registered repos — main workspace + worktree workspaces
         foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
@@ -103,14 +174,25 @@ function Sync-WtwWorkspace {
             }
         }
     } else {
-        Write-Host ''
-        Write-Host '  Usage:' -ForegroundColor Yellow
-        Write-Host '    wtw sync --all [--dry-run]              Sync all managed workspaces'
-        Write-Host '    wtw sync --all --repo sn3               Sync one repo only'
-        Write-Host '    wtw sync --all --template <path>        Sync all with a new template'
-        Write-Host '    wtw sync <workspace-file> [--dry-run]   Sync a specific file'
-        Write-Host ''
-        return
+        # No target, no --all: detect from cwd
+        $detected = Resolve-WtwCurrentTarget
+        if (-not $detected) {
+            Write-Host ''
+            Write-Host '  Usage:' -ForegroundColor Yellow
+            Write-Host '    wtw sync [name] [--dry-run]               Sync current or named workspace'
+            Write-Host '    wtw sync --all [--dry-run]                Sync all managed workspaces'
+            Write-Host '    wtw sync --all --repo sn3                 Sync one repo only'
+            Write-Host '    wtw sync --all --template <path>          Sync all with a new template'
+            Write-Host '    wtw sync <name> --color-source json       Skip prompt; use colors.json first'
+            Write-Host '    wtw sync <name> --color-source workspace  Skip prompt; use workspace peacock first'
+            Write-Host ''
+            return
+        }
+        Write-Host "  Detected: $detected" -ForegroundColor DarkGray
+        $targetPath = Resolve-WtwWorkspaceFile $detected $wsDir
+        if (-not $targetPath) { return }
+        $item = Resolve-WtwSyncTargetFromFile $targetPath $ColorSource $templateOverride
+        if ($item) { $syncTargets += $item }
     }
 
     if ($syncTargets.Count -eq 0) {

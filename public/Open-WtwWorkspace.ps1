@@ -30,16 +30,19 @@ function Open-WtwWorkspace {
         $wsFile = $target.RepoEntry.templateWorkspace
     }
 
-    if (-not $wsFile) {
-        Write-Error "No workspace found for '$Name'. Run 'wtw list' to see available targets."
+    # Workspace file found — open it
+    if ($wsFile -and (Test-Path $wsFile)) {
+        Write-Host "  Opening in ${editorCmd}: $wsFile" -ForegroundColor Green
+        & $editorCmd $wsFile
         return
     }
 
-    if (-not (Test-Path $wsFile)) {
-        Write-Error "Workspace file missing: $wsFile"
-        return
+    # No workspace file — fall back to opening the directory
+    $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+    if ($dir -and (Test-Path $dir)) {
+        Write-Host "  Opening in ${editorCmd}: $dir" -ForegroundColor Green
+        & $editorCmd $dir
+    } else {
+        Write-Error "No workspace or directory found for '$Name'."
     }
-
-    Write-Host "  Opening in ${editorCmd}: $wsFile" -ForegroundColor Green
-    & $editorCmd $wsFile
 }

@@ -62,6 +62,7 @@ function Invoke-Wtw {
         Write-Host '    remove <task>     Remove worktree + workspace'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'
+        Write-Host '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
         Write-Host '    sync [file|--all] Re-apply template to managed workspaces'
         Write-Host '    clean             Clean stale AI worktrees'
         Write-Host '    install           Install/update wtw globally (~/.wtw/module/)'
@@ -75,6 +76,12 @@ function Invoke-Wtw {
     $parsed = Convert-WtwArgsToSplat $rawArgs
     $splat = $parsed.Splat
     $pos = $parsed.Positional
+
+    # --help / -h / help on any subcommand → show command-specific help
+    if ($splat.Contains('Help') -or $splat.Contains('h') -or $pos -contains 'help') {
+        Show-WtwCommandHelp $Command
+        return
+    }
 
     # Merge positional args into splat at position keys for commands that take them
     # Most commands take a single positional arg (task/name)
@@ -93,6 +100,7 @@ function Invoke-Wtw {
         'ws'        { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
         'copy'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Copy-WtwWorkspace @splat }
         'sync'      { if ($pos.Count -gt 0) { $splat['Target'] = $pos[0] }; Sync-WtwWorkspace @splat }
+        'color'     { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; if ($pos.Count -gt 1) { $splat['Color'] = $pos[1] }; Set-WtwColor @splat }
         'clean'     { Invoke-WtwClean @splat }
         'install'   { Install-Wtw @splat }
         'update'    { Install-Wtw @splat }
