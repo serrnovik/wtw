@@ -122,7 +122,7 @@ function Find-WtwContrastColor {
     if ($excludedColor) { $repulsionSet += $excludedColor }
     # Use a loop instead of pipeline to avoid array unrolling
     $assignedRgb = @()
-    foreach ($hex in $repulsionSet) { $assignedRgb += , (Convert-HexToRgb $hex) }
+    foreach ($hex in $repulsionSet) { $assignedRgb += , (ConvertTo-WtwRgbArray $hex) }
 
     # Candidates: full palette + generated hue samples for broader coverage
     $candidates = @()
@@ -145,7 +145,7 @@ function Find-WtwContrastColor {
     $bestScore = -1
 
     foreach ($c in $candidates) {
-        $rgb = Convert-HexToRgb $c
+        $rgb = ConvertTo-WtwRgbArray $c
         $minDist = [double]::MaxValue
         foreach ($a in $assignedRgb) {
             $d = Get-PerceptualDistance $rgb $a
@@ -160,7 +160,7 @@ function Find-WtwContrastColor {
     return $best
 }
 
-function Convert-HexToRgb {
+function ConvertTo-WtwRgbArray {
     param([string] $Hex)
     $Hex = $Hex.TrimStart('#')
     return @(
