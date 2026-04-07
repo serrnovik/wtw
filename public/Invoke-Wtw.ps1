@@ -76,6 +76,12 @@ function Invoke-Wtw {
     $splat = $parsed.Splat
     $pos = $parsed.Positional
 
+    # --help / -h / help on any subcommand → show main help
+    if ($splat.ContainsKey('Help') -or $splat.ContainsKey('h') -or $pos -contains 'help') {
+        Invoke-Wtw
+        return
+    }
+
     # Merge positional args into splat at position keys for commands that take them
     # Most commands take a single positional arg (task/name)
     # We handle this by manually adding positional params
