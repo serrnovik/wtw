@@ -44,12 +44,24 @@ function Sync-WtwWorkspace {
         $wsContent = Read-JsoncFile $targetPath
         if ($wsContent) {
             $rn = $wsContent.settings.'wtw.repo'
+            $tn = $wsContent.settings.'wtw.task'
+
+            # Prefer colors.json (authoritative) over workspace file (may be stale)
+            $colors = Get-WtwColors
+            $taskKey = if ($tn -and $rn) {
+                # Check if this is a worktree task or main
+                $reg = Get-WtwRegistry
+                $repoEntry = if ($rn -and $reg.repos.PSObject.Properties.Name -contains $rn) { $reg.repos.$rn } else { $null }
+                if ($repoEntry -and $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $tn) { "$rn/$tn" } else { "$rn/main" }
+            } else { $null }
+            $authColor = if ($taskKey -and $colors.assignments.PSObject.Properties.Name -contains $taskKey) { $colors.assignments.$taskKey } else { $null }
+
             $syncTargets += [PSCustomObject]@{
                 wsFile         = $targetPath
                 repoName       = $rn
-                wsName         = $wsContent.settings.'wtw.task' ?? [System.IO.Path]::GetFileNameWithoutExtension($targetPath)
+                wsName         = $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($targetPath)
                 codeFolderPath = $wsContent.settings.'wtw.worktreePath' ?? ($wsContent.folders[0].path)
-                color          = $wsContent.settings.'peacock.color'
+                color          = $authColor ?? $wsContent.settings.'peacock.color'
                 branch         = $wsContent.settings.'wtw.branch'
                 worktreePath   = $wsContent.settings.'wtw.worktreePath'
                 templatePath   = $templateOverride ?? $wsContent.settings.'wtw.templateSource'

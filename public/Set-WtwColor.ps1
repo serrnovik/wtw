@@ -45,7 +45,7 @@ function Set-WtwColor {
 
     # Resolve color
     if ($Color -eq 'random') {
-        $newColor = Find-WtwContrastColor $colors
+        $newColor = Find-WtwContrastColor $colors -ExcludeKey $colorKey
         Write-Host "  Picked: $newColor" -ForegroundColor DarkGray
     } elseif ($Color -match '^#?[0-9a-fA-F]{6}$') {
         $newColor = if ($Color.StartsWith('#')) { $Color } else { "#$Color" }
@@ -94,19 +94,34 @@ function Find-WtwContrastColor {
     .SYNOPSIS
         Pick a color maximally distant from all currently assigned colors.
     #>
-    param([PSObject] $Colors)
+    param(
+        [PSObject] $Colors,
+        [string] $ExcludeKey  # Don't count this key's current color as "in use"
+    )
 
+    # Collect assigned colors, remembering the excluded key's current color
     $assigned = @()
+    $excludedColor = $null
     foreach ($prop in $Colors.assignments.PSObject.Properties) {
+        if ($ExcludeKey -and $prop.Name -eq $ExcludeKey) {
+            $excludedColor = $prop.Value
+            continue
+        }
         $assigned += $prop.Value
     }
 
-    if ($assigned.Count -eq 0) {
-        # Nothing assigned yet — pick first from palette
+    if ($assigned.Count -eq 0 -and -not $excludedColor) {
+        # Nothing assigned at all — pick first from palette
         return @($Colors.palette)[0]
     }
 
-    $assignedRgb = $assigned | ForEach-Object { Convert-HexToRgb $_ }
+    # Use assigned colors + excluded color as repulsion points
+    # (excluded color: we want distance from it so "random" gives something visibly different)
+    $repulsionSet = @($assigned)
+    if ($excludedColor) { $repulsionSet += $excludedColor }
+    # Use a loop instead of pipeline to avoid array unrolling
+    $assignedRgb = @()
+    foreach ($hex in $repulsionSet) { $assignedRgb += , (Convert-HexToRgb $hex) }
 
     # Candidates: full palette + generated hue samples for broader coverage
     $candidates = @()
@@ -116,6 +131,12 @@ function Find-WtwContrastColor {
     for ($h = 0; $h -lt 360; $h += 5) {
         $candidates += Convert-HslToHex $h 0.75 0.45
         $candidates += Convert-HslToHex $h 0.90 0.55
+    }
+
+    # Remove the excluded key's current color from candidates so "random" always gives a new color
+    if ($excludedColor) {
+        $excludedLower = $excludedColor.ToLower()
+        $candidates = $candidates | Where-Object { $_.ToLower() -ne $excludedLower }
     }
 
     # Score each candidate: minimum perceptual distance to any assigned color
