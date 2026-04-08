@@ -128,27 +128,14 @@ function Resolve-WtwTarget {
 
     # 6. Fuzzy match — find closest target by edit distance
     $allTargets = Get-WtwAllTargetNames $registry
-    $maxDist = [Math]::Max(2, [Math]::Floor($Name.Length / 3))
-    $fuzzyMatches = @()
-    foreach ($candidate in $allTargets) {
-        $dist = Get-WtwEditDistance $Name $candidate
-        if ($dist -le $maxDist) {
-            $fuzzyMatches += [PSCustomObject]@{ Target = $candidate; Dist = $dist }
-        }
+    $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
+    if ($fuzzy.Match) {
+        return (Resolve-WtwTarget $fuzzy.Match)
     }
-    $fuzzyMatches = $fuzzyMatches | Sort-Object Dist
-
-    if ($fuzzyMatches.Count -gt 0) {
-        $best = $fuzzyMatches[0]
-        $tied = @($fuzzyMatches | Where-Object { $_.Dist -eq $best.Dist })
-        if ($tied.Count -eq 1) {
-            Write-Host "  Fuzzy match: '$Name' → '$($best.Target)'" -ForegroundColor Yellow
-            return (Resolve-WtwTarget $best.Target)
-        } else {
-            $suggestions = ($tied | ForEach-Object { $_.Target }) -join ', '
-            Write-Error "Could not resolve '$Name'. Did you mean: ${suggestions}?"
-            return $null
-        }
+    if ($fuzzy.Suggestions.Count -gt 0) {
+        $suggestions = $fuzzy.Suggestions -join ', '
+        Write-Error "Could not resolve '$Name'. Did you mean: ${suggestions}?"
+        return $null
     }
 
     Write-Error "Could not resolve '$Name'. Run 'wtw list' to see available targets."

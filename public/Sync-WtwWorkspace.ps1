@@ -15,11 +15,17 @@ function Resolve-WtwSyncTargetFromFile {
     $rn = $wsContent.settings.'wtw.repo'
     $tn = $wsContent.settings.'wtw.task'
 
+    # wtw.task may be stored as "repo_task" (workspace name) — strip repo prefix to get registry key
+    $taskName = $tn
+    if ($taskName -and $rn -and $taskName.StartsWith("${rn}_")) {
+        $taskName = $taskName.Substring($rn.Length + 1)
+    }
+
     $colors = Get-WtwColors
-    $taskKey = if ($tn -and $rn) {
+    $taskKey = if ($taskName -and $rn) {
         $reg = Get-WtwRegistry
         $repoEntry = if ($rn -and $reg.repos.PSObject.Properties.Name -contains $rn) { $reg.repos.$rn } else { $null }
-        if ($repoEntry -and $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $tn) { "$rn/$tn" } else { "$rn/main" }
+        if ($repoEntry -and $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $taskName) { "$rn/$taskName" } else { "$rn/main" }
     } else { $null }
     $authColor = if ($taskKey -and $colors.assignments.PSObject.Properties.Name -contains $taskKey) { $colors.assignments.$taskKey } else { $null }
     $workspacePeacockColor = $wsContent.settings.'peacock.color'
