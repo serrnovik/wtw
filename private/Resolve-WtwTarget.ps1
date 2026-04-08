@@ -10,6 +10,7 @@ function Resolve-WtwTarget {
           3. Bare task name exact match    -> searches all repos for unique match
           4. "alias-task" prefix match     -> unique prefix on task name (sn3-b -> sn3-brain-stores-refactor)
           5. Bare task name prefix match   -> unique prefix across all repos
+          6. Fuzzy match (Levenshtein)    -> auto-resolve if unique close match, suggest if tied
     .OUTPUTS
         PSCustomObject with: RepoName, RepoEntry, TaskName, WorktreeEntry
         or $null if nothing matched.
@@ -123,6 +124,31 @@ function Resolve-WtwTarget {
         $names = ($prefixFound | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
         Write-Error "Ambiguous prefix '$Name'. Matches: $names"
         return $null
+    }
+
+    # 6. Fuzzy match — find closest target by edit distance
+    $allTargets = Get-WtwAllTargetNames $registry
+    $maxDist = [Math]::Max(2, [Math]::Floor($Name.Length / 3))
+    $fuzzyMatches = @()
+    foreach ($candidate in $allTargets) {
+        $dist = Get-WtwEditDistance $Name $candidate
+        if ($dist -le $maxDist) {
+            $fuzzyMatches += [PSCustomObject]@{ Target = $candidate; Dist = $dist }
+        }
+    }
+    $fuzzyMatches = $fuzzyMatches | Sort-Object Dist
+
+    if ($fuzzyMatches.Count -gt 0) {
+        $best = $fuzzyMatches[0]
+        $tied = @($fuzzyMatches | Where-Object { $_.Dist -eq $best.Dist })
+        if ($tied.Count -eq 1) {
+            Write-Host "  Fuzzy match: '$Name' → '$($best.Target)'" -ForegroundColor Yellow
+            return (Resolve-WtwTarget $best.Target)
+        } else {
+            $suggestions = ($tied | ForEach-Object { $_.Target }) -join ', '
+            Write-Error "Could not resolve '$Name'. Did you mean: ${suggestions}?"
+            return $null
+        }
     }
 
     Write-Error "Could not resolve '$Name'. Run 'wtw list' to see available targets."
