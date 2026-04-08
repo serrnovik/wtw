@@ -1,9 +1,6 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
-    . "$PSScriptRoot/../private/New-WtwWorkspaceFile.ps1"
-    . "$PSScriptRoot/../private/Read-JsoncFile.ps1"
-    . "$PSScriptRoot/../private/ConvertTo-PeacockColorBlock.ps1"
-    . "$PSScriptRoot/../private/Get-WtwRegistry.ps1"
+    Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
 }
 
 Describe 'New-WtwWorkspaceFile' {

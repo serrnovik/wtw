@@ -1,6 +1,6 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
-    . "$PSScriptRoot/../private/ConvertTo-PeacockColorBlock.ps1"
+    Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
 }
 
 Describe 'ConvertTo-PeacockColorBlock' {
