@@ -1,26 +1,26 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
-    . "$PSScriptRoot/../public/Set-WtwColor.ps1"
-    . "$PSScriptRoot/../private/ConvertTo-PeacockColorBlock.ps1"
+    Get-ChildItem -Path "$PSScriptRoot/../public" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
+    Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
 }
 
-Describe 'Convert-HexToRgb' {
+Describe 'ConvertTo-WtwRgb' {
     It 'parses a hex color with hash' {
-        $rgb = Convert-HexToRgb '#e05d44'
+        $rgb = ConvertTo-WtwRgb '#e05d44'
         $rgb[0] | Should -Be 224
         $rgb[1] | Should -Be 93
         $rgb[2] | Should -Be 68
     }
 
     It 'parses a hex color without hash' {
-        $rgb = Convert-HexToRgb 'ff0000'
+        $rgb = ConvertTo-WtwRgb 'ff0000'
         $rgb[0] | Should -Be 255
         $rgb[1] | Should -Be 0
         $rgb[2] | Should -Be 0
     }
 
     It 'parses black' {
-        $rgb = Convert-HexToRgb '#000000'
+        $rgb = ConvertTo-WtwRgb '#000000'
         $rgb | Should -Be @(0, 0, 0)
     }
 }

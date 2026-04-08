@@ -1,6 +1,6 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
-    . "$PSScriptRoot/../private/Resolve-WtwEditor.ps1"
+    Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
 }
 
 Describe 'Resolve-WtwEditorCommand' {

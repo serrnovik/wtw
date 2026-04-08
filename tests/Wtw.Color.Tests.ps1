@@ -1,6 +1,6 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
-    . "$PSScriptRoot/../private/ConvertTo-PeacockColorBlock.ps1"
+    Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
 }
 
 Describe 'ConvertTo-PeacockColorBlock' {
@@ -47,14 +47,14 @@ Describe 'Lighten-HexColor' {
     }
 }
 
-Describe 'Darken-HexColor' {
+Describe 'ConvertTo-DarkerHexColor' {
     It 'darkens a color' {
-        $result = Darken-HexColor '#ffffff' -Factor 0.5
+        $result = ConvertTo-DarkerHexColor '#ffffff' -Factor 0.5
         $result | Should -Be '#808080'
     }
 
     It 'black stays black' {
-        $result = Darken-HexColor '#000000' -Factor 0.5
+        $result = ConvertTo-DarkerHexColor '#000000' -Factor 0.5
         $result | Should -Be '#000000'
     }
 }

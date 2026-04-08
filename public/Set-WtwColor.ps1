@@ -10,6 +10,12 @@ function Set-WtwColor {
         [switch] $NoSync
     )
 
+    # If Name looks like a color value, shift: treat it as Color and detect Name from cwd
+    if ($Name -and -not $Color -and ($Name -eq 'random' -or $Name -match '^#?[0-9a-fA-F]{6}$')) {
+        $Color = $Name
+        $Name = $null
+    }
+
     # Detect from cwd if no name given
     if (-not $Name) {
         $Name = Resolve-WtwCurrentTarget
@@ -121,7 +127,7 @@ function Find-WtwContrastColor {
     if ($excludedColor) { $repulsionSet += $excludedColor }
     # Use a loop instead of pipeline to avoid array unrolling
     $assignedRgb = @()
-    foreach ($hex in $repulsionSet) { $assignedRgb += , (Convert-HexToRgb $hex) }
+    foreach ($hex in $repulsionSet) { $assignedRgb += , (ConvertTo-WtwRgb $hex) }
 
     # Candidates: full palette + generated hue samples for broader coverage
     $candidates = @()
@@ -144,7 +150,7 @@ function Find-WtwContrastColor {
     $bestScore = -1
 
     foreach ($c in $candidates) {
-        $rgb = Convert-HexToRgb $c
+        $rgb = ConvertTo-WtwRgb $c
         $minDist = [double]::MaxValue
         foreach ($a in $assignedRgb) {
             $d = Get-PerceptualDistance $rgb $a
@@ -159,7 +165,7 @@ function Find-WtwContrastColor {
     return $best
 }
 
-function Convert-HexToRgb {
+function ConvertTo-WtwRgb {
     param([string] $Hex)
     $Hex = $Hex.TrimStart('#')
     return @(
