@@ -13,7 +13,7 @@ function Resolve-WtwEditorCommand {
     # 1. Exact + prefix match
     foreach ($editor in $editors) {
         foreach ($prefix in $editor.prefixes) {
-            if ($prefix -eq $Name -or $prefix.StartsWith($Name)) {
+            if ($prefix -eq $Name -or $prefix.StartsWith($Name, [System.StringComparison]::OrdinalIgnoreCase)) {
                 return $editor.cmd
             }
         }

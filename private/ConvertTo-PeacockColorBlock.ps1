@@ -8,8 +8,8 @@ function ConvertTo-PeacockColorBlock {
     $base = $BaseColor
     $fg = Get-ContrastForeground $base
     $lighter = Lighten-HexColor $base -Factor 0.25
-    $darker = Darken-HexColor $base -Factor 0.15
-    $complementHue = Lighten-HexColor (Darken-HexColor $base -Factor 0.3) -Factor 0.1
+    $darker = ConvertTo-DarkerHexColor $base -Factor 0.15
+    $complementHue = Lighten-HexColor (ConvertTo-DarkerHexColor $base -Factor 0.3) -Factor 0.1
 
     return [ordered]@{
         'tab.activeBackground'            = $base
