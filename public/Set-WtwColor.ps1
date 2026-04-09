@@ -7,14 +7,9 @@ function Set-WtwColor {
         [Parameter(Position = 1)]
         [string] $Color,
 
+        [Alias('ns')]
         [switch] $NoSync
     )
-
-    # If Name looks like a color value, shift: treat it as Color and detect Name from cwd
-    if ($Name -and -not $Color -and ($Name -eq 'random' -or $Name -match '^#?[0-9a-fA-F]{6}$')) {
-        $Color = $Name
-        $Name = $null
-    }
 
     # Detect from cwd if no name given
     if (-not $Name) {
@@ -127,7 +122,7 @@ function Find-WtwContrastColor {
     if ($excludedColor) { $repulsionSet += $excludedColor }
     # Use a loop instead of pipeline to avoid array unrolling
     $assignedRgb = @()
-    foreach ($hex in $repulsionSet) { $assignedRgb += , (ConvertTo-WtwRgb $hex) }
+    foreach ($hex in $repulsionSet) { $assignedRgb += , (ConvertTo-WtwRgbArray $hex) }
 
     # Candidates: full palette + generated hue samples for broader coverage
     $candidates = @()
@@ -150,7 +145,7 @@ function Find-WtwContrastColor {
     $bestScore = -1
 
     foreach ($c in $candidates) {
-        $rgb = ConvertTo-WtwRgb $c
+        $rgb = ConvertTo-WtwRgbArray $c
         $minDist = [double]::MaxValue
         foreach ($a in $assignedRgb) {
             $d = Get-PerceptualDistance $rgb $a
@@ -165,7 +160,7 @@ function Find-WtwContrastColor {
     return $best
 }
 
-function ConvertTo-WtwRgb {
+function ConvertTo-WtwRgbArray {
     param([string] $Hex)
     $Hex = $Hex.TrimStart('#')
     return @(
@@ -201,12 +196,12 @@ function Convert-HslToHex {
     $m = $L - $c / 2
 
     $r1 = 0; $g1 = 0; $b1 = 0
-    if     ($H -lt  60) { $r1 = $c; $g1 = $x; $b1 = 0  }
-    elseif ($H -lt 120) { $r1 = $x; $g1 = $c; $b1 = 0  }
-    elseif ($H -lt 180) { $r1 = 0;  $g1 = $c; $b1 = $x }
-    elseif ($H -lt 240) { $r1 = 0;  $g1 = $x; $b1 = $c }
-    elseif ($H -lt 300) { $r1 = $x; $g1 = 0;  $b1 = $c }
-    else                { $r1 = $c; $g1 = 0;  $b1 = $x }
+    if ($H -lt 60) { $r1 = $c; $g1 = $x; $b1 = 0 }
+    elseif ($H -lt 120) { $r1 = $x; $g1 = $c; $b1 = 0 }
+    elseif ($H -lt 180) { $r1 = 0; $g1 = $c; $b1 = $x }
+    elseif ($H -lt 240) { $r1 = 0; $g1 = $x; $b1 = $c }
+    elseif ($H -lt 300) { $r1 = $x; $g1 = 0; $b1 = $c }
+    else { $r1 = $c; $g1 = 0; $b1 = $x }
 
     $r = [int](($r1 + $m) * 255)
     $g = [int](($g1 + $m) * 255)

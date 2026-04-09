@@ -15,17 +15,18 @@ function Resolve-WtwSyncTargetFromFile {
     $rn = $wsContent.settings.'wtw.repo'
     $tn = $wsContent.settings.'wtw.task'
 
-    # wtw.task may be stored as "repo_task" (workspace name) — strip repo prefix to get registry key
-    $taskName = $tn
-    if ($taskName -and $rn -and $taskName.StartsWith("${rn}_")) {
-        $taskName = $taskName.Substring($rn.Length + 1)
-    }
-
     $colors = Get-WtwColors
-    $taskKey = if ($taskName -and $rn) {
+    $taskKey = if ($tn -and $rn) {
         $reg = Get-WtwRegistry
         $repoEntry = if ($rn -and $reg.repos.PSObject.Properties.Name -contains $rn) { $reg.repos.$rn } else { $null }
-        if ($repoEntry -and $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $taskName) { "$rn/$taskName" } else { "$rn/main" }
+        # wtw.task may store the workspace name (e.g. "repo_task") rather than the
+        # registry worktree key ("task"). Try exact match first, then strip repo prefix.
+        $wtName = $tn
+        if ($repoEntry -and $repoEntry.worktrees -and -not ($repoEntry.worktrees.PSObject.Properties.Name -contains $wtName)) {
+            $prefix = "${rn}_"
+            if ($tn.StartsWith($prefix) -and $tn.Length -gt $prefix.Length) { $wtName = $tn.Substring($prefix.Length) }
+        }
+        if ($repoEntry -and $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $wtName) { "$rn/$wtName" } else { "$rn/main" }
     } else { $null }
     $authColor = if ($taskKey -and $colors.assignments.PSObject.Properties.Name -contains $taskKey) { $colors.assignments.$taskKey } else { $null }
     $workspacePeacockColor = $wsContent.settings.'peacock.color'

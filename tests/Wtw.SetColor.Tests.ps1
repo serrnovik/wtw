@@ -4,23 +4,23 @@ BeforeAll {
     Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
 }
 
-Describe 'ConvertTo-WtwRgb' {
+Describe 'ConvertTo-WtwRgbArray' {
     It 'parses a hex color with hash' {
-        $rgb = ConvertTo-WtwRgb '#e05d44'
+        $rgb = ConvertTo-WtwRgbArray '#e05d44'
         $rgb[0] | Should -Be 224
         $rgb[1] | Should -Be 93
         $rgb[2] | Should -Be 68
     }
 
     It 'parses a hex color without hash' {
-        $rgb = ConvertTo-WtwRgb 'ff0000'
+        $rgb = ConvertTo-WtwRgbArray 'ff0000'
         $rgb[0] | Should -Be 255
         $rgb[1] | Should -Be 0
         $rgb[2] | Should -Be 0
     }
 
     It 'parses black' {
-        $rgb = ConvertTo-WtwRgb '#000000'
+        $rgb = ConvertTo-WtwRgbArray '#000000'
         $rgb | Should -Be @(0, 0, 0)
     }
 }
