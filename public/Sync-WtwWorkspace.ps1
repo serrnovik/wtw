@@ -24,7 +24,7 @@ function Resolve-WtwSyncTargetFromFile {
         $wtName = $tn
         if ($repoEntry -and $repoEntry.worktrees -and -not ($repoEntry.worktrees.PSObject.Properties.Name -contains $wtName)) {
             $prefix = "${rn}_"
-            if ($tn.StartsWith($prefix)) { $wtName = $tn.Substring($prefix.Length) }
+            if ($tn.StartsWith($prefix) -and $tn.Length -gt $prefix.Length) { $wtName = $tn.Substring($prefix.Length) }
         }
         if ($repoEntry -and $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $wtName) { "$rn/$wtName" } else { "$rn/main" }
     } else { $null }
