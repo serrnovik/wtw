@@ -6,10 +6,12 @@ function Resolve-WtwTarget {
         Unified resolution logic used by Enter, Remove, Open, etc.
         Resolution order:
           1. Exact repo alias match       -> returns repo (no worktree)
+          1b. Repo name/alias prefix match -> unique prefix on repo names and aliases
           2. "alias-task" exact match      -> returns repo + worktree
           3. Bare task name exact match    -> searches all repos for unique match
           4. "alias-task" prefix match     -> unique prefix on task name (sn3-b -> sn3-brain-stores-refactor)
           5. Bare task name prefix match   -> unique prefix across all repos
+          6. Fuzzy match (Levenshtein)    -> auto-resolve if unique close match, suggest if tied
     .OUTPUTS
         PSCustomObject with: RepoName, RepoEntry, TaskName, WorktreeEntry
         or $null if nothing matched.
@@ -33,6 +35,33 @@ function Resolve-WtwTarget {
                 WorktreeEntry  = $null
             }
         }
+    }
+
+    # 1b. Repo name/alias prefix match
+    $prefixRepos = @()
+    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+        $repo = $registry.repos.$repoName
+        $matched = $false
+        if ($repoName -like "${Name}*") { $matched = $true }
+        if (-not $matched) {
+            foreach ($alias in (Get-WtwRepoAliases $repo)) {
+                if ($alias -like "${Name}*") { $matched = $true; break }
+            }
+        }
+        if ($matched) {
+            $prefixRepos += [PSCustomObject]@{
+                RepoName       = $repoName
+                RepoEntry      = $repo
+                TaskName       = $null
+                WorktreeEntry  = $null
+            }
+        }
+    }
+    if ($prefixRepos.Count -eq 1) { return $prefixRepos[0] }
+    if ($prefixRepos.Count -gt 1) {
+        $names = ($prefixRepos | ForEach-Object { $_.RepoName }) -join ', '
+        Write-Error "Ambiguous prefix '$Name'. Matches repos: $names"
+        return $null
     }
 
     # 2. "alias-task" exact match
@@ -122,6 +151,18 @@ function Resolve-WtwTarget {
     if ($prefixFound.Count -gt 1) {
         $names = ($prefixFound | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
         Write-Error "Ambiguous prefix '$Name'. Matches: $names"
+        return $null
+    }
+
+    # 6. Fuzzy match — find closest target by edit distance
+    $allTargets = Get-WtwAllTargetNames $registry
+    $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
+    if ($fuzzy.Match) {
+        return (Resolve-WtwTarget $fuzzy.Match)
+    }
+    if ($fuzzy.Suggestions.Count -gt 0) {
+        $suggestions = $fuzzy.Suggestions -join ', '
+        Write-Error "Could not resolve '$Name'. Did you mean: ${suggestions}?"
         return $null
     }
 
