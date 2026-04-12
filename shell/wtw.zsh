@@ -3,7 +3,16 @@
 # Delegates all logic to pwsh. Only cd and terminal escapes run natively.
 
 _wtw_module="${HOME}/.wtw/module/wtw.psm1"
-_wtw_pwsh_cmd="pwsh -NoLogo -NoProfile -Command \"Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw"
+
+# Resolve pwsh path at source time — handles cases where pwsh is in a PATH
+# segment that's set up before this file is sourced (e.g. Homebrew paths)
+_wtw_pwsh=$(command -v pwsh 2>/dev/null || echo "pwsh")
+if [ ! -x "$_wtw_pwsh" ] && [ "$_wtw_pwsh" = "pwsh" ]; then
+    # Try common Homebrew/system locations
+    for _p in /usr/local/bin/pwsh /opt/homebrew/bin/pwsh /usr/bin/pwsh /snap/bin/pwsh; do
+        [ -x "$_p" ] && _wtw_pwsh="$_p" && break
+    done
+fi
 
 # Terminal color: set tab color + title via escape sequences
 _wtw_set_terminal() {
@@ -37,7 +46,7 @@ _wtw_go() {
     local name="$1"
     [ -z "$name" ] && echo "Usage: wtw go <name>" && return 1
     local result
-    result=$(pwsh -NoLogo -NoProfile -Command "
+    result=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
         Invoke-Wtw __resolve '${name}'
     " 2>&1)
@@ -48,7 +57,7 @@ _wtw_go() {
     cd "$path" || return 1
     # Run startup script if configured, otherwise set terminal color
     if [ -n "$startup_script" ] && [ -f "${path}/${startup_script}" ]; then
-        pwsh -NoLogo -NoProfile -File "${path}/${startup_script}"
+        "$_wtw_pwsh" -NoLogo -NoProfile -File "${path}/${startup_script}"
     else
         _wtw_set_terminal "$color" "$title"
     fi
@@ -60,10 +69,10 @@ wtw() {
         go)
             shift; _wtw_go "$@" ;;
         "")
-            pwsh -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
         # Commands that modify registry — delegate fully to pwsh
         init|add|create|remove|rm|workspace|ws|copy|sync|color|clean|install|update)
-            pwsh -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*"
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*"
             # Regenerate aliases after commands that change the registry
             case "$1" in
                 init|add|create|remove|rm) _wtw_register_aliases ;;
@@ -71,13 +80,13 @@ wtw() {
             ;;
         # List — delegate to pwsh (ANSI output passes through)
         list|ls)
-            pwsh -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
         # Open — delegate to pwsh
         open)
-            shift; pwsh -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw open $*" ;;
+            shift; "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw open $*" ;;
         # Help
         help|-h|--help)
-            pwsh -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
         # Unknown: try as implicit "go" (same as pwsh behavior)
         *)
             _wtw_go "$1" ;;
@@ -88,7 +97,7 @@ wtw() {
 _wtw_register_aliases() {
     [ ! -f "$_wtw_module" ] && return
     local _wtw_output
-    _wtw_output=$(pwsh -NoLogo -NoProfile -Command "
+    _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
         Invoke-Wtw __aliases
     " 2>/dev/null) || return
@@ -103,7 +112,7 @@ _wtw_register_aliases() {
         _wtw_defs+="  cd '${_wtw_p}' || return 1"$'\n'
         if [ -n "$_wtw_s" ]; then
             _wtw_defs+="  if [ -f '${_wtw_p}/${_wtw_s}' ]; then"$'\n'
-            _wtw_defs+="    pwsh -NoLogo -NoProfile -File '${_wtw_p}/${_wtw_s}'"$'\n'
+            _wtw_defs+="    $_wtw_pwsh -NoLogo -NoProfile -File '${_wtw_p}/${_wtw_s}'"$'\n'
             _wtw_defs+="  else"$'\n'
             _wtw_defs+="    _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'
             _wtw_defs+="  fi"$'\n'

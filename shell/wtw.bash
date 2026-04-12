@@ -4,6 +4,14 @@
 
 _wtw_module="${HOME}/.wtw/module/wtw.psm1"
 
+# Resolve pwsh path at source time
+_wtw_pwsh=$(command -v pwsh 2>/dev/null || echo "pwsh")
+if [ ! -x "$_wtw_pwsh" ] && [ "$_wtw_pwsh" = "pwsh" ]; then
+    for _p in /usr/local/bin/pwsh /opt/homebrew/bin/pwsh /usr/bin/pwsh /snap/bin/pwsh; do
+        [ -x "$_p" ] && _wtw_pwsh="$_p" && break
+    done
+fi
+
 # Terminal color: set tab color + title via escape sequences
 _wtw_set_terminal() {
     local color="$1" title="$2"
@@ -36,7 +44,7 @@ _wtw_go() {
     local name="$1"
     [ -z "$name" ] && echo "Usage: wtw go <name>" && return 1
     local result
-    result=$(pwsh -NoLogo -NoProfile -Command "
+    result=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
         Invoke-Wtw __resolve '${name}'
     " 2>&1)
@@ -46,7 +54,7 @@ _wtw_go() {
     [ -z "$path" ] && echo "Could not resolve '$name'" && return 1
     cd "$path" || return 1
     if [ -n "$startup_script" ] && [ -f "${path}/${startup_script}" ]; then
-        pwsh -NoLogo -NoProfile -File "${path}/${startup_script}"
+        "$_wtw_pwsh" -NoLogo -NoProfile -File "${path}/${startup_script}"
     else
         _wtw_set_terminal "$color" "$title"
     fi
@@ -58,15 +66,15 @@ wtw() {
         go)
             shift; _wtw_go "$@" ;;
         "")
-            pwsh -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
         init|add|create|remove|rm|workspace|ws|copy|sync|color|clean|install|update)
-            pwsh -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*"
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*"
             case "$1" in
                 init|add|create|remove|rm) _wtw_register_aliases ;;
             esac
             ;;
         list|ls|open|help|-h|--help)
-            pwsh -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
         *)
             _wtw_go "$1" ;;
     esac
@@ -76,7 +84,7 @@ wtw() {
 _wtw_register_aliases() {
     [ ! -f "$_wtw_module" ] && return
     local _wtw_output
-    _wtw_output=$(pwsh -NoLogo -NoProfile -Command "
+    _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
         Invoke-Wtw __aliases
     " 2>/dev/null) || return
@@ -90,7 +98,7 @@ _wtw_register_aliases() {
         _wtw_defs+="  cd '${_wtw_p}' || return 1"$'\n'
         if [ -n "$_wtw_s" ]; then
             _wtw_defs+="  if [ -f '${_wtw_p}/${_wtw_s}' ]; then"$'\n'
-            _wtw_defs+="    pwsh -NoLogo -NoProfile -File '${_wtw_p}/${_wtw_s}'"$'\n'
+            _wtw_defs+="    $_wtw_pwsh -NoLogo -NoProfile -File '${_wtw_p}/${_wtw_s}'"$'\n'
             _wtw_defs+="  else"$'\n'
             _wtw_defs+="    _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'
             _wtw_defs+="  fi"$'\n'
