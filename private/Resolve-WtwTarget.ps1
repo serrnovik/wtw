@@ -174,7 +174,7 @@ function Resolve-WtwTarget {
     }
 
     if ($substringFound.Count -eq 1) {
-        Write-Host "  Substring match: '$Name' → '$($substringFound[0].TaskName)'" -ForegroundColor Yellow
+        Write-Verbose "Substring match: '$Name' -> '$($substringFound[0].TaskName)'"
         return $substringFound[0]
     }
     if ($substringFound.Count -gt 1) {

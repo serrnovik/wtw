@@ -5,6 +5,7 @@ function Resolve-WtwFuzzyMatch {
     .OUTPUTS
         PSCustomObject with: Match (string or $null), Suggestions (string[] if tied)
     #>
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]   $Name,
         [Parameter(Mandatory)][string[]] $Candidates
@@ -28,7 +29,7 @@ function Resolve-WtwFuzzyMatch {
     $tied = @($fuzzyMatches | Where-Object { $_.Dist -eq $best.Dist })
 
     if ($tied.Count -eq 1) {
-        Write-Host "  Fuzzy match: '$Name' → '$($best.Target)'" -ForegroundColor Yellow
+        Write-Verbose "Fuzzy match: '$Name' -> '$($best.Target)'"
         return [PSCustomObject]@{ Match = $best.Target; Suggestions = @() }
     }
 
