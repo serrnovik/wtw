@@ -146,6 +146,7 @@ wtw clean                 # interactive selection + removal
 | `wtw sync --all [--dry-run] [--repo X]` | Re-apply template to all managed workspaces |
 | `wtw clean [--dry-run] [--force]` | Clean stale AI worktrees (codex, cursor, conductor) |
 | `wtw install [--skip-profile]` | Install/update globally to `~/.wtw/module/` |
+| `wtw skill [--agent claude\|agents\|all]` | Install AI skill into current repo for agent support |
 
 ## Importing Existing Worktrees
 

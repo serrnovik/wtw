@@ -14,6 +14,7 @@
         'Get-WtwList'
         'Initialize-WtwConfig'
         'Install-Wtw'
+        'Install-WtwSkill'
         'Invoke-Wtw'
         'Invoke-WtwClean'
         'New-WtwWorkspace'

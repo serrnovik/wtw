@@ -66,7 +66,7 @@ function Install-Wtw {
     # Copy module files
     New-Item -Path $installDir -ItemType Directory -Force | Out-Null
 
-    $dirs = @('public', 'private', 'completions', 'shell')
+    $dirs = @('public', 'private', 'completions', 'shell', 'skills')
     foreach ($dir in $dirs) {
         $src = Join-Path $sourceDir $dir
         if (Test-Path $src) {
@@ -221,6 +221,24 @@ if (Test-Path $_wtwModule) {
             }
         } else {
             Write-Host '  Peacock extension found in all editors.' -ForegroundColor Green
+        }
+    }
+
+    # Propose AI skill installation if inside a git repo
+    $currentRepoRoot = Resolve-WtwRepoRoot
+    if ($currentRepoRoot) {
+        $claudeSkill = Join-Path $currentRepoRoot '.claude' 'skills' 'worktree-workspace' 'SKILL.md'
+        $agentsSkill = Join-Path $currentRepoRoot '.agents' 'skills' 'worktree-workspace' 'SKILL.md'
+        if (-not (Test-Path $claudeSkill) -or -not (Test-Path $agentsSkill)) {
+            Write-Host ''
+            Write-Host '  AI skill not found in this repo.' -ForegroundColor Yellow
+            Write-Host '  Install it so AI agents (Claude, Codex, Cursor, Gemini) can use wtw.' -ForegroundColor DarkGray
+            $installSkill = Read-Host '  Install wtw AI skill? [y/N]'
+            if ($installSkill -in @('y', 'Y', 'yes')) {
+                Install-WtwSkill -RepoRoot $currentRepoRoot
+            } else {
+                Write-Host "  Skipped. Run 'wtw skill' later to install." -ForegroundColor DarkGray
+            }
         }
     }
 

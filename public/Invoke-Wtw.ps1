@@ -97,6 +97,7 @@ function Invoke-Wtw {
         Write-Host '    sync [file|--all] Re-apply template to managed workspaces'
         Write-Host '    clean             Clean stale AI worktrees'
         Write-Host '    install           Install/update wtw globally (~/.wtw/module/)'
+        Write-Host '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
         Write-Host ''
         Write-Host '  Options:' -ForegroundColor Yellow
         Write-Host '    --help, -h        Show this help'
@@ -135,6 +136,7 @@ function Invoke-Wtw {
         'clean'     { Invoke-WtwClean @splat }
         'install'   { Install-Wtw @splat }
         'update'    { Install-Wtw @splat }
+        'skill'     { Install-WtwSkill @splat }
         'help'    { Invoke-Wtw }
         # Internal commands for shell integration (zsh/bash wrappers call these)
         '__resolve' {
