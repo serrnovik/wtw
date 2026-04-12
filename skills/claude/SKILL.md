@@ -70,12 +70,12 @@ Colors are auto-assigned from a 20-color palette. `random` picks the color with 
 ## Name resolution
 
 wtw resolves names in this order:
-1. Exact repo alias (`sn3` → main repo)
-2. Repo/alias prefix (`sn` → `sn3` if unique)
-3. `alias-task` format (`sn3-auth` → worktree)
+1. Exact repo alias (`proj` → main repo)
+2. Repo/alias prefix (`pr` → `proj` if unique)
+3. `alias-task` format (`proj-auth` → worktree)
 4. Bare task name (`auth` → searches all repos)
 5. Task prefix (`au` → `auth` if unique)
-6. **Substring** (`content` → `ntb-content-engine`)
+6. **Substring** (`content` → `my-content-engine`)
 7. Fuzzy match (Levenshtein distance)
 
 ## Important Patterns

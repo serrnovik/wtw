@@ -47,7 +47,7 @@ function Invoke-WtwClean {
         # Find all repo-like directories under the stale path
         $dirs = Get-ChildItem -Path $resolvedPath -Directory -ErrorAction SilentlyContinue
         foreach ($dir in $dirs) {
-            # Look for repo directories inside (e.g., .codex/worktrees/3cc3/snowmain3/)
+            # Look for repo directories inside (e.g., .codex/worktrees/3cc3/myrepo/)
             $repoDirs = Get-ChildItem -Path $dir.FullName -Directory -ErrorAction SilentlyContinue
             if ($repoDirs) {
                 foreach ($repoDir in $repoDirs) {

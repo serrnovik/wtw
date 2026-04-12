@@ -5,17 +5,17 @@ BeforeAll {
 
 Describe 'Get-WtwRepoAliases' {
     It 'returns array from aliases field' {
-        $repo = [PSCustomObject]@{ aliases = @('sn3', 'snowmain3') }
+        $repo = [PSCustomObject]@{ aliases = @('p1', 'myapp') }
         $result = Get-WtwRepoAliases $repo
-        $result | Should -Contain 'sn3'
-        $result | Should -Contain 'snowmain3'
+        $result | Should -Contain 'p1'
+        $result | Should -Contain 'myapp'
         $result.Count | Should -Be 2
     }
 
     It 'returns array from legacy alias field' {
-        $repo = [PSCustomObject]@{ alias = 'sn3' }
+        $repo = [PSCustomObject]@{ alias = 'p1' }
         $result = Get-WtwRepoAliases $repo
-        $result | Should -Contain 'sn3'
+        $result | Should -Contain 'p1'
         $result.Count | Should -Be 1
     }
 
@@ -28,18 +28,18 @@ Describe 'Get-WtwRepoAliases' {
 
 Describe 'Test-WtwAliasMatch' {
     It 'matches when name is in aliases array' {
-        $repo = [PSCustomObject]@{ aliases = @('sn3', 'snowmain3') }
-        Test-WtwAliasMatch $repo 'sn3' | Should -BeTrue
-        Test-WtwAliasMatch $repo 'snowmain3' | Should -BeTrue
+        $repo = [PSCustomObject]@{ aliases = @('p1', 'myapp') }
+        Test-WtwAliasMatch $repo 'p1' | Should -BeTrue
+        Test-WtwAliasMatch $repo 'myapp' | Should -BeTrue
     }
 
     It 'does not match unknown alias' {
-        $repo = [PSCustomObject]@{ aliases = @('sn3') }
+        $repo = [PSCustomObject]@{ aliases = @('p1') }
         Test-WtwAliasMatch $repo 'evx1' | Should -BeFalse
     }
 
     It 'matches legacy alias field' {
-        $repo = [PSCustomObject]@{ alias = 'sn3' }
-        Test-WtwAliasMatch $repo 'sn3' | Should -BeTrue
+        $repo = [PSCustomObject]@{ alias = 'p1' }
+        Test-WtwAliasMatch $repo 'p1' | Should -BeTrue
     }
 }

@@ -63,11 +63,11 @@ pwsh -Command "wtw install"
 
 wtw resolves names flexibly:
 1. Exact repo alias (`app` → main repo)
-2. Repo/alias prefix (`sn` → `sn3` if unique)
+2. Repo/alias prefix (`pr` → `proj` if unique)
 3. `alias-task` format (`app-auth` → worktree)
 4. Bare task name (`auth` → searches all repos)
 5. Task prefix (`au` → `auth` if unique)
-6. Substring (`content` → `ntb-content-engine`)
+6. Substring (`content` → `my-content-engine`)
 7. Fuzzy match (Levenshtein distance)
 
 ## Color Management

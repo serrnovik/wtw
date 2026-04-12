@@ -9,9 +9,9 @@ function Resolve-WtwTarget {
           1b. Repo name/alias prefix match -> unique prefix on repo names and aliases
           2. "alias-task" exact match      -> returns repo + worktree
           3. Bare task name exact match    -> searches all repos for unique match
-          4. "alias-task" prefix match     -> unique prefix on task name (sn3-b -> sn3-brain-stores-refactor)
+          4. "alias-task" prefix match     -> unique prefix on task name (proj-b -> proj-backend-refactor)
           5. Bare task name prefix match   -> unique prefix across all repos
-          5b. Substring match on task     -> "content" matches "ntb-content-engine"
+          5b. Substring match on task     -> "content" matches "my-content-engine"
           6. Fuzzy match (Levenshtein)    -> auto-resolve if unique close match, suggest if tied
     .OUTPUTS
         PSCustomObject with: RepoName, RepoEntry, TaskName, WorktreeEntry
@@ -103,7 +103,7 @@ function Resolve-WtwTarget {
         return $null
     }
 
-    # 4. "alias-task" prefix match - sn3-b matches sn3-brain-stores-refactor
+    # 4. "alias-task" prefix match - proj-b matches proj-backend-refactor
     if ($Name -match '^(.+?)-(.+)$') {
         $aliasOrName  = $Matches[1]
         $taskPrefix   = $Matches[2]
@@ -155,7 +155,7 @@ function Resolve-WtwTarget {
         return $null
     }
 
-    # 5b. Substring match on task names -> "content" matches "ntb-content-engine"
+    # 5b. Substring match on task names -> "content" matches "my-content-engine"
     $escapedName = [WildcardPattern]::Escape($Name)
     $substringFound = @()
     foreach ($repoName in $registry.repos.PSObject.Properties.Name) {

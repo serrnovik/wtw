@@ -216,7 +216,7 @@ function Sync-WtwWorkspace {
             Write-Host '  Usage:' -ForegroundColor Yellow
             Write-Host '    wtw sync [name] [--dry-run]               Sync current or named workspace'
             Write-Host '    wtw sync --all [--dry-run]                Sync all managed workspaces'
-            Write-Host '    wtw sync --all --repo sn3                 Sync one repo only'
+            Write-Host '    wtw sync --all --repo proj                Sync one repo only'
             Write-Host '    wtw sync --all --template <path>          Sync all with a new template'
             Write-Host '    wtw sync <name> --color-source json       Skip prompt; use colors.json first'
             Write-Host '    wtw sync <name> --color-source workspace  Skip prompt; use workspace peacock first'
