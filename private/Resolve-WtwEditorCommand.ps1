@@ -27,6 +27,6 @@ function Resolve-WtwEditorCommand {
     if ($fuzzy.Match) {
         return (Resolve-WtwEditorCommand $fuzzy.Match)
     }
-    # Tied or no match — fall through to target resolution
+    # Tied or no match - fall through to target resolution
     return $null
 }

@@ -14,7 +14,7 @@ function Resolve-WtwCurrentTarget {
         }
     }
 
-    # We're in the main repo — return first alias
+    # We're in the main repo - return first alias
     $aliases = Get-WtwRepoAliases $repo
     if ($aliases.Count -gt 0) { return $aliases[0] }
     return $repoName

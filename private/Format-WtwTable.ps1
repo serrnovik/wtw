@@ -1,4 +1,21 @@
-# Render a hex color as an ANSI true-color swatch with contrasting foreground text.
+<#
+.SYNOPSIS
+    Renders a hex color as an ANSI true-color swatch with contrasting foreground text.
+
+.DESCRIPTION
+    Validates '#RRGGBB', then emits escape sequences for 24-bit foreground and background.
+    Used by Format-WtwTable for the Color column.
+
+.PARAMETER Hex
+    Six-digit hex color including leading '#'.
+
+.EXAMPLE
+    Format-WtwColorSwatch -Hex '#e05d44'
+    Returns an ANSI-colored string showing the hex value on a colored background.
+
+.NOTES
+    Depends on: Get-ContrastForeground
+#>
 function Format-WtwColorSwatch {
     param([string] $Hex)
     if ($Hex -notmatch '^#[0-9a-fA-F]{6}$') { return $Hex }
@@ -14,6 +31,26 @@ function Format-WtwColorSwatch {
     return "${esc}[38;2;${fr};${fg2};${fb}m${esc}[48;2;${r};${g};${b}m ${Hex} ${esc}[0m"
 }
 
+<#
+.SYNOPSIS
+    Prints a table of objects to the host with aligned columns.
+
+.DESCRIPTION
+    Computes column widths, writes a header and separator, then each row. When a column
+    is named 'Color' and the value matches a six-digit hex, Format-WtwColorSwatch is used.
+
+.PARAMETER Items
+    Array of objects (e.g., PSCustomObject rows) to display.
+
+.PARAMETER Columns
+    Optional ordered list of property names to show. Defaults to all properties of the first item.
+
+.EXAMPLE
+    Format-WtwTable -Items $rows -Columns @('Name', 'Color')
+
+.NOTES
+    Depends on: Format-WtwColorSwatch (when Color column holds a hex value)
+#>
 function Format-WtwTable {
     [CmdletBinding()]
     param(

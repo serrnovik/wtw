@@ -1,6 +1,24 @@
-# Set terminal tab color and title using escape sequences.
-# Supported: iTerm2, Windows Terminal, Kitty, Konsole, WezTerm, tmux.
-# Unsupported terminals (Terminal.app, GNOME Terminal, Alacritty, etc.) get title only.
+<#
+.SYNOPSIS
+    Sets terminal tab or window color and optional title using escape sequences.
+
+.DESCRIPTION
+    Writes OSC sequences for supported terminals (iTerm2, Windows Terminal, Kitty,
+    Konsole, WezTerm, tmux). Others may only get title updates. Side effect: writes
+    escape codes to the host output stream (no file I/O).
+
+.PARAMETER Color
+    Optional six-digit hex color, with or without leading '#'.
+
+.PARAMETER Title
+    Optional string for window/tab title (OSC 0).
+
+.EXAMPLE
+    Set-WtwTerminalColor -Color '#2ba7d0' -Title 'my-branch'
+
+.NOTES
+    Depends on: tmux, iTerm2, WT_SESSION, KITTY_PID, KONSOLE_VERSION, WEZTERM_PANE where applicable.
+#>
 function Set-WtwTerminalColor {
     [CmdletBinding()]
     param(
@@ -15,7 +33,7 @@ function Set-WtwTerminalColor {
     $bel = [char]7
     $inTmux = $null -ne $env:TMUX
 
-    # Set tab/window title — OSC 0 works nearly everywhere
+    # Set tab/window title - OSC 0 works nearly everywhere
     if ($Title) {
         if ($inTmux) {
             # tmux: passthrough + set pane title
@@ -49,26 +67,39 @@ function Set-WtwTerminalColor {
             Write-Host "${esc}]6;1;bg;green;brightness;${g}${bel}" -NoNewline
             Write-Host "${esc}]6;1;bg;blue;brightness;${b}${bel}" -NoNewline
         } elseif ($env:WT_SESSION) {
-            # Windows Terminal — OSC 9;9
+            # Windows Terminal - OSC 9;9
             Write-Host "${esc}]9;9;rgb:$($hex.Substring(0,2))/$($hex.Substring(2,2))/$($hex.Substring(4,2))${esc}\" -NoNewline
         } elseif ($env:KITTY_PID -or $termProgram -eq 'kitty') {
-            # Kitty — OSC 30 sets the tab/window title bar color
+            # Kitty - OSC 30 sets the tab/window title bar color
             Write-Host "${esc}]30;#${hex}${bel}" -NoNewline
         } elseif ($env:KONSOLE_VERSION) {
-            # Konsole — same OSC 30 as Kitty
+            # Konsole - same OSC 30 as Kitty
             Write-Host "${esc}]30;#${hex}${bel}" -NoNewline
         } elseif ($env:WEZTERM_PANE) {
-            # WezTerm — set tab color via user var
+            # WezTerm - set tab color via user var
             Write-Host "${esc}]1337;SetUserVar=wtw_color=$(
                 [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("#${hex}"))
             )${bel}" -NoNewline
         }
         # Unsupported terminals (Terminal.app, GNOME Terminal, Alacritty, foot, etc.)
-        # fall through — title is already set above for orientation
+        # fall through - title is already set above for orientation
     }
 }
 
-# Reset terminal tab color to default.
+<#
+.SYNOPSIS
+    Resets terminal tab color styling to the default.
+
+.DESCRIPTION
+    Sends reset sequences for tmux, iTerm2, Windows Terminal, Kitty, Konsole, or WezTerm
+    when detected. Side effect: writes escape codes to the host output stream.
+
+.EXAMPLE
+    Reset-WtwTerminalColor
+
+.NOTES
+    Pairs with Set-WtwTerminalColor; same environment detection logic.
+#>
 function Reset-WtwTerminalColor {
     [CmdletBinding()]
     param()

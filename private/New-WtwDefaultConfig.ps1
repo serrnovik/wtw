@@ -1,4 +1,17 @@
-# Create a default wtw config object with sensible defaults.
+<#
+.SYNOPSIS
+    Creates a new default wtw configuration object.
+
+.DESCRIPTION
+    Returns a PSCustomObject with editor, workspacesDir, and staleWorktreePaths defaults
+    suitable for first-time setup.
+
+.EXAMPLE
+    New-WtwDefaultConfig
+
+.NOTES
+    No external dependencies.
+#>
 function New-WtwDefaultConfig {
     [CmdletBinding()]
     param()

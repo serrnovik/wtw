@@ -1,4 +1,21 @@
-# Generate the full VS Code Peacock color customizations block from a base color.
+<#
+.SYNOPSIS
+    Builds a VS Code Peacock-style color customizations map from a base color.
+
+.DESCRIPTION
+    Derives tab, activity bar, status bar, and title bar colors from BaseColor using
+    Lighten-HexColor, ConvertTo-DarkerHexColor, Add-HexAlpha, and Get-ContrastForeground.
+
+.PARAMETER BaseColor
+    Hex color for the theme base (e.g., '#RRGGBB').
+
+.EXAMPLE
+    ConvertTo-PeacockColorBlock -BaseColor '#2ba7d0'
+    Returns an ordered hashtable of VS Code color keys and hex values.
+
+.NOTES
+    Depends on: Get-ContrastForeground, Lighten-HexColor, ConvertTo-DarkerHexColor, Add-HexAlpha
+#>
 function ConvertTo-PeacockColorBlock {
     [CmdletBinding()]
     param(

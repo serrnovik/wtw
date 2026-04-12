@@ -103,7 +103,7 @@ function Resolve-WtwTarget {
         return $null
     }
 
-    # 4. "alias-task" prefix match — sn3-b matches sn3-brain-stores-refactor
+    # 4. "alias-task" prefix match - sn3-b matches sn3-brain-stores-refactor
     if ($Name -match '^(.+?)-(.+)$') {
         $aliasOrName  = $Matches[1]
         $taskPrefix   = $Matches[2]
@@ -183,7 +183,7 @@ function Resolve-WtwTarget {
         return $null
     }
 
-    # 6. Fuzzy match — find closest target by edit distance
+    # 6. Fuzzy match - find closest target by edit distance
     $allTargets = Get-WtwAllTargetNames $registry
     $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
     if ($fuzzy.Match) {
