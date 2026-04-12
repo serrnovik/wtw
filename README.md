@@ -18,11 +18,11 @@ Re-run `wtw install` from the repo source after pulling updates. Running `wtw in
 ### 1. Register your repos
 
 ```powershell
-cd ~/Data/snogit/snowmain3
-wtw init "sn3,snowmain3" --template ./configs/workspace-templates/snowmain.code-workspace.template
+cd ~/projects/my-app
+wtw init "app,my-app"
 
-cd ~/Data/snogit/snowmain2
-wtw init "sn2,snowmain2" --template ./configs/workspace-templates/snowmain.code-workspace.template
+cd ~/projects/api-service
+wtw init "api,api-service" --template ./workspace.code-workspace.template
 ```
 
 This generates a `.code-workspace` file for each repo and registers it in the global registry.
@@ -30,14 +30,14 @@ This generates a `.code-workspace` file for each repo and registers it in the gl
 ### 2. Create a worktree
 
 ```powershell
-cd ~/Data/snogit/snowmain3
+cd ~/projects/my-app
 wtw create auth
 ```
 
 This creates:
-- Git worktree at `~/Data/snogit/snowmain3_auth/` (sibling to main repo)
+- Git worktree at `~/projects/my-app_auth/` (sibling to main repo)
 - Branch `auth`
-- Workspace file `snowmain3_auth.code-workspace` from your template
+- Workspace file `my-app_auth.code-workspace` from your template
 - Unique Peacock color
 - Superset project (if installed)
 
@@ -69,7 +69,7 @@ wtw clean                 # interactive selection + removal
 | `wtw init [aliases] [--template X]` | Register current repo (comma-separated aliases, optional shared template) |
 | `wtw add [path] [--repo X --task X]` | Import an existing worktree into the registry |
 | `wtw create <task> [--branch X] [--open] [--no-branch]` | Create worktree + workspace + branch |
-| `wtw list [--repo alias]` | List all repos and worktrees with paths and aliases |
+| `wtw list [-d\|--detailed] [--repo alias]` | List all repos and worktrees with paths and aliases |
 | `wtw <name>` | Switch to repo/worktree — implicit `go` (cd + session init) |
 | `wtw go <name>` | Same as above, explicit |
 | `wtw open [name] [--editor X]` | Open workspace in editor (defaults to current repo/worktree) |
@@ -80,6 +80,7 @@ wtw clean                 # interactive selection + removal
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
 | `wtw workspace <name> [--main] [--worktree-path X]` | Generate workspace file only (no git worktree) |
 | `wtw copy <name> [--code-folder X]` | Standalone workspace copy from template |
+| `wtw color [name] [hex\|random]` | Set workspace color |
 | `wtw sync --all [--dry-run] [--repo X]` | Re-apply template to all managed workspaces |
 | `wtw clean [--dry-run] [--force]` | Clean stale AI worktrees (codex, cursor, superset) |
 | `wtw install [--skip-profile]` | Install/update globally to `~/.wtw/module/` |
@@ -90,13 +91,13 @@ To import a worktree created by another tool (codex, cursor, manually) into the 
 
 ```powershell
 # From inside the worktree (auto-detects parent repo):
-cd /Users/sno/.codex/worktrees/c6b4/snowmain3
+cd /path/to/worktree
 wtw add
-# → Detected parent repo: snowmain3
+# → Detected parent repo: my-app
 # → prompts for task name
 
 # Or from anywhere, with explicit params:
-wtw add /path/to/worktree --repo snowmain3 --task my-feature
+wtw add /path/to/worktree --repo my-app --task my-feature
 ```
 
 After importing, the worktree appears in `wtw list` and you can use `wtw go my-feature`.
@@ -105,36 +106,31 @@ After importing, the worktree appears in `wtw list` and you can use `wtw go my-f
 
 All commands that accept a target name (`go`, `open`, `remove`, editor shortcuts, and the implicit go) share the same resolution logic via `Resolve-WtwTarget`:
 
-1. **Exact repo alias** — `sn3` goes to main repo
-2. **alias-task format** — `sn3-auth` resolves to repo `sn3` + worktree `auth`
+1. **Exact repo alias** — `app` goes to main repo
+2. **alias-task format** — `app-auth` resolves to repo `app` + worktree `auth`
 3. **Bare task name** — `auth` searches all repos (works if unambiguous)
 
-Multiple aliases per repo: `wtw init "sn3, snowmain3"` registers both.
+Multiple aliases per repo: `wtw init "app, my-app"` registers both.
 
 After `wtw create auth`, all these work:
 ```powershell
 wtw auth              # implicit go (task name)
-wtw sn3-auth          # alias-task format
+wtw app-auth          # alias-task format
 wtw go auth           # explicit go
-wtw remove sn3-auth   # remove using alias-task format
-wtw cursor sn3-auth   # open in Cursor
-sn3-auth              # shell alias (after terminal restart)
+wtw remove app-auth   # remove using alias-task format
+wtw cursor app-auth   # open in Cursor
+app-auth              # shell alias (after terminal restart)
 ```
 
 ## Templates
 
-Templates live in `configs/workspace-templates/` and define the shared workspace structure.
-
-### Template format
-
-Templates use `{{WTW_*}}` placeholders:
+Templates define the shared workspace structure and use `{{WTW_*}}` placeholders:
 
 ```json
 {
   "folders": [
     { "name": "{{WTW_WORKSPACE_NAME}}", "path": "{{WTW_CODE_FOLDER}}" },
-    { "path": "../../.gstack" },
-    { "path": "../obsidian/SnowObsidian" }
+    { "path": "../shared-tools" }
   ],
   "settings": {
     "terminal.integrated.cwd": "${workspaceFolder:{{WTW_WORKSPACE_NAME}}}",
@@ -145,7 +141,7 @@ Templates use `{{WTW_*}}` placeholders:
 
 | Placeholder | Replaced with |
 |-------------|---------------|
-| `{{WTW_WORKSPACE_NAME}}` | Workspace name (e.g., `snowmain3_auth`) |
+| `{{WTW_WORKSPACE_NAME}}` | Workspace name (e.g., `my-app_auth`) |
 | `{{WTW_CODE_FOLDER}}` | Absolute path to the worktree |
 
 Colors (`workbench.colorCustomizations`, `peacock.color`) are **not** in the template — wtw injects them automatically from the color palette.
@@ -155,12 +151,12 @@ Colors (`workbench.colorCustomizations`, `peacock.color`) are **not** in the tem
 Multiple repos can share a template for consistent terminal profiles, extra folders, and editor settings:
 
 ```powershell
-# snowmain2 and snowmain3 share the same workspace structure:
-wtw init "sn3,snowmain3" --template ./configs/workspace-templates/snowmain.code-workspace.template
-wtw init "sn2,snowmain2" --template ./configs/workspace-templates/snowmain.code-workspace.template
+# Two repos share the same workspace structure:
+wtw init "app,my-app" --template ./templates/shared.code-workspace.template
+wtw init "api,api-service" --template ./templates/shared.code-workspace.template
 
-# everix has a different structure:
-wtw init "e1,everix" --template ./configs/workspace-templates/everix.code-workspace.template
+# A third repo has a different structure:
+wtw init "dash,dashboard" --template ./templates/dashboard.code-workspace.template
 ```
 
 ### Syncing after template changes
@@ -170,7 +166,7 @@ When you update a template (add a folder, change a setting), re-apply it:
 ```powershell
 wtw sync --all --dry-run    # preview what would change
 wtw sync --all              # apply to all repos + worktrees
-wtw sync --all --repo sn3   # apply to one repo only
+wtw sync --all --repo app   # apply to one repo only
 ```
 
 ### Legacy support
@@ -179,20 +175,50 @@ If `--template` points to a real `.code-workspace` file (no `{{WTW_*}}` placehol
 
 ## List Output
 
-`wtw list` shows all registered repos and their worktrees:
+### Standard view
+
+`wtw list` shows all registered repos and their worktrees in a compact table. The **Color** column renders with actual ANSI true-color backgrounds in supported terminals:
 
 ```
-Kind  Repo       Aliases                      Branch                         Color    Path                                          Workspace
-----  ---------  ---------------------------  -----------------------------  -------  --------------------------------------------  --------------------------------
-repo  snowmain3  sn3, snowmain3               NTB-Dashboard-Context-Capture  #2285a6  /Users/sno/Data/snogit/snowmain3              snowmain3.code-workspace
-  wt             sn3-auth, snowmain3-auth     auth                           #e05d44  /Users/sno/Data/snogit/snowmain3_auth         snowmain3_auth.code-workspace
-repo  snowmain2  sn2, snowmain2               landing-page-post-poc          #869336  /Users/sno/Data/snogit/snowmain2              snowmain2.code-workspace
-repo  everix1    e1, evx1, everix1            EVX-6008-uptime-monitor        #215732  /Users/sno/Data/everix/everix1                everix1.code-workspace
+  Kind  Repo         Aliases                Branch          Color    Path                              Workspace
+  ----  -----------  ---------------------  --------------  -------  --------------------------------  ----------------------------
+  repo  my-app       app, my-app            main            #2285a6  /home/user/projects/my-app        my-app.code-workspace
+    wt               app-auth, my-app-auth  auth            #e05d44  /home/user/projects/my-app_auth   my-app_auth.code-workspace
+  repo  api-service  api, api-service       develop         #97ca00  /home/user/projects/api-service   api-service.code-workspace
 ```
 
 - **Kind**: `repo` = main repo, `wt` = worktree (indented)
 - **Aliases**: what you type in `wtw go` / `wtw cursor` / shell shortcuts
-- **Path**: where the code lives on disk
+- **Color**: rendered as a colored swatch with contrasting text
+
+### Detailed view
+
+`wtw list --detailed` (or `wtw list -d`) shows a card-style layout with:
+- Repo names rendered as full-width colored badges
+- Worktree entries with color dot indicators
+- Clickable `file://` hyperlinks on paths (in terminals that support OSC 8)
+- A **Settings** section at the bottom with clickable links to all config files
+
+```
+  ╔══════════════════════════════════════════╗
+  ║  wtw — Worktree & Workspace Registry     ║
+  ╚══════════════════════════════════════════╝
+
+    my-app    main
+    Aliases   : app, my-app
+    Path      : /home/user/projects/my-app
+    Workspace : my-app.code-workspace
+
+      ██ auth
+      Aliases   : app-auth, my-app-auth
+      Path      : /home/user/projects/my-app_auth
+      Workspace : my-app_auth.code-workspace
+
+  ─── Settings ───
+    Registry : ~/.wtw/registry.json
+    Colors   : ~/.wtw/colors.json
+    Config   : ~/.wtw/config.json
+```
 
 ## Config
 
@@ -210,28 +236,28 @@ All config lives in `~/.wtw/`:
 Worktrees are created as siblings to the main repo, named `{registryKey}_{task}`:
 
 ```
-~/Data/snogit/
-├── snowmain3/               # main repo
-├── snowmain3_auth/          # worktree: wtw create auth
-├── snowmain3_billing/       # worktree: wtw create billing
-├── snowmain2/               # another repo copy
-├── snowmain2_hotfix/        # worktree: wtw create hotfix (from sn2)
+~/projects/
+├── my-app/               # main repo
+├── my-app_auth/          # worktree: wtw create auth
+├── my-app_billing/       # worktree: wtw create billing
+├── api-service/          # another repo
+├── api-service_hotfix/   # worktree: wtw create hotfix (from api)
 ```
 
 ## Workspace Files
 
-Generated in the configured `workspacesDir` (default: `~/Data/code-workspaces/`):
+Generated in the configured `workspacesDir` (default: `~/code-workspaces/`):
 
 ```
-~/Data/code-workspaces/
-├── snowmain3.code-workspace          # main repo (generated by wtw init)
-├── snowmain3_auth.code-workspace     # generated by wtw create auth
-├── snowmain3_billing.code-workspace  # generated by wtw create billing
+~/code-workspaces/
+├── my-app.code-workspace             # main repo (generated by wtw init)
+├── my-app_auth.code-workspace        # generated by wtw create auth
+├── my-app_billing.code-workspace     # generated by wtw create billing
 ```
 
 Each generated workspace:
 - Points to the worktree as the code folder
-- Keeps extra folders from template (.gstack, obsidian, etc.)
+- Keeps extra folders from template
 - Gets a unique Peacock color from the 20-color palette
 - Has terminal profiles pointing to the correct `${workspaceFolder:X}`
 - Stores `wtw.*` metadata in settings for sync support
@@ -241,7 +267,7 @@ Each generated workspace:
 20-color palette auto-assigned per worktree. Colors are recycled when worktrees are removed. Colors are applied to:
 - VS Code/Cursor Peacock color customizations (title bar, activity bar, status bar)
 - Superset project sidebar (if installed)
-- iTerm2 / Windows Terminal tab colors (via `start-repository-session.ps1`)
+- iTerm2 / Windows Terminal tab colors (via session scripts)
 
 ## Superset Integration
 
@@ -254,10 +280,10 @@ When [Superset](https://superset.sh) is installed (`~/.superset/local.db` exists
 `wtw install` adds a loader to your PowerShell profile. On shell startup, `Register-WtwProfile` creates shortcut aliases from the registry:
 
 ```powershell
-sn3              # same as: wtw go sn3
-sn3-auth         # same as: wtw go sn3-auth
-snowmain3        # same as: wtw go snowmain3
-snowmain3-auth   # same as: wtw go snowmain3-auth
+app              # same as: wtw go app
+app-auth         # same as: wtw go app-auth
+my-app           # same as: wtw go my-app
+my-app-auth      # same as: wtw go my-app-auth
 ```
 
 New worktrees get aliases after terminal restart. Within the current session, use `wtw <name>` directly.
@@ -267,27 +293,14 @@ New worktrees get aliases after terminal restart. Within the current session, us
 `wtw init` rejects aliases already used by another repo:
 
 ```
-wtw init "sn3,duplicate"
-# Error: Alias 'sn3' is already used by repo 'snowmain3'. Choose different aliases.
+wtw init "app,duplicate"
+# Error: Alias 'app' is already used by repo 'my-app'. Choose different aliases.
 ```
 
 ## Git Hooks in Worktrees
 
-Worktrees share hooks with the main repo (`.git` is a file in worktrees, not a directory). `start-repository-session.ps1` detects this and skips hook installation for worktrees.
+Worktrees share hooks with the main repo (`.git` is a file in worktrees, not a directory). Session scripts detect this and skip hook installation for worktrees.
 
 ## Cross-Platform
 
 Works on macOS, Windows, and Linux with PowerShell 7+. Uses `Join-Path` everywhere, `du -sk` for fast size scanning on Unix (falls back to `Get-ChildItem` on Windows).
-
-## Changelog
-
-### Unified Name Resolution (2026-04-04)
-
-Extracted the 3-step name resolution logic (exact alias, alias-task format, bare task name) into a shared `Resolve-WtwTarget` helper in `private/`. Previously this logic was duplicated across `Enter-WtwWorktree`, `Open-WtwWorkspace`, and `Remove-WtwWorktree` — with `Remove-WtwWorktree` missing the alias-task parsing entirely, causing `wtw remove sn3-play2` to fail with "not found" even though `wtw list` showed it.
-
-**Changed files:**
-- `private/Resolve-WtwTarget.ps1` — new shared resolution helper
-- `public/Enter-WtwWorktree.ps1` — refactored to use `Resolve-WtwTarget`
-- `public/Open-WtwWorkspace.ps1` — refactored to use `Resolve-WtwTarget`
-- `public/Remove-WtwWorktree.ps1` — refactored to use `Resolve-WtwTarget`, param renamed `$Task` → `$Name`
-- `public/Invoke-Wtw.ps1` — `remove`/`rm` dispatch now passes `Name` instead of `Task`

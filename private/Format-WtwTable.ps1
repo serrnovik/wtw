@@ -1,3 +1,18 @@
+function Format-WtwColorSwatch {
+    param([string] $Hex)
+    if ($Hex -notmatch '^#[0-9a-fA-F]{6}$') { return $Hex }
+    $r = [convert]::ToInt32($Hex.Substring(1, 2), 16)
+    $g = [convert]::ToInt32($Hex.Substring(3, 2), 16)
+    $b = [convert]::ToInt32($Hex.Substring(5, 2), 16)
+    $fg = Get-ContrastForeground $Hex
+    $fr = [convert]::ToInt32($fg.Substring(1, 2), 16)
+    $fg2 = [convert]::ToInt32($fg.Substring(3, 2), 16)
+    $fb = [convert]::ToInt32($fg.Substring(5, 2), 16)
+    $esc = [char]27
+    # Render: colored block with hex text inside
+    return "${esc}[38;2;${fr};${fg2};${fb}m${esc}[48;2;${r};${g};${b}m ${Hex} ${esc}[0m"
+}
+
 function Format-WtwTable {
     [CmdletBinding()]
     param(
@@ -37,7 +52,20 @@ function Format-WtwTable {
 
     # Rows
     foreach ($item in $Items) {
-        $row = ($Columns | ForEach-Object { "$($item.$_)".PadRight($widths[$_]) }) -join '  '
+        $segments = @()
+        foreach ($col in $Columns) {
+            $val = "$($item.$col)"
+            $padded = $val.PadRight($widths[$col])
+            if ($col -eq 'Color' -and $val -match '^#[0-9a-fA-F]{6}$') {
+                $segments += Format-WtwColorSwatch $val
+                # Swatch visible width = val.Length + 2 (spaces around hex), compensate
+                $extra = $widths[$col] - $val.Length - 2
+                if ($extra -gt 0) { $segments += ' ' * $extra }
+            } else {
+                $segments += $padded
+            }
+        }
+        $row = $segments -join '  '
         Write-Host "  $row"
     }
 }

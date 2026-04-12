@@ -53,7 +53,7 @@ function Invoke-Wtw {
         Write-Host '    init [aliases]    Register current repo (--template <alias> to share settings)'
         Write-Host '    add [path]        Add existing repo/worktree to registry'
         Write-Host '    create <task>     Create worktree + workspace'
-        Write-Host '    list              List registered worktrees'
+        Write-Host '    list [-d|--detailed]  List registered worktrees'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
         Write-Host '    open [name]       Open workspace in editor (default: current)'
         Write-Host '    cursor [name]     Open in Cursor   (alias: cur)'

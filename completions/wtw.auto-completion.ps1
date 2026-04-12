@@ -59,7 +59,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'clean'  { @('--dry-run', '--force') }
             'remove' { @('--repo', '--force') }
             'open'   { @('--repo', '--editor') }
-            'list'   { @('--repo') }
+            'list'   { @('--repo', '--detailed', '-d') }
             default  { @() }
         }
         $flags | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
