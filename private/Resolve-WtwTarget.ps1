@@ -11,6 +11,7 @@ function Resolve-WtwTarget {
           3. Bare task name exact match    -> searches all repos for unique match
           4. "alias-task" prefix match     -> unique prefix on task name (sn3-b -> sn3-brain-stores-refactor)
           5. Bare task name prefix match   -> unique prefix across all repos
+          5b. Substring match on task     -> "content" matches "ntb-content-engine"
           6. Fuzzy match (Levenshtein)    -> auto-resolve if unique close match, suggest if tied
     .OUTPUTS
         PSCustomObject with: RepoName, RepoEntry, TaskName, WorktreeEntry
@@ -151,6 +152,33 @@ function Resolve-WtwTarget {
     if ($prefixFound.Count -gt 1) {
         $names = ($prefixFound | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
         Write-Error "Ambiguous prefix '$Name'. Matches: $names"
+        return $null
+    }
+
+    # 5b. Substring match on task names -> "content" matches "ntb-content-engine"
+    $substringFound = @()
+    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+        $repo = $registry.repos.$repoName
+        if (-not $repo.worktrees) { continue }
+        foreach ($t in $repo.worktrees.PSObject.Properties.Name) {
+            if ($t -like "*${Name}*") {
+                $substringFound += [PSCustomObject]@{
+                    RepoName       = $repoName
+                    RepoEntry      = $repo
+                    TaskName       = $t
+                    WorktreeEntry  = $repo.worktrees.$t
+                }
+            }
+        }
+    }
+
+    if ($substringFound.Count -eq 1) {
+        Write-Host "  Substring match: '$Name' → '$($substringFound[0].TaskName)'" -ForegroundColor Yellow
+        return $substringFound[0]
+    }
+    if ($substringFound.Count -gt 1) {
+        $names = ($substringFound | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
+        Write-Error "Ambiguous substring '$Name'. Matches: $names"
         return $null
     }
 

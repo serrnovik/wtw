@@ -55,12 +55,10 @@ _wtw_go() {
     IFS=$'\t' read -r path color title startup_script <<< "$result"
     [ -z "$path" ] && echo "Could not resolve '$name'" && return 1
     cd "$path" || return 1
-    # Run startup script if configured, otherwise set terminal color
-    if [ -n "$startup_script" ] && [ -f "${path}/${startup_script}" ]; then
-        "$_wtw_pwsh" -NoLogo -NoProfile -File "${path}/${startup_script}"
-    else
-        _wtw_set_terminal "$color" "$title"
-    fi
+    # Always set terminal color/title natively from zsh.
+    # Startup scripts are pwsh-specific (they expect a full pwsh profile environment)
+    # and should not be launched from a zsh subprocess.
+    _wtw_set_terminal "$color" "$title"
 }
 
 # Main wtw function — dispatches commands
@@ -110,15 +108,7 @@ _wtw_register_aliases() {
         [ -z "$_wtw_a" ] && continue
         _wtw_defs+="function ${_wtw_a}() {"$'\n'
         _wtw_defs+="  cd '${_wtw_p}' || return 1"$'\n'
-        if [ -n "$_wtw_s" ]; then
-            _wtw_defs+="  if [ -f '${_wtw_p}/${_wtw_s}' ]; then"$'\n'
-            _wtw_defs+="    $_wtw_pwsh -NoLogo -NoProfile -File '${_wtw_p}/${_wtw_s}'"$'\n'
-            _wtw_defs+="  else"$'\n'
-            _wtw_defs+="    _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'
-            _wtw_defs+="  fi"$'\n'
-        else
-            _wtw_defs+="  _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'
-        fi
+        _wtw_defs+="  _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'
         _wtw_defs+="}"$'\n'
     done <<< "$_wtw_output"
 
