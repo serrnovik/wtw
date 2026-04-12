@@ -91,5 +91,10 @@ function Reset-WtwTerminalColor {
         Write-Host "${esc}]30;${bel}" -NoNewline
     } elseif ($env:KONSOLE_VERSION) {
         Write-Host "${esc}]30;${bel}" -NoNewline
+    } elseif ($env:WEZTERM_PANE) {
+        # WezTerm: clear user var
+        Write-Host "${esc}]1337;SetUserVar=wtw_color=$(
+            [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes(''))
+        )${bel}" -NoNewline
     }
 }

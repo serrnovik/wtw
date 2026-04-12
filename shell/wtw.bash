@@ -43,10 +43,11 @@ _wtw_set_terminal() {
 _wtw_go() {
     local name="$1"
     [ -z "$name" ] && echo "Usage: wtw go <name>" && return 1
+    local safe_name="${name//\'/\'\\\'\'}"
     local result
     result=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
-        Invoke-Wtw __resolve '${name}'
+        Invoke-Wtw __resolve '${safe_name}'
     " 2>&1)
     [ $? -ne 0 ] && echo "$result" && return 1
     local path color title startup_script
@@ -64,13 +65,13 @@ wtw() {
         "")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
         init|add|create|remove|rm|workspace|ws|copy|sync|color|clean|install|update)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*"
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@"
             case "$1" in
                 init|add|create|remove|rm) _wtw_register_aliases ;;
             esac
             ;;
         list|ls|open|help|-h|--help)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@" ;;
         *)
             _wtw_go "$1" ;;
     esac
@@ -90,6 +91,11 @@ _wtw_register_aliases() {
     local _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s
     while IFS=$'\t' read -r _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s; do
         [ -z "$_wtw_a" ] && continue
+        # Skip aliases with unsafe characters (only allow alphanumeric, dash, underscore)
+        [[ "$_wtw_a" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
+        _wtw_p="${_wtw_p//\'/\'\\\'\'}"
+        _wtw_c="${_wtw_c//\'/\'\\\'\'}"
+        _wtw_t="${_wtw_t//\'/\'\\\'\'}"
         _wtw_defs+="${_wtw_a}() {"$'\n'
         _wtw_defs+="  cd '${_wtw_p}' || return 1"$'\n'
         _wtw_defs+="  _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'

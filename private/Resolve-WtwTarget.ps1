@@ -156,12 +156,13 @@ function Resolve-WtwTarget {
     }
 
     # 5b. Substring match on task names -> "content" matches "ntb-content-engine"
+    $escapedName = [WildcardPattern]::Escape($Name)
     $substringFound = @()
     foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
         $repo = $registry.repos.$repoName
         if (-not $repo.worktrees) { continue }
         foreach ($t in $repo.worktrees.PSObject.Properties.Name) {
-            if ($t -like "*${Name}*") {
+            if ($t -like "*${escapedName}*") {
                 $substringFound += [PSCustomObject]@{
                     RepoName       = $repoName
                     RepoEntry      = $repo

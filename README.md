@@ -172,7 +172,7 @@ All commands that accept a target name (`go`, `open`, `remove`, editor shortcuts
 2. **alias-task format** — `app-auth` resolves to repo `app` + worktree `auth`
 3. **Bare task name** — `auth` searches all repos (works if unambiguous)
 
-Multiple aliases per repo: `wtw init "app, my-app"` registers both.
+Multiple aliases per repo: `wtw init "app,my-app"` registers both.
 
 After `wtw create auth`, all these work:
 ```powershell

@@ -45,10 +45,11 @@ _wtw_set_terminal() {
 _wtw_go() {
     local name="$1"
     [ -z "$name" ] && echo "Usage: wtw go <name>" && return 1
+    local safe_name="${name//\'/\'\\\'\'}"
     local result
     result=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
-        Invoke-Wtw __resolve '${name}'
+        Invoke-Wtw __resolve '${safe_name}'
     " 2>&1)
     [ $? -ne 0 ] && echo "$result" && return 1
     local path color title startup_script
@@ -70,7 +71,7 @@ wtw() {
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
         # Commands that modify registry — delegate fully to pwsh
         init|add|create|remove|rm|workspace|ws|copy|sync|color|clean|install|update)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*"
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@"
             # Regenerate aliases after commands that change the registry
             case "$1" in
                 init|add|create|remove|rm) _wtw_register_aliases ;;
@@ -78,13 +79,13 @@ wtw() {
             ;;
         # List — delegate to pwsh (ANSI output passes through)
         list|ls)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@" ;;
         # Open — delegate to pwsh
         open)
-            shift; "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw open $*" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@" ;;
         # Help
         help|-h|--help)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw $*" ;;
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@" ;;
         # Unknown: try as implicit "go" (same as pwsh behavior)
         *)
             _wtw_go "$1" ;;
@@ -106,6 +107,11 @@ _wtw_register_aliases() {
     local _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s
     while IFS=$'\t' read -r _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s; do
         [ -z "$_wtw_a" ] && continue
+        # Skip aliases with unsafe characters (only allow alphanumeric, dash, underscore)
+        [[ "$_wtw_a" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
+        _wtw_p="${_wtw_p//\'/\'\\\'\'}"
+        _wtw_c="${_wtw_c//\'/\'\\\'\'}"
+        _wtw_t="${_wtw_t//\'/\'\\\'\'}"
         _wtw_defs+="function ${_wtw_a}() {"$'\n'
         _wtw_defs+="  cd '${_wtw_p}' || return 1"$'\n'
         _wtw_defs+="  _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'

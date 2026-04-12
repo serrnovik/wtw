@@ -3,55 +3,8 @@ BeforeAll {
     Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
 }
 
-Describe 'Shell wrapper files' {
-    It 'wtw.zsh exists and is non-empty' {
-        $path = Join-Path $PSScriptRoot '../shell/wtw.zsh'
-        $path | Should -Exist
-        (Get-Content $path -Raw).Length | Should -BeGreaterThan 100
-    }
-
-    It 'wtw.bash exists and is non-empty' {
-        $path = Join-Path $PSScriptRoot '../shell/wtw.bash'
-        $path | Should -Exist
-        (Get-Content $path -Raw).Length | Should -BeGreaterThan 100
-    }
-
-    It 'wtw.zsh defines wtw function' {
-        $content = Get-Content (Join-Path $PSScriptRoot '../shell/wtw.zsh') -Raw
-        $content | Should -Match 'wtw\(\)'
-    }
-
-    It 'wtw.bash defines wtw function' {
-        $content = Get-Content (Join-Path $PSScriptRoot '../shell/wtw.bash') -Raw
-        $content | Should -Match 'wtw\(\)'
-    }
-
-    It 'zsh wrapper resolves pwsh path at source time' {
-        $content = Get-Content (Join-Path $PSScriptRoot '../shell/wtw.zsh') -Raw
-        $content | Should -Match '_wtw_pwsh=\$\(command -v pwsh'
-    }
-
-    It 'bash wrapper resolves pwsh path at source time' {
-        $content = Get-Content (Join-Path $PSScriptRoot '../shell/wtw.bash') -Raw
-        $content | Should -Match '_wtw_pwsh=\$\(command -v pwsh'
-    }
-
-    It 'neither wrapper uses bare pwsh for commands (only $_wtw_pwsh)' {
-        foreach ($file in @('wtw.zsh', 'wtw.bash')) {
-            $lines = Get-Content (Join-Path $PSScriptRoot "../shell/$file")
-            foreach ($line in $lines) {
-                # Skip comments, the resolver line itself, and the fallback echo
-                if ($line -match '^\s*#') { continue }
-                if ($line -match '_wtw_pwsh=') { continue }
-                if ($line -match 'command -v pwsh') { continue }
-                if ($line -match 'echo "pwsh"') { continue }
-                if ($line -match '/pwsh') { continue }  # path probing lines
-                # No bare 'pwsh ' should appear
-                $line | Should -Not -Match '(?<![_$/])\bpwsh\b\s+-No' -Because "line in $file should use `$_wtw_pwsh: $line"
-            }
-        }
-    }
-}
+# Shell wrapper file checks (syntax, function defs, bare-pwsh) are in bats tests.
+# This file tests the PowerShell side that the shell wrappers depend on.
 
 Describe 'Terminal escape sequences' {
     It 'Set-WtwTerminalColor does not throw with valid hex color' {
@@ -103,6 +56,7 @@ Describe '__resolve and __aliases output format' {
     It '__resolve output contains no Write-Host noise' -Skip:(-not $script:hasRepos) {
         $result = & { Invoke-Wtw __resolve $script:firstAlias } 6>$null
         $result | Should -Not -Match 'Fuzzy match'
+        $result | Should -Not -Match 'Substring match'
         $result | Should -Not -Match 'Detected'
         $result | Should -Not -Match '\[0m'  # no ANSI escapes
     }
