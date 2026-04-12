@@ -136,6 +136,43 @@ function Invoke-Wtw {
         'install'   { Install-Wtw @splat }
         'update'    { Install-Wtw @splat }
         'help'    { Invoke-Wtw }
+        # Internal commands for shell integration (zsh/bash wrappers call these)
+        '__resolve' {
+            # Output: path\tcolor\ttitle\tstartup_script
+            # Used by wtw.zsh/wtw.bash to get resolve info without importing the full module interactively
+            if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name>"; return }
+            $target = Resolve-WtwTarget $pos[0]
+            if (-not $target) { exit 1 }
+            $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+            $c = if ($target.WorktreeEntry) { $target.WorktreeEntry.color } else { (Get-WtwColors).assignments."$($target.RepoName)/main" }
+            $t = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
+            $s = $target.RepoEntry.sessionScript ?? ''
+            Write-Output "${p}`t${c}`t${t}`t${s}"
+        }
+        '__aliases' {
+            # Output shell alias definitions: one per line as "alias_name\tpath\tcolor\ttitle\tstartup_script"
+            $registry = Get-WtwRegistry
+            $colors = Get-WtwColors
+            foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+                $repo = $registry.repos.$repoName
+                $aliases = Get-WtwRepoAliases $repo
+                $ss = $repo.sessionScript ?? ''
+                $mainColor = $colors.assignments."$repoName/main" ?? ''
+                foreach ($a in $aliases) {
+                    Write-Output "${a}`t$($repo.mainPath)`t${mainColor}`t${repoName}`t${ss}"
+                }
+                if ($repo.worktrees) {
+                    foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+                        $wt = $repo.worktrees.$taskName
+                        $wtColor = $wt.color ?? ''
+                        $wtTitle = "$repoName/$taskName"
+                        foreach ($a in $aliases) {
+                            Write-Output "${a}-${taskName}`t$($wt.path)`t${wtColor}`t${wtTitle}`t${ss}"
+                        }
+                    }
+                }
+            }
+        }
         default   {
             # Check if command is an editor shortcut (cursor, cur, code, co, anti, etc.)
             $resolvedEditor = Resolve-WtwEditorCommand $Command

@@ -29,15 +29,50 @@ No manual bookkeeping. No stale directories. No identical-looking windows.
 
 ## Install
 
+### One-liner (recommended)
+
+Checks for git and PowerShell 7+, installs them if missing, clones wtw, and runs `wtw install`.
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/serrnovik/wtw/main/install.sh | bash
+```
+
+**Windows** (from PowerShell):
+
 ```powershell
-# From inside the repo containing this module:
-Import-Module ./devops/worktree-workspace/wtw.psm1 -Force
+irm https://raw.githubusercontent.com/serrnovik/wtw/main/install.ps1 | iex
+```
+
+### From PowerShell Gallery
+
+If you already have PowerShell 7+:
+
+```powershell
+Install-Module -Name wtw -Scope CurrentUser
+Import-Module wtw
 wtw install
 ```
 
-This copies the module to `~/.wtw/module/`, adds a loader to your PowerShell profile, detects installed editors, and offers to install the Peacock extension.
+### From source (git)
 
-Re-run `wtw install` from the repo source after pulling updates. Running `wtw install` from the global copy is blocked (it would delete itself).
+```powershell
+git clone https://github.com/serrnovik/wtw.git
+cd wtw
+Import-Module ./wtw.psm1 -Force
+wtw install
+```
+
+### What `wtw install` does
+
+- Copies the module to `~/.wtw/module/`
+- Sets up your shell profile (PowerShell, zsh, and/or bash)
+- Detects installed editors (VS Code, Cursor, Windsurf, VSCodium, Antigravity)
+- Offers to install the [Peacock extension](https://marketplace.visualstudio.com/items?itemName=johnpapa.vscode-peacock)
+- Checks that git is available
+
+Re-run `wtw install` from source after pulling updates.
 
 ## Quick Start
 
@@ -340,6 +375,47 @@ wtw init "app,duplicate"
 
 Worktrees share hooks with the main repo (`.git` is a file in worktrees, not a directory). Session scripts detect this and skip hook installation for worktrees.
 
+## Shell Integration
+
+wtw is a PowerShell module, but you don't need to use pwsh as your daily shell. Thin wrappers for **zsh** and **bash** delegate to pwsh for all logic while handling `cd` and terminal colors natively.
+
+### Setup
+
+`wtw install` detects your shell and offers to add the loader:
+
+| Shell | Config file | Loader |
+|-------|------------|--------|
+| **PowerShell** | `$PROFILE` | Module import + `Register-WtwProfile` (automatic) |
+| **zsh** | `~/.zshrc` | `source ~/.wtw/shell/wtw.zsh` |
+| **bash** | `~/.bashrc` | `source ~/.wtw/shell/wtw.bash` |
+
+### What runs where
+
+| Command | zsh/bash | pwsh |
+|---------|----------|------|
+| `wtw go <name>` / `wtw <name>` | `cd` + terminal color (native) | Name resolution (subprocess) |
+| Shell aliases (`app-auth`) | `cd` + terminal color (native) | Pre-generated at shell startup |
+| `wtw list`, `wtw create`, etc. | Passthrough | Full logic |
+
+The pwsh subprocess adds ~400ms latency to `wtw go`. Pre-generated shell aliases are instant.
+
+### Terminal Color Support
+
+| Terminal | Tab color | Window title | Platform |
+|----------|-----------|-------------|----------|
+| **iTerm2** | Yes | Yes | macOS |
+| **Windows Terminal** | Yes | Yes | Windows |
+| **Kitty** | Yes | Yes | Linux/macOS |
+| **Konsole** | Yes | Yes | Linux (KDE) |
+| **tmux** | Pane border color | Pane title | All |
+| **WezTerm** | Via user var | Yes | All |
+| Terminal.app | No | Yes | macOS |
+| GNOME Terminal | No | Yes | Linux |
+| Alacritty | No | Yes | All |
+| cmd.exe / PowerShell console | No | Yes | Windows |
+
+Terminals without tab color support still get the window title set, which helps with orientation when alt-tabbing.
+
 ## Cross-Platform
 
-Works on macOS, Windows, and Linux with PowerShell 7+. Uses `Join-Path` everywhere, `du -sk` for fast size scanning on Unix (falls back to `Get-ChildItem` on Windows).
+Works on macOS, Windows, and Linux with PowerShell 7+. Uses `Join-Path` everywhere, `du -sk` for fast size scanning on Unix (falls back to `Get-ChildItem` on Windows). zsh and bash wrappers available for non-PowerShell daily drivers.
