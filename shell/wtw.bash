@@ -56,6 +56,22 @@ _wtw_run_script() {
     esac
 }
 
+# Set worktree environment variables for dev tooling integration
+_wtw_export_env() {
+    local wt_id="$1" wt_index="${2:-0}"
+    local port_offset=$((wt_index * 100))
+    export WTW_WORKTREE_ID="$wt_id"
+    export WTW_WORKTREE_INDEX="$wt_index"
+    export DEV_WORKTREE_ID="$wt_id"
+    export DEV_WORKTREE_INDEX="$wt_index"
+    export DEV_WORKTREE_PORT_OFFSET="$port_offset"
+    if [ -n "$wt_id" ]; then
+        export DEV_WORKTREE_DASHED_POSTFIX="-${wt_id}"
+    else
+        export DEV_WORKTREE_DASHED_POSTFIX=""
+    fi
+}
+
 # Go to a worktree: resolve via pwsh, cd natively, run session script + set terminal color
 _wtw_go() {
     local name="$1"
@@ -67,10 +83,11 @@ _wtw_go() {
         Invoke-Wtw __resolve '${safe_name}' --shell bash
     " 2>&1)
     [ $? -ne 0 ] && echo "$result" && return 1
-    local path color title startup_script
-    IFS=$'\t' read -r path color title startup_script <<< "$result"
+    local path color title startup_script wt_id wt_index
+    IFS=$'\t' read -r path color title startup_script wt_id wt_index <<< "$result"
     [ -z "$path" ] && echo "Could not resolve '$name'" && return 1
     cd "$path" || return 1
+    _wtw_export_env "$wt_id" "$wt_index"
     _wtw_set_terminal "$color" "$title"
     if [ -n "$startup_script" ]; then
         _wtw_run_script "${path}/${startup_script}"
@@ -120,8 +137,8 @@ _wtw_register_aliases() {
     [ -z "$_wtw_output" ] && return
 
     local _wtw_defs=""
-    local _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s
-    while IFS=$'\t' read -r _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s; do
+    local _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s _wtw_wid _wtw_widx
+    while IFS=$'\t' read -r _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s _wtw_wid _wtw_widx; do
         [ -z "$_wtw_a" ] && continue
         [[ "$_wtw_a" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
         _wtw_p="${_wtw_p//\'/\'\\\'\'}"
@@ -130,6 +147,7 @@ _wtw_register_aliases() {
         _wtw_s="${_wtw_s//\'/\'\\\'\'}"
         _wtw_defs+="${_wtw_a}() {"$'\n'
         _wtw_defs+="  cd '${_wtw_p}' || return 1"$'\n'
+        _wtw_defs+="  _wtw_export_env '${_wtw_wid}' '${_wtw_widx}'"$'\n'
         _wtw_defs+="  _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'
         if [ -n "$_wtw_s" ]; then
             _wtw_defs+="  _wtw_run_script '${_wtw_p}/${_wtw_s}'"$'\n'

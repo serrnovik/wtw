@@ -125,3 +125,20 @@ wtw sync --all             # apply
 wtw clean --dry-run        # see what's stale
 wtw clean                  # interactive selection
 ```
+
+## Dev Environment Variables
+
+When switching to a worktree, wtw exports environment variables that build/deploy tools can use for isolation:
+
+| Variable | In worktree | In main repo |
+|----------|------------|-------------|
+| `DEV_WORKTREE_ID` | `auth` | *(empty)* |
+| `DEV_WORKTREE_DASHED_POSTFIX` | `-auth` | *(empty)* |
+| `DEV_WORKTREE_PORT_OFFSET` | `100` | `0` |
+| `DEV_WORKTREE_INDEX` | `1` | `0` |
+
+These are generic (tool-agnostic). Use them in jaxfiles or deploy scripts:
+```yaml
+# Namespace with optional worktree suffix
+namespace: "{{ boss.suite.name }}{{ env.DEV_WORKTREE_DASHED_POSTFIX }}"
+```

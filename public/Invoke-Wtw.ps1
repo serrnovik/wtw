@@ -140,7 +140,7 @@ function Invoke-Wtw {
         'help'    { Invoke-Wtw }
         # Internal commands for shell integration (zsh/bash wrappers call these)
         '__resolve' {
-            # Output: path\tcolor\ttitle\tstartup_script
+            # Output: path\tcolor\ttitle\tstartup_script\tworktree_id\tworktree_index
             # Used by wtw.zsh/wtw.bash — must be clean stdout (no Write-Host noise)
             # Optional: --shell zsh|bash to resolve per-shell session script
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name> [--shell zsh|bash]"; return }
@@ -151,10 +151,20 @@ function Invoke-Wtw {
             $c = if ($target.WorktreeEntry) { $target.WorktreeEntry.color } else { (Get-WtwColors).assignments."$($target.RepoName)/main" }
             $t = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
             $s = Resolve-WtwSessionScript -RepoEntry $target.RepoEntry -Shell $shellType
-            Write-Output "${p}`t${c}`t${t}`t${s}"
+            # Compute worktree index for env vars
+            $wtId = $target.TaskName ?? ''
+            $wtIndex = 0
+            if ($target.TaskName -and $target.RepoEntry.worktrees) {
+                $i = 1
+                foreach ($tn in $target.RepoEntry.worktrees.PSObject.Properties.Name) {
+                    if ($tn -eq $target.TaskName) { $wtIndex = $i; break }
+                    $i++
+                }
+            }
+            Write-Output "${p}`t${c}`t${t}`t${s}`t${wtId}`t${wtIndex}"
         }
         '__aliases' {
-            # Output shell alias definitions: one per line as "alias_name\tpath\tcolor\ttitle\tstartup_script"
+            # Output: alias_name\tpath\tcolor\ttitle\tstartup_script\tworktree_id\tworktree_index
             # Optional: --shell zsh|bash to resolve per-shell session scripts
             $shellType = $splat['Shell'] ?? ''
             $registry = Get-WtwRegistry
@@ -165,16 +175,18 @@ function Invoke-Wtw {
                 $ss = Resolve-WtwSessionScript -RepoEntry $repo -Shell $shellType
                 $mainColor = $colors.assignments."$repoName/main" ?? ''
                 foreach ($a in $aliases) {
-                    Write-Output "${a}`t$($repo.mainPath)`t${mainColor}`t${repoName}`t${ss}"
+                    Write-Output "${a}`t$($repo.mainPath)`t${mainColor}`t${repoName}`t${ss}`t`t0"
                 }
                 if ($repo.worktrees) {
+                    $wtIdx = 1
                     foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
                         $wt = $repo.worktrees.$taskName
                         $wtColor = $wt.color ?? ''
                         $wtTitle = "$repoName/$taskName"
                         foreach ($a in $aliases) {
-                            Write-Output "${a}-${taskName}`t$($wt.path)`t${wtColor}`t${wtTitle}`t${ss}"
+                            Write-Output "${a}-${taskName}`t$($wt.path)`t${wtColor}`t${wtTitle}`t${ss}`t${taskName}`t${wtIdx}"
                         }
+                        $wtIdx++
                     }
                 }
             }

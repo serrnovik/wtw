@@ -46,6 +46,9 @@ function Enter-WtwWorktree {
         $target.RepoName
     }
 
+    # Set worktree environment variables (WTW_*, DEV_WORKTREE_*)
+    Set-WtwWorktreeEnv -RepoName $target.RepoName -TaskName $target.TaskName -RepoEntry $repo
+
     # Use Set-GitRepo if available (from user profile), otherwise direct approach
     if (Get-Command 'Set-GitRepo' -ErrorAction SilentlyContinue) {
         $toolName = if ($sessionScript) { $sessionScript } else { 'start-repository-session.ps1' }

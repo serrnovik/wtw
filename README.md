@@ -448,6 +448,69 @@ The pwsh subprocess adds ~400ms latency to `wtw go`. Pre-generated shell aliases
 
 Terminals without tab color support still get the window title set, which helps with orientation when alt-tabbing.
 
+## Dev Environment Integration
+
+### Philosophy
+
+wtw's surface is lean: it manages worktrees, workspaces, colors, and shell aliases. It does **not** know about ports, namespaces, databases, or deployment — that's your build tool's job.
+
+What wtw does is **tag the session** with environment variables that your build tool can read. If the variable is set, your deploy scripts can isolate. If not, they run shared. Zero config for the common case, opt-in isolation when you need it.
+
+### Environment variables
+
+When you `wtw go auth` (or use a shell alias), wtw exports:
+
+| Variable | Example (worktree `auth`, index 1) | Example (main repo) |
+|----------|-----------------------------------|--------------------|
+| `WTW_WORKTREE_ID` | `auth` | *(empty)* |
+| `WTW_WORKTREE_INDEX` | `1` | *(empty)* |
+| `DEV_WORKTREE_ID` | `auth` | *(empty)* |
+| `DEV_WORKTREE_INDEX` | `1` | `0` |
+| `DEV_WORKTREE_DASHED_POSTFIX` | `-auth` | *(empty)* |
+| `DEV_WORKTREE_PORT_OFFSET` | `100` | `0` |
+
+The `WTW_*` vars are wtw-specific. The `DEV_WORKTREE_*` vars are **generic and tool-agnostic** — any build system, task runner, or deploy script can use them without depending on wtw.
+
+### How build tools consume them
+
+The key insight: `DEV_WORKTREE_DASHED_POSTFIX` is either `-auth` or empty string. So config that appends it works unchanged for both isolated and shared mode:
+
+**Namespace isolation** (config file with env var expansion):
+```yaml
+# Your build config — namespace includes worktree suffix when set, empty otherwise
+kubernetes:
+  namespace: "myapp${DEV_WORKTREE_DASHED_POSTFIX}"
+  # → "myapp-auth" (worktree) or "myapp" (main)
+```
+
+**Port isolation** (in a deploy script):
+```bash
+BASE_PORT=31632
+PORT=$((BASE_PORT + ${DEV_WORKTREE_PORT_OFFSET:-0}))
+# → 31732 (worktree index 1) or 31632 (main)
+```
+
+```powershell
+# Same in PowerShell:
+$port = 31632 + [int]($env:DEV_WORKTREE_PORT_OFFSET ?? '0')
+```
+
+**Docker Compose** (in `.env` or directly):
+```yaml
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+```
+```bash
+# Set before docker compose up:
+export POSTGRES_PORT=$((5432 + ${DEV_WORKTREE_PORT_OFFSET:-0}))
+```
+
+### Index assignment
+
+The worktree index is determined by registry order (1-based, sequential per repo). Main repo is always index 0. The index is stable — it doesn't change when other worktrees are added or removed, only when the worktree itself is created.
+
 ## Cross-Platform
 
 Works on macOS, Windows, and Linux with PowerShell 7+. Uses `Join-Path` everywhere, `du -sk` for fast size scanning on Unix (falls back to `Get-ChildItem` on Windows). zsh and bash wrappers available for non-PowerShell daily drivers.
