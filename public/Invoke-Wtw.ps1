@@ -139,9 +139,10 @@ function Invoke-Wtw {
         # Internal commands for shell integration (zsh/bash wrappers call these)
         '__resolve' {
             # Output: path\tcolor\ttitle\tstartup_script
-            # Used by wtw.zsh/wtw.bash to get resolve info without importing the full module interactively
+            # Used by wtw.zsh/wtw.bash — must be clean stdout (no Write-Host noise)
+            # Redirect stream 6 (Information/Write-Host) to $null to suppress fuzzy match messages
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name>"; return }
-            $target = Resolve-WtwTarget $pos[0]
+            $target = & { Resolve-WtwTarget $pos[0] } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             $c = if ($target.WorktreeEntry) { $target.WorktreeEntry.color } else { (Get-WtwColors).assignments."$($target.RepoName)/main" }
