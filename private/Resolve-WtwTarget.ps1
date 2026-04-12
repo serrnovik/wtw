@@ -9,8 +9,9 @@ function Resolve-WtwTarget {
           1b. Repo name/alias prefix match -> unique prefix on repo names and aliases
           2. "alias-task" exact match      -> returns repo + worktree
           3. Bare task name exact match    -> searches all repos for unique match
-          4. "alias-task" prefix match     -> unique prefix on task name (sn3-b -> sn3-brain-stores-refactor)
+          4. "alias-task" prefix match     -> unique prefix on task name (proj-b -> proj-backend-refactor)
           5. Bare task name prefix match   -> unique prefix across all repos
+          5b. Substring match on task     -> "content" matches "my-content-engine"
           6. Fuzzy match (Levenshtein)    -> auto-resolve if unique close match, suggest if tied
     .OUTPUTS
         PSCustomObject with: RepoName, RepoEntry, TaskName, WorktreeEntry
@@ -102,7 +103,7 @@ function Resolve-WtwTarget {
         return $null
     }
 
-    # 4. "alias-task" prefix match — sn3-b matches sn3-brain-stores-refactor
+    # 4. "alias-task" prefix match - proj-b matches proj-backend-refactor
     if ($Name -match '^(.+?)-(.+)$') {
         $aliasOrName  = $Matches[1]
         $taskPrefix   = $Matches[2]
@@ -154,7 +155,35 @@ function Resolve-WtwTarget {
         return $null
     }
 
-    # 6. Fuzzy match — find closest target by edit distance
+    # 5b. Substring match on task names -> "content" matches "my-content-engine"
+    $escapedName = [WildcardPattern]::Escape($Name)
+    $substringFound = @()
+    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+        $repo = $registry.repos.$repoName
+        if (-not $repo.worktrees) { continue }
+        foreach ($t in $repo.worktrees.PSObject.Properties.Name) {
+            if ($t -like "*${escapedName}*") {
+                $substringFound += [PSCustomObject]@{
+                    RepoName       = $repoName
+                    RepoEntry      = $repo
+                    TaskName       = $t
+                    WorktreeEntry  = $repo.worktrees.$t
+                }
+            }
+        }
+    }
+
+    if ($substringFound.Count -eq 1) {
+        Write-Verbose "Substring match: '$Name' -> '$($substringFound[0].TaskName)'"
+        return $substringFound[0]
+    }
+    if ($substringFound.Count -gt 1) {
+        $names = ($substringFound | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
+        Write-Error "Ambiguous substring '$Name'. Matches: $names"
+        return $null
+    }
+
+    # 6. Fuzzy match - find closest target by edit distance
     $allTargets = Get-WtwAllTargetNames $registry
     $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
     if ($fuzzy.Match) {

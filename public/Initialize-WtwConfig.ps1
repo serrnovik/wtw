@@ -1,4 +1,36 @@
 function Initialize-WtwConfig {
+    <#
+    .SYNOPSIS
+        Register the current repo with wtw.
+    .DESCRIPTION
+        Creates config, detects session script, sets up workspace template,
+        and registers the repo in the wtw registry with alias and color assignment.
+    .PARAMETER Alias
+        Comma-separated aliases for the repo (e.g. "app,my-app").
+    .PARAMETER WorkspacesDir
+        Override the default directory where workspace files are stored.
+    .PARAMETER Name
+        Override the registry key (defaults to the repo directory name).
+    .PARAMETER Template
+        Alias or registry key of another repo, or path to a .template file
+        to use as the workspace template source.
+    .PARAMETER StartupScript
+        Name of a PowerShell script in the repo root to run on session entry
+        (e.g. "start-repository-session.ps1"). Overrides auto-detection.
+        Worktrees inherit this from the parent repo.
+    .PARAMETER StartupScriptZsh
+        Name of a zsh-specific session script (e.g. "start-session.zsh").
+        Used as the per-shell override when entering a worktree from zsh.
+    .PARAMETER StartupScriptBash
+        Name of a bash-specific session script (e.g. "start-session.bash").
+        Used as the per-shell override when entering a worktree from bash.
+    .EXAMPLE
+        wtw init "app,my-app" --template ./workspace.template
+        Register the current repo with aliases "app" and "my-app", using a local template file.
+    .EXAMPLE
+        wtw init "app" --startup-script start-repository-session.ps1
+        Register with a custom session startup script.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]
@@ -6,7 +38,10 @@ function Initialize-WtwConfig {
 
         [string] $WorkspacesDir,
         [string] $Name,
-        [string] $Template  # alias or registry key of repo, or path to .template file
+        [string] $Template,  # alias or registry key of repo, or path to .template file
+        [string] $StartupScript,
+        [string] $StartupScriptZsh,
+        [string] $StartupScriptBash
     )
 
     # Detect repo root
@@ -23,12 +58,16 @@ function Initialize-WtwConfig {
     Write-Host "  Registry key:  $registryKey" -ForegroundColor Cyan
     Write-Host "  Path:          $repoRoot" -ForegroundColor Cyan
 
-    # Session script
-    $sessionScript = Get-WtwSessionScript $repoRoot
+    # Session script — explicit override or auto-detect
+    $sessionScript = if ($StartupScript) {
+        $StartupScript
+    } else {
+        Get-WtwSessionScript $repoRoot
+    }
     if ($sessionScript) {
         Write-Host "  Session script: $sessionScript" -ForegroundColor Cyan
     } else {
-        Write-Host '  Session script: (none found)' -ForegroundColor DarkGray
+        Write-Host '  Session script: (none — wtw will set terminal color/title directly)' -ForegroundColor DarkGray
     }
 
     # Alias
@@ -143,10 +182,14 @@ function Initialize-WtwConfig {
 
         # Save registry first so New-WtwWorkspaceFile can resolve the repo
         $worktreeParent = Split-Path $repoRoot -Parent
+        $sessionScriptsMap = [PSCustomObject]@{}
+        if ($StartupScriptZsh)  { $sessionScriptsMap | Add-Member -NotePropertyName 'zsh'  -NotePropertyValue $StartupScriptZsh }
+        if ($StartupScriptBash) { $sessionScriptsMap | Add-Member -NotePropertyName 'bash' -NotePropertyValue $StartupScriptBash }
         $repoEntry = [PSCustomObject]@{
             mainPath          = $repoRoot
             worktreeParent    = $worktreeParent
             sessionScript     = $sessionScript
+            sessionScripts    = $sessionScriptsMap
             template          = $templateSource
             templateWorkspace = $mainWorkspaceFile
             aliases           = $aliasArray
@@ -172,10 +215,14 @@ function Initialize-WtwConfig {
     } else {
         # No template — just register without workspace
         $worktreeParent = Split-Path $repoRoot -Parent
+        $sessionScriptsMap = [PSCustomObject]@{}
+        if ($StartupScriptZsh)  { $sessionScriptsMap | Add-Member -NotePropertyName 'zsh'  -NotePropertyValue $StartupScriptZsh }
+        if ($StartupScriptBash) { $sessionScriptsMap | Add-Member -NotePropertyName 'bash' -NotePropertyValue $StartupScriptBash }
         $repoEntry = [PSCustomObject]@{
             mainPath          = $repoRoot
             worktreeParent    = $worktreeParent
             sessionScript     = $sessionScript
+            sessionScripts    = $sessionScriptsMap
             template          = $null
             templateWorkspace = $null
             aliases           = $aliasArray
@@ -188,14 +235,6 @@ function Initialize-WtwConfig {
         $registry.repos | Add-Member -NotePropertyName $registryKey -NotePropertyValue $repoEntry -Force
         Save-WtwRegistry $registry
     }
-
-    # Superset integration disabled — Superset manages its own worktrees via subtrees
-    # if (Test-WtwSupersetInstalled) {
-    #     $defaultBranch = git -C $repoRoot symbolic-ref refs/remotes/origin/HEAD --short 2>$null
-    #     if (-not $defaultBranch) { $defaultBranch = 'main' }
-    #     $defaultBranch = $defaultBranch -replace '^origin/', ''
-    #     Sync-WtwSupersetProject -RepoPath $repoRoot -Name $repoDir -Color $mainColor -DefaultBranch $defaultBranch
-    # }
 
     Write-Host ''
     Write-Host "  Registered '$registryKey' (aliases: $($aliasArray -join ', '))" -ForegroundColor Green

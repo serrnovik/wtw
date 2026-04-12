@@ -1,3 +1,20 @@
+<#
+.SYNOPSIS
+    Resolves a repo alias to a registry name and entry, or uses the current repo from cwd.
+
+.DESCRIPTION
+    Loads the registry via Get-WtwRegistry. If RepoAlias is set, finds a matching repo;
+    otherwise uses Get-WtwRepoFromCwd. Emits errors when not found.
+
+.PARAMETER RepoAlias
+    Optional alias or canonical registry name.
+
+.EXAMPLE
+    Resolve-WtwRepo -RepoAlias 'myrepo'
+
+.NOTES
+    Depends on: Get-WtwRegistry, Test-WtwAliasMatch, Get-WtwRepoFromCwd
+#>
 function Resolve-WtwRepo {
     [CmdletBinding()]
     param(

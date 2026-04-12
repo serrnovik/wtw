@@ -15,6 +15,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'open';   Tip = 'Open workspace in editor' }
             @{ Name = 'remove'; Tip = 'Remove worktree + workspace' }
             @{ Name = 'clean';  Tip = 'Clean stale AI worktrees' }
+            @{ Name = 'skill';  Tip = 'Install AI skill into current repo' }
             @{ Name = 'help';   Tip = 'Show help' }
         )
         $subcommands | Where-Object { $_.Name -like "$wordToComplete*" } | ForEach-Object {
@@ -55,11 +56,13 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     # Complete flags
     if ($wordToComplete -like '-*' -or $wordToComplete -like '--*') {
         $flags = switch ($subCommand) {
+            'init'   { @('--template', '--startup-script', '--startup-script-zsh', '--startup-script-bash', '--workspaces-dir', '--name') }
+            'skill'  { @('--agent') }
             'create' { @('--branch', '--repo', '--open', '--no-branch') }
             'clean'  { @('--dry-run', '--force') }
             'remove' { @('--repo', '--force') }
             'open'   { @('--repo', '--editor') }
-            'list'   { @('--repo') }
+            'list'   { @('--repo', '--detailed', '-d') }
             default  { @() }
         }
         $flags | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {

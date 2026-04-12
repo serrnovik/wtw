@@ -1,4 +1,23 @@
 function Add-WtwEntry {
+    <#
+    .SYNOPSIS
+        Import an existing repo or worktree into the registry.
+    .DESCRIPTION
+        Registers an existing directory as a worktree in the wtw registry.
+        Auto-detects the parent repo from the .git file for worktrees. Assigns
+        a color and links any existing workspace file.
+    .PARAMETER Path
+        Path to the repo or worktree directory (default: current directory).
+    .PARAMETER Repo
+        Parent repo name for worktree registration.
+    .PARAMETER Task
+        Worktree task name to register under.
+    .PARAMETER Branch
+        Override the branch name (default: auto-detected from git).
+    .EXAMPLE
+        wtw add /path/to/worktree --repo my-app --task feature
+        Import an existing worktree directory as task "feature" under repo "my-app".
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]

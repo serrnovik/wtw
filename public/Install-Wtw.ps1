@@ -1,4 +1,20 @@
 function Install-Wtw {
+    <#
+    .SYNOPSIS
+        Install or update wtw globally to ~/.wtw/module/.
+    .DESCRIPTION
+        Copies the wtw module (public, private, completions, and root psm1) to
+        ~/.wtw/module/ and adds a profile loader snippet to the PowerShell profile.
+        Blocks self-install when already running from the global copy.
+    .PARAMETER SkipProfile
+        Do not modify the PowerShell profile (skip adding the auto-loader snippet).
+    .EXAMPLE
+        wtw install
+        Install wtw globally and add the profile loader.
+    .EXAMPLE
+        wtw install --skip-profile
+        Install wtw globally without modifying the PowerShell profile.
+    #>
     [CmdletBinding()]
     param(
         [switch] $SkipProfile
@@ -22,6 +38,21 @@ function Install-Wtw {
         return
     }
 
+    # Check for git
+    if (-not (Get-Command 'git' -ErrorAction SilentlyContinue)) {
+        Write-Host ''
+        Write-Host '  Git is required but not found.' -ForegroundColor Red
+        if ($IsMacOS) {
+            Write-Host '  Install via: brew install git' -ForegroundColor Yellow
+        } elseif ($IsLinux) {
+            Write-Host '  Install via: sudo apt install git  (or your distro equivalent)' -ForegroundColor Yellow
+        } else {
+            Write-Host '  Install from: https://git-scm.com/downloads/win' -ForegroundColor Yellow
+        }
+        Write-Host ''
+        return
+    }
+
     Write-Host ''
     Write-Host '  Installing wtw...' -ForegroundColor Cyan
     Write-Host "  Source:  $sourceDir"
@@ -35,7 +66,7 @@ function Install-Wtw {
     # Copy module files
     New-Item -Path $installDir -ItemType Directory -Force | Out-Null
 
-    $dirs = @('public', 'private', 'completions')
+    $dirs = @('public', 'private', 'completions', 'shell', 'skills')
     foreach ($dir in $dirs) {
         $src = Join-Path $sourceDir $dir
         if (Test-Path $src) {
@@ -47,6 +78,14 @@ function Install-Wtw {
     # Copy module root file
     $rootFile = Join-Path $sourceDir 'wtw.psm1'
     Copy-Item -Path $rootFile -Destination (Join-Path $installDir 'wtw.psm1') -Force
+
+    # Also copy shell files to ~/.wtw/shell/ for easy sourcing
+    $shellSrc = Join-Path $sourceDir 'shell'
+    $shellDest = Join-Path $HOME '.wtw' 'shell'
+    if (Test-Path $shellSrc) {
+        if (Test-Path $shellDest) { Remove-Item $shellDest -Recurse -Force }
+        Copy-Item -Path $shellSrc -Destination $shellDest -Recurse -Force
+    }
 
     Write-Host "  Module installed to $installDir" -ForegroundColor Green
 
@@ -78,6 +117,128 @@ if (Test-Path $_wtwModule) {
             }
             Set-Content -Path $profilePath -Value $profileSnippet -Encoding utf8
             Write-Host "  Created profile with wtw loader: $profilePath" -ForegroundColor Green
+        }
+    }
+
+    # Offer zsh/bash shell integration (non-Windows)
+    if (-not $SkipProfile -and -not $IsWindows) {
+        $shellFile = Join-Path $HOME '.wtw' 'shell'
+        $userShell = $env:SHELL ?? ''
+        $shellConfigs = @()
+
+        if ($userShell -match 'zsh' -or (Test-Path (Join-Path $HOME '.zshrc'))) {
+            $shellConfigs += @{ Shell = 'zsh'; Rc = (Join-Path $HOME '.zshrc'); Source = (Join-Path $shellFile 'wtw.zsh') }
+        }
+        if ($userShell -match 'bash' -or (Test-Path (Join-Path $HOME '.bashrc'))) {
+            $shellConfigs += @{ Shell = 'bash'; Rc = (Join-Path $HOME '.bashrc'); Source = (Join-Path $shellFile 'wtw.bash') }
+        }
+
+        foreach ($sh in $shellConfigs) {
+            if (-not (Test-Path $sh.Source)) { continue }
+
+            $snippet = "`n# wtw — worktree + workspace manager`n[ -f `"$($sh.Source)`" ] && source `"$($sh.Source)`"`n"
+            $alreadyInstalled = $false
+
+            if (Test-Path $sh.Rc) {
+                $rcContent = Get-Content $sh.Rc -Raw -ErrorAction SilentlyContinue
+                if ($rcContent -and $rcContent -match 'wtw.*worktree.*workspace.*manager') {
+                    $alreadyInstalled = $true
+                }
+            }
+
+            if ($alreadyInstalled) {
+                Write-Host "  $($sh.Shell) integration already in $($sh.Rc) — skipping." -ForegroundColor DarkGray
+            } else {
+                $addShell = Read-Host "  Add wtw to $($sh.Rc) for $($sh.Shell)? [y/N]"
+                if ($addShell -in @('y', 'Y', 'yes')) {
+                    Add-Content -Path $sh.Rc -Value $snippet -Encoding utf8
+                    Write-Host "  Added wtw loader to $($sh.Rc)" -ForegroundColor Green
+                }
+            }
+        }
+    }
+
+    # Detect installed editors and offer to install Peacock extension
+    Write-Host ''
+    Write-Host '  Checking editors...' -ForegroundColor Cyan
+
+    $editorDefs = @(
+        @{ Name = 'VS Code';      Cmd = 'code';        ExtCmd = 'code' }
+        @{ Name = 'Cursor';       Cmd = 'cursor';      ExtCmd = 'cursor' }
+        @{ Name = 'Antigravity';  Cmd = 'antigravity';  ExtCmd = 'antigravity' }
+        @{ Name = 'Windsurf';     Cmd = 'windsurf';    ExtCmd = 'windsurf' }
+        @{ Name = 'VSCodium';     Cmd = 'codium';      ExtCmd = 'codium' }
+    )
+
+    $peacockExtId = 'johnpapa.vscode-peacock'
+    $installedEditors = @()
+
+    foreach ($ed in $editorDefs) {
+        $found = Get-Command $ed.Cmd -ErrorAction SilentlyContinue
+        if ($found) {
+            $installedEditors += $ed
+            Write-Host "    $($ed.Name) ($($ed.Cmd))" -ForegroundColor Green -NoNewline
+
+            # Check if Peacock is already installed
+            $extensions = & $ed.ExtCmd --list-extensions 2>$null
+            if ($extensions -and ($extensions -match $peacockExtId)) {
+                Write-Host "  — Peacock installed" -ForegroundColor DarkGray
+            } else {
+                Write-Host "  — Peacock NOT installed" -ForegroundColor Yellow
+            }
+        }
+    }
+
+    if ($installedEditors.Count -eq 0) {
+        Write-Host '    No supported editors found (code, cursor, antigravity, windsurf, codium).' -ForegroundColor Yellow
+        Write-Host '    wtw works best with the Peacock extension for workspace colors.' -ForegroundColor DarkGray
+    } else {
+        # Check if any editors are missing Peacock
+        $needPeacock = @()
+        foreach ($ed in $installedEditors) {
+            $extensions = & $ed.ExtCmd --list-extensions 2>$null
+            if (-not $extensions -or -not ($extensions -match $peacockExtId)) {
+                $needPeacock += $ed
+            }
+        }
+
+        if ($needPeacock.Count -gt 0) {
+            Write-Host ''
+            $names = ($needPeacock | ForEach-Object { $_.Name }) -join ', '
+            Write-Host "  Peacock extension is recommended for workspace colors." -ForegroundColor Yellow
+            Write-Host "  Missing in: $names" -ForegroundColor DarkGray
+            $install = Read-Host "  Install Peacock extension? [y/N]"
+            if ($install -in @('y', 'Y', 'yes')) {
+                foreach ($ed in $needPeacock) {
+                    Write-Host "    Installing in $($ed.Name)..." -ForegroundColor Cyan -NoNewline
+                    & $ed.ExtCmd --install-extension $peacockExtId 2>$null | Out-Null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host " done" -ForegroundColor Green
+                    } else {
+                        Write-Host " failed" -ForegroundColor Red
+                    }
+                }
+            }
+        } else {
+            Write-Host '  Peacock extension found in all editors.' -ForegroundColor Green
+        }
+    }
+
+    # Propose AI skill installation if inside a git repo
+    $currentRepoRoot = Resolve-WtwRepoRoot
+    if ($currentRepoRoot) {
+        $claudeSkill = Join-Path $currentRepoRoot '.claude' 'skills' 'worktree-workspace' 'SKILL.md'
+        $agentsSkill = Join-Path $currentRepoRoot '.agents' 'skills' 'worktree-workspace' 'SKILL.md'
+        if (-not (Test-Path $claudeSkill) -or -not (Test-Path $agentsSkill)) {
+            Write-Host ''
+            Write-Host '  AI skill not found in this repo.' -ForegroundColor Yellow
+            Write-Host '  Install it so AI agents (Claude, Codex, Cursor, Gemini) can use wtw.' -ForegroundColor DarkGray
+            $installSkill = Read-Host '  Install wtw AI skill? [y/N]'
+            if ($installSkill -in @('y', 'Y', 'yes')) {
+                Install-WtwSkill -RepoRoot $currentRepoRoot
+            } else {
+                Write-Host "  Skipped. Run 'wtw skill' later to install." -ForegroundColor DarkGray
+            }
         }
     }
 

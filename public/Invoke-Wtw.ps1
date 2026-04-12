@@ -1,4 +1,18 @@
 function Convert-WtwArgsToSplat {
+    <#
+    .SYNOPSIS
+        Parse CLI arguments into a PowerShell splatting hashtable.
+    .DESCRIPTION
+        Converts --kebab-case flags to PascalCase parameter names and determines
+        whether each flag is a switch or a key-value pair by peeking at the next
+        argument. Returns a hashtable with Splat (named params) and Positional
+        (remaining args) keys.
+    .PARAMETER ArgList
+        Raw argument array from the CLI invocation.
+    .EXAMPLE
+        Convert-WtwArgsToSplat @('myTask', '--dry-run', '--repo', 'app')
+        Returns @{ Splat = @{ DryRun = [switch]::Present; Repo = 'app' }; Positional = @('myTask') }
+    #>
     param([object[]] $ArgList)
 
     $splat = [ordered]@{}
@@ -35,6 +49,21 @@ function Convert-WtwArgsToSplat {
 }
 
 function Invoke-Wtw {
+    <#
+    .SYNOPSIS
+        Main CLI dispatcher for wtw.
+    .DESCRIPTION
+        Routes subcommands (create, list, sync, clean, etc.) to their handler
+        functions. Parses raw CLI arguments via Convert-WtwArgsToSplat and splats
+        them to the target command. Does not use [CmdletBinding()] because it
+        relies on automatic $args for flexible dispatch.
+    .EXAMPLE
+        wtw create auth --open
+        Creates a worktree and workspace for "auth" and opens it in the editor.
+    .EXAMPLE
+        wtw sync --all --dry-run
+        Preview-syncs all managed workspaces.
+    #>
     $Command = $null
     $rawArgs = @()
 
@@ -53,12 +82,14 @@ function Invoke-Wtw {
         Write-Host '    init [aliases]    Register current repo (--template <alias> to share settings)'
         Write-Host '    add [path]        Add existing repo/worktree to registry'
         Write-Host '    create <task>     Create worktree + workspace'
-        Write-Host '    list              List registered worktrees'
+        Write-Host '    list [-d|--detailed]  List registered worktrees'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
         Write-Host '    open [name]       Open workspace in editor (default: current)'
-        Write-Host '    cursor [name]     Open in Cursor   (alias: cur)'
-        Write-Host '    code [name]       Open in VS Code  (alias: co)'
+        Write-Host '    cursor [name]     Open in Cursor      (alias: cur)'
+        Write-Host '    code [name]       Open in VS Code     (alias: co)'
         Write-Host '    antigravity [name] Open in Antigravity (alias: anti)'
+        Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
+        Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
         Write-Host '    remove <task>     Remove worktree + workspace'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'
@@ -66,6 +97,7 @@ function Invoke-Wtw {
         Write-Host '    sync [file|--all] Re-apply template to managed workspaces'
         Write-Host '    clean             Clean stale AI worktrees'
         Write-Host '    install           Install/update wtw globally (~/.wtw/module/)'
+        Write-Host '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
         Write-Host ''
         Write-Host '  Options:' -ForegroundColor Yellow
         Write-Host '    --help, -h        Show this help'
@@ -104,7 +136,61 @@ function Invoke-Wtw {
         'clean'     { Invoke-WtwClean @splat }
         'install'   { Install-Wtw @splat }
         'update'    { Install-Wtw @splat }
+        'skill'     { Install-WtwSkill @splat }
         'help'    { Invoke-Wtw }
+        # Internal commands for shell integration (zsh/bash wrappers call these)
+        '__resolve' {
+            # Output: path\tcolor\ttitle\tstartup_script\tworktree_id\tworktree_index
+            # Used by wtw.zsh/wtw.bash — must be clean stdout (no Write-Host noise)
+            # Optional: --shell zsh|bash to resolve per-shell session script
+            if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name> [--shell zsh|bash]"; return }
+            $shellType = $splat['Shell'] ?? ''
+            $target = & { Resolve-WtwTarget $pos[0] } 6>$null
+            if (-not $target) { exit 1 }
+            $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+            $c = if ($target.WorktreeEntry) { $target.WorktreeEntry.color } else { (Get-WtwColors).assignments."$($target.RepoName)/main" }
+            $t = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
+            $s = Resolve-WtwSessionScript -RepoEntry $target.RepoEntry -Shell $shellType
+            # Compute worktree index for env vars
+            $wtId = $target.TaskName ?? ''
+            $wtIndex = 0
+            if ($target.TaskName -and $target.RepoEntry.worktrees) {
+                $i = 1
+                foreach ($tn in $target.RepoEntry.worktrees.PSObject.Properties.Name) {
+                    if ($tn -eq $target.TaskName) { $wtIndex = $i; break }
+                    $i++
+                }
+            }
+            Write-Output "${p}`t${c}`t${t}`t${s}`t${wtId}`t${wtIndex}"
+        }
+        '__aliases' {
+            # Output: alias_name\tpath\tcolor\ttitle\tstartup_script\tworktree_id\tworktree_index
+            # Optional: --shell zsh|bash to resolve per-shell session scripts
+            $shellType = $splat['Shell'] ?? ''
+            $registry = Get-WtwRegistry
+            $colors = Get-WtwColors
+            foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+                $repo = $registry.repos.$repoName
+                $aliases = Get-WtwRepoAliases $repo
+                $ss = Resolve-WtwSessionScript -RepoEntry $repo -Shell $shellType
+                $mainColor = $colors.assignments."$repoName/main" ?? ''
+                foreach ($a in $aliases) {
+                    Write-Output "${a}`t$($repo.mainPath)`t${mainColor}`t${repoName}`t${ss}`t`t0"
+                }
+                if ($repo.worktrees) {
+                    $wtIdx = 1
+                    foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+                        $wt = $repo.worktrees.$taskName
+                        $wtColor = $wt.color ?? ''
+                        $wtTitle = "$repoName/$taskName"
+                        foreach ($a in $aliases) {
+                            Write-Output "${a}-${taskName}`t$($wt.path)`t${wtColor}`t${wtTitle}`t${ss}`t${taskName}`t${wtIdx}"
+                        }
+                        $wtIdx++
+                    }
+                }
+            }
+        }
         default   {
             # Check if command is an editor shortcut (cursor, cur, code, co, anti, etc.)
             $resolvedEditor = Resolve-WtwEditorCommand $Command

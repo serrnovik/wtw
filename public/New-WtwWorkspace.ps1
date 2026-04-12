@@ -1,4 +1,27 @@
 function New-WtwWorkspace {
+    <#
+    .SYNOPSIS
+        Generate a workspace file without creating a git worktree.
+    .DESCRIPTION
+        Creates a VS Code workspace file for a repo or worktree using the
+        configured template, without creating a new git worktree. Useful for
+        adding workspace files to existing worktrees or the main repo.
+    .PARAMETER Name
+        Target name for the workspace (task name or identifier).
+    .PARAMETER WorktreePath
+        Path to an existing worktree directory to use as the code folder.
+    .PARAMETER Repo
+        Parent repo alias or name.
+    .PARAMETER Main
+        Generate a workspace for the main repo instead of a worktree.
+    .PARAMETER CodeFolder
+        Override the code folder path in the workspace file.
+    .PARAMETER Open
+        Open the workspace in the configured editor after generation.
+    .EXAMPLE
+        wtw workspace my-feature --repo app
+        Generate a workspace file for "my-feature" under the "app" repo.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]

@@ -1,4 +1,25 @@
 function Set-WtwColor {
+    <#
+    .SYNOPSIS
+        Set or display the Peacock color for a workspace.
+    .DESCRIPTION
+        Assigns a hex color or auto-selects a maximum-contrast color for a workspace.
+        When called without a Color argument, displays the current color assignment.
+        Updates both colors.json and the registry, then syncs the workspace file
+        unless --no-sync is specified.
+    .PARAMETER Name
+        Target workspace or repo name. Defaults to the current working directory.
+    .PARAMETER Color
+        Hex color (e.g. '#689b59' or 689b59) or 'random' for automatic contrast selection.
+    .PARAMETER NoSync
+        Skip re-syncing the workspace file after the color change.
+    .EXAMPLE
+        wtw color auth random
+        Assigns a maximum-contrast color to the "auth" workspace.
+    .EXAMPLE
+        wtw color auth '#689b59'
+        Sets the "auth" workspace color to the specified hex value.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]

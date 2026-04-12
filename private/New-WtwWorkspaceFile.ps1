@@ -37,7 +37,7 @@ function New-WtwWorkspaceFile {
         $json = $json -replace '\{\{WTW_CODE_FOLDER\}\}', ($CodeFolderPath -replace '\\', '\\')
         $workspace = $json | ConvertFrom-Json
     } else {
-        # Legacy: real workspace file — regex replace folder[0] and ${workspaceFolder:X}
+        # Legacy: real workspace file - regex replace folder[0] and ${workspaceFolder:X}
         # Strip JSONC artifacts
         $cleaned = $raw -replace '(?m)^\s*//.*$', ''
         $cleaned = $cleaned -replace ',\s*([\}\]])', '$1'

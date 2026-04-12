@@ -7,6 +7,8 @@ function Resolve-WtwEditorCommand {
         @{ prefixes = @('cursor', 'cur'); cmd = 'cursor' }
         @{ prefixes = @('code', 'co'); cmd = 'code' }
         @{ prefixes = @('antigravity', 'anti', 'ag'); cmd = 'antigravity' }
+        @{ prefixes = @('windsurf', 'wind', 'ws'); cmd = 'windsurf' }
+        @{ prefixes = @('codium', 'vscodium'); cmd = 'codium' }
         @{ prefixes = @('sourcegit', 'sgit', 'sg'); cmd = 'sourcegit' }
     )
 
@@ -25,6 +27,6 @@ function Resolve-WtwEditorCommand {
     if ($fuzzy.Match) {
         return (Resolve-WtwEditorCommand $fuzzy.Match)
     }
-    # Tied or no match — fall through to target resolution
+    # Tied or no match - fall through to target resolution
     return $null
 }

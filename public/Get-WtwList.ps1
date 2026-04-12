@@ -1,7 +1,25 @@
 function Get-WtwList {
+    <#
+    .SYNOPSIS
+        List all registered repos and worktrees.
+    .DESCRIPTION
+        Displays a table of all repos and their worktrees with ANSI-colored
+        swatches. Detailed mode shows a card layout with clickable file links
+        and settings file paths.
+    .PARAMETER Repo
+        Filter the listing to a specific repo by name or alias.
+    .PARAMETER Detailed
+        Show card-style output with clickable file links and settings paths.
+    .EXAMPLE
+        wtw list -d
+        Show all repos and worktrees in detailed card layout.
+    #>
     [CmdletBinding()]
     param(
-        [string] $Repo
+        [string] $Repo,
+
+        [Alias('d')]
+        [switch] $Detailed
     )
 
     $registry = Get-WtwRegistry
@@ -55,7 +73,86 @@ function Get-WtwList {
         }
     }
 
+    if ($Detailed) {
+        Format-WtwDetailedList $items
+    } else {
+        Write-Host ''
+        Format-WtwTable $items @('Kind', 'Repo', 'Aliases', 'Branch', 'Color', 'Path', 'Workspace')
+        Write-Host ''
+    }
+}
+
+function Format-WtwDetailedList {
+    param([array] $Items)
+
+    $esc = [char]27
+
     Write-Host ''
-    Format-WtwTable $items @('Kind', 'Repo', 'Aliases', 'Branch', 'Color', 'Path', 'Workspace')
+    Write-Host '  ╔══════════════════════════════════════════╗' -ForegroundColor DarkGray
+    Write-Host '  ║  wtw — Worktree & Workspace Registry     ║' -ForegroundColor DarkGray
+    Write-Host '  ╚══════════════════════════════════════════╝' -ForegroundColor DarkGray
+    Write-Host ''
+
+    foreach ($item in $Items) {
+        $color = $item.Color
+        $isRepo = $item.Kind -eq 'repo'
+
+        if ($isRepo) {
+            # Repo header with color swatch
+            $swatch = ''
+            if ($color -match '^#[0-9a-fA-F]{6}$') {
+                $r = [convert]::ToInt32($color.Substring(1, 2), 16)
+                $g = [convert]::ToInt32($color.Substring(3, 2), 16)
+                $b = [convert]::ToInt32($color.Substring(5, 2), 16)
+                $fg = Get-ContrastForeground $color
+                $fr = [convert]::ToInt32($fg.Substring(1, 2), 16)
+                $fg2 = [convert]::ToInt32($fg.Substring(3, 2), 16)
+                $fb = [convert]::ToInt32($fg.Substring(5, 2), 16)
+                $swatch = "${esc}[38;2;${fr};${fg2};${fb}m${esc}[48;2;${r};${g};${b}m  $($item.Repo)  ${esc}[0m"
+            } else {
+                $swatch = "  $($item.Repo)"
+            }
+            Write-Host "  $swatch" -NoNewline
+            Write-Host "  $($item.Branch)" -ForegroundColor Yellow
+            Write-Host "    Aliases   : $($item.Aliases)" -ForegroundColor Gray
+            Write-Host "    Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor Gray
+            Write-Host "    Workspace : $($item.Workspace)" -ForegroundColor Gray
+            Write-Host ''
+        } else {
+            # Worktree entry (indented)
+            $swatch = ''
+            if ($color -match '^#[0-9a-fA-F]{6}$') {
+                $r = [convert]::ToInt32($color.Substring(1, 2), 16)
+                $g = [convert]::ToInt32($color.Substring(3, 2), 16)
+                $b = [convert]::ToInt32($color.Substring(5, 2), 16)
+                $swatch = "${esc}[48;2;${r};${g};${b}m  ${esc}[0m"
+            } else {
+                $swatch = '  '
+            }
+            Write-Host "    ${swatch} " -NoNewline
+            Write-Host "$($item.Branch)" -ForegroundColor Yellow
+            Write-Host "      Aliases   : $($item.Aliases)" -ForegroundColor DarkGray
+            Write-Host "      Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor DarkGray
+            Write-Host "      Workspace : $($item.Workspace)" -ForegroundColor DarkGray
+            Write-Host ''
+        }
+    }
+
+    # Settings file links
+    $wtwDir = Join-Path $HOME '.wtw'
+    $registryFile = Join-Path $wtwDir 'registry.json'
+    $colorsFile = Join-Path $wtwDir 'colors.json'
+    $configFile = Join-Path $wtwDir 'config.json'
+
+    Write-Host '  ─── Settings ───' -ForegroundColor DarkGray
+    if (Test-Path $registryFile) {
+        Write-Host "    Registry : ${esc}]8;;file://${registryFile}${esc}\${registryFile}${esc}]8;;${esc}\"  -ForegroundColor DarkCyan
+    }
+    if (Test-Path $colorsFile) {
+        Write-Host "    Colors   : ${esc}]8;;file://${colorsFile}${esc}\${colorsFile}${esc}]8;;${esc}\" -ForegroundColor DarkCyan
+    }
+    if (Test-Path $configFile) {
+        Write-Host "    Config   : ${esc}]8;;file://${configFile}${esc}\${configFile}${esc}]8;;${esc}\" -ForegroundColor DarkCyan
+    }
     Write-Host ''
 }

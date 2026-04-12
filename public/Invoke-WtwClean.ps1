@@ -1,4 +1,22 @@
 function Invoke-WtwClean {
+    <#
+    .SYNOPSIS
+        Find and remove stale AI-created worktrees.
+    .DESCRIPTION
+        Scans configured stale worktree paths (codex, cursor, conductor) and registered
+        repos for detached HEAD worktrees. Shows sizes and allows interactive selection
+        of which items to remove. Prunes git worktree metadata after removal.
+    .PARAMETER DryRun
+        Preview stale worktrees without removing anything.
+    .PARAMETER Force
+        Remove all stale worktrees without interactive prompting.
+    .EXAMPLE
+        wtw clean --dry-run
+        List all stale worktrees with sizes but make no changes.
+    .EXAMPLE
+        wtw clean --force
+        Remove all stale worktrees without prompting.
+    #>
     [CmdletBinding()]
     param(
         [switch] $DryRun,
@@ -29,7 +47,7 @@ function Invoke-WtwClean {
         # Find all repo-like directories under the stale path
         $dirs = Get-ChildItem -Path $resolvedPath -Directory -ErrorAction SilentlyContinue
         foreach ($dir in $dirs) {
-            # Look for repo directories inside (e.g., .codex/worktrees/3cc3/snowmain3/)
+            # Look for repo directories inside (e.g., .codex/worktrees/3cc3/myrepo/)
             $repoDirs = Get-ChildItem -Path $dir.FullName -Directory -ErrorAction SilentlyContinue
             if ($repoDirs) {
                 foreach ($repoDir in $repoDirs) {

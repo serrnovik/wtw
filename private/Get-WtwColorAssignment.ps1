@@ -7,6 +7,19 @@ $script:WtwDefaultPalette = @(
     '#0075ca', '#d876e3', '#f9a825', '#00c853', '#795548'
 )
 
+<#
+.SYNOPSIS
+    Reads the wtw color palette and per-worktree assignments from JSON.
+
+.DESCRIPTION
+    Loads ~/.wtw/colors.json. If missing, returns default palette and empty assignments.
+
+.EXAMPLE
+    Get-WtwColors
+
+.NOTES
+    Side effect: defines $script:WtwColorsPath and $script:WtwDefaultPalette when loaded.
+#>
 function Get-WtwColors {
     [CmdletBinding()]
     param()
@@ -20,6 +33,22 @@ function Get-WtwColors {
     return Get-Content -Path $script:WtwColorsPath -Raw | ConvertFrom-Json
 }
 
+<#
+.SYNOPSIS
+    Persists the wtw color palette and assignments to JSON.
+
+.DESCRIPTION
+    Writes Colors to ~/.wtw/colors.json, creating the parent directory if needed.
+
+.PARAMETER Colors
+    Object with palette and assignments (same shape as Get-WtwColors).
+
+.EXAMPLE
+    Save-WtwColors -Colors $colors
+
+.NOTES
+    Depends on: $script:WtwColorsPath from this file's load order.
+#>
 function Save-WtwColors {
     [CmdletBinding()]
     param(
