@@ -126,7 +126,7 @@ wtw clean                 # interactive selection + removal
 
 | Command | Description |
 |---------|-------------|
-| `wtw init [aliases] [--template X]` | Register current repo (comma-separated aliases, optional shared template) |
+| `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X]` | Register current repo with aliases, template, and per-shell session scripts |
 | `wtw add [path] [--repo X --task X]` | Import an existing worktree into the registry |
 | `wtw create <task> [--branch X] [--open] [--no-branch]` | Create worktree + workspace + branch |
 | `wtw list [-d\|--detailed] [--repo alias]` | List all repos and worktrees with paths and aliases |
@@ -333,22 +333,53 @@ Each generated workspace:
 
 ## Startup Scripts
 
-When you `wtw go <name>`, wtw changes to the worktree directory and then:
+When you `wtw go <name>`, wtw changes to the worktree directory, sets the terminal tab color and title, and then runs the startup script if one is configured.
 
-1. If a **startup script** is configured (via `--startup-script` on `wtw init` or auto-detected), it runs that script. The script can handle terminal coloring, environment setup, etc.
-2. If **no startup script** is found, wtw sets the terminal tab color and window title itself using escape sequences (iTerm2, Windows Terminal).
+### Script detection
 
-Auto-detected script names: `start-repository-session.ps1`, `start-tools-session.ps1`.
+wtw detects the interpreter from the file extension:
+
+| Extension | In pwsh session | In zsh/bash session |
+|-----------|----------------|---------------------|
+| `.ps1` | Runs with pwsh | Runs with pwsh (subprocess) |
+| `.zsh` | N/A | Sourced in zsh |
+| `.sh`, `.bash` | N/A | Sourced in current shell |
+
+### Per-shell overrides
+
+You can set different scripts for different shells. The zsh/bash wrappers check for a per-shell override first, then fall back to the default:
 
 ```powershell
-# Register with a custom startup script:
-wtw init "app" --startup-script my-session-init.ps1
+# Default script (used by pwsh, and by zsh/bash if no override)
+wtw init "app" --startup-script start-repository-session.ps1
 
-# Or let wtw auto-detect (looks for start-repository-session.ps1):
-wtw init "app"
+# Zsh-specific session script (sourced when switching from zsh)
+wtw init "app" --startup-script-zsh start-session.zsh
 
-# Worktrees inherit the startup script from their parent repo.
+# Bash-specific session script
+wtw init "app" --startup-script-bash start-session.sh
+
+# All at once
+wtw init "app" --startup-script start-repo.ps1 --startup-script-zsh start-session.zsh
 ```
+
+This is stored in the registry as:
+
+```json
+{
+  "sessionScript": "start-repository-session.ps1",
+  "sessionScripts": {
+    "zsh": "start-session.zsh",
+    "bash": "start-session.sh"
+  }
+}
+```
+
+### Auto-detection
+
+If no `--startup-script` is provided, wtw looks for these files in the repo root: `start-repository-session.ps1`, `start-tools-session.ps1`.
+
+Worktrees inherit the startup script from their parent repo.
 
 ## Profile Integration
 

@@ -33,7 +33,9 @@ function Initialize-WtwConfig {
         [string] $WorkspacesDir,
         [string] $Name,
         [string] $Template,  # alias or registry key of repo, or path to .template file
-        [string] $StartupScript
+        [string] $StartupScript,
+        [string] $StartupScriptZsh,
+        [string] $StartupScriptBash
     )
 
     # Detect repo root
@@ -174,10 +176,14 @@ function Initialize-WtwConfig {
 
         # Save registry first so New-WtwWorkspaceFile can resolve the repo
         $worktreeParent = Split-Path $repoRoot -Parent
+        $sessionScriptsMap = [PSCustomObject]@{}
+        if ($StartupScriptZsh)  { $sessionScriptsMap | Add-Member -NotePropertyName 'zsh'  -NotePropertyValue $StartupScriptZsh }
+        if ($StartupScriptBash) { $sessionScriptsMap | Add-Member -NotePropertyName 'bash' -NotePropertyValue $StartupScriptBash }
         $repoEntry = [PSCustomObject]@{
             mainPath          = $repoRoot
             worktreeParent    = $worktreeParent
             sessionScript     = $sessionScript
+            sessionScripts    = $sessionScriptsMap
             template          = $templateSource
             templateWorkspace = $mainWorkspaceFile
             aliases           = $aliasArray
@@ -203,10 +209,14 @@ function Initialize-WtwConfig {
     } else {
         # No template — just register without workspace
         $worktreeParent = Split-Path $repoRoot -Parent
+        $sessionScriptsMap = [PSCustomObject]@{}
+        if ($StartupScriptZsh)  { $sessionScriptsMap | Add-Member -NotePropertyName 'zsh'  -NotePropertyValue $StartupScriptZsh }
+        if ($StartupScriptBash) { $sessionScriptsMap | Add-Member -NotePropertyName 'bash' -NotePropertyValue $StartupScriptBash }
         $repoEntry = [PSCustomObject]@{
             mainPath          = $repoRoot
             worktreeParent    = $worktreeParent
             sessionScript     = $sessionScript
+            sessionScripts    = $sessionScriptsMap
             template          = $null
             templateWorkspace = $null
             aliases           = $aliasArray

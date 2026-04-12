@@ -39,7 +39,24 @@ _wtw_set_terminal() {
     fi
 }
 
-# Go to a worktree: resolve via pwsh, cd natively, set terminal color
+# Run a session script, detecting interpreter from file extension
+_wtw_run_script() {
+    local script_path="$1"
+    [ -z "$script_path" ] && return
+    [ ! -f "$script_path" ] && return
+    case "$script_path" in
+        *.ps1)
+            # Pass the current shell's PATH so pwsh subprocess can find
+            # tools like vault, kubectl, id, etc.
+            PATH="$PATH" "$_wtw_pwsh" -NoLogo -File "$script_path"
+            ;;
+        *.bash) source "$script_path" ;;
+        *.sh)  source "$script_path" ;;
+        *)     source "$script_path" ;;
+    esac
+}
+
+# Go to a worktree: resolve via pwsh, cd natively, run session script + set terminal color
 _wtw_go() {
     local name="$1"
     [ -z "$name" ] && echo "Usage: wtw go <name>" && return 1
@@ -47,7 +64,7 @@ _wtw_go() {
     local result
     result=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
-        Invoke-Wtw __resolve '${safe_name}'
+        Invoke-Wtw __resolve '${safe_name}' --shell bash
     " 2>&1)
     [ $? -ne 0 ] && echo "$result" && return 1
     local path color title startup_script
@@ -55,6 +72,19 @@ _wtw_go() {
     [ -z "$path" ] && echo "Could not resolve '$name'" && return 1
     cd "$path" || return 1
     _wtw_set_terminal "$color" "$title"
+    if [ -n "$startup_script" ]; then
+        _wtw_run_script "${path}/${startup_script}"
+    fi
+}
+
+# Helper: build a safe pwsh argument string by quoting each arg
+_wtw_quote_args() {
+    local result=""
+    for arg in "$@"; do
+        local safe="${arg//\'/\'\'}"
+        result+=" '${safe}'"
+    done
+    echo "$result"
 }
 
 # Main wtw function
@@ -64,14 +94,16 @@ wtw() {
             shift; _wtw_go "$@" ;;
         "")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
-        init|add|create|remove|rm|workspace|ws|copy|sync|color|clean|install|update)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@"
+        init|add|create|remove|rm|workspace|ws|copy|sync|color|clean|install|update|skill)
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
             case "$1" in
                 init|add|create|remove|rm) _wtw_register_aliases ;;
             esac
             ;;
         list|ls|open|help|-h|--help)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@" ;;
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         *)
             _wtw_go "$1" ;;
     esac
@@ -83,7 +115,7 @@ _wtw_register_aliases() {
     local _wtw_output
     _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
-        Invoke-Wtw __aliases
+        Invoke-Wtw __aliases --shell bash
     " 2>/dev/null) || return
     [ -z "$_wtw_output" ] && return
 
@@ -91,14 +123,17 @@ _wtw_register_aliases() {
     local _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s
     while IFS=$'\t' read -r _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s; do
         [ -z "$_wtw_a" ] && continue
-        # Skip aliases with unsafe characters (only allow alphanumeric, dash, underscore)
         [[ "$_wtw_a" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
         _wtw_p="${_wtw_p//\'/\'\\\'\'}"
         _wtw_c="${_wtw_c//\'/\'\\\'\'}"
         _wtw_t="${_wtw_t//\'/\'\\\'\'}"
+        _wtw_s="${_wtw_s//\'/\'\\\'\'}"
         _wtw_defs+="${_wtw_a}() {"$'\n'
         _wtw_defs+="  cd '${_wtw_p}' || return 1"$'\n'
         _wtw_defs+="  _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'
+        if [ -n "$_wtw_s" ]; then
+            _wtw_defs+="  _wtw_run_script '${_wtw_p}/${_wtw_s}'"$'\n'
+        fi
         _wtw_defs+="}"$'\n'
     done <<< "$_wtw_output"
 

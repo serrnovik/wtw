@@ -56,7 +56,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     # Complete flags
     if ($wordToComplete -like '-*' -or $wordToComplete -like '--*') {
         $flags = switch ($subCommand) {
-            'init'   { @('--template', '--startup-script', '--workspaces-dir', '--name') }
+            'init'   { @('--template', '--startup-script', '--startup-script-zsh', '--startup-script-bash', '--workspaces-dir', '--name') }
             'skill'  { @('--agent') }
             'create' { @('--branch', '--repo', '--open', '--no-branch') }
             'clean'  { @('--dry-run', '--force') }

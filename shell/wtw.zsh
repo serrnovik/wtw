@@ -41,7 +41,25 @@ _wtw_set_terminal() {
     # Unsupported terminals: title is already set above
 }
 
-# Go to a worktree: resolve via pwsh, cd natively, set terminal color
+# Run a session script, detecting interpreter from file extension
+_wtw_run_script() {
+    local script_path="$1"
+    [ -z "$script_path" ] && return
+    [ ! -f "$script_path" ] && return
+    case "$script_path" in
+        *.ps1)
+            # Pass the current shell's PATH so pwsh subprocess can find
+            # tools like vault, kubectl, id, etc.
+            PATH="$PATH" "$_wtw_pwsh" -NoLogo -File "$script_path"
+            ;;
+        *.zsh) source "$script_path" ;;
+        *.sh)  source "$script_path" ;;
+        *.bash) source "$script_path" ;;
+        *)     source "$script_path" ;;  # default: try sourcing
+    esac
+}
+
+# Go to a worktree: resolve via pwsh, cd natively, run session script + set terminal color
 _wtw_go() {
     local name="$1"
     [ -z "$name" ] && echo "Usage: wtw go <name>" && return 1
@@ -49,17 +67,30 @@ _wtw_go() {
     local result
     result=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
-        Invoke-Wtw __resolve '${safe_name}'
+        Invoke-Wtw __resolve '${safe_name}' --shell zsh
     " 2>&1)
     [ $? -ne 0 ] && echo "$result" && return 1
     local path color title startup_script
     IFS=$'\t' read -r path color title startup_script <<< "$result"
     [ -z "$path" ] && echo "Could not resolve '$name'" && return 1
     cd "$path" || return 1
-    # Always set terminal color/title natively from zsh.
-    # Startup scripts are pwsh-specific (they expect a full pwsh profile environment)
-    # and should not be launched from a zsh subprocess.
+    # Always set terminal color/title
     _wtw_set_terminal "$color" "$title"
+    # Run session script if configured (interpreter detected from extension)
+    if [ -n "$startup_script" ]; then
+        _wtw_run_script "${path}/${startup_script}"
+    fi
+}
+
+# Helper: build a safe pwsh argument string by quoting each arg
+_wtw_quote_args() {
+    local result=""
+    for arg in "$@"; do
+        # Escape single quotes for PowerShell
+        local safe="${arg//\'/\'\'}"
+        result+=" '${safe}'"
+    done
+    echo "$result"
 }
 
 # Main wtw function — dispatches commands
@@ -70,8 +101,9 @@ wtw() {
         "")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
         # Commands that modify registry — delegate fully to pwsh
-        init|add|create|remove|rm|workspace|ws|copy|sync|color|clean|install|update)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@"
+        init|add|create|remove|rm|workspace|ws|copy|sync|color|clean|install|update|skill)
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
             # Regenerate aliases after commands that change the registry
             case "$1" in
                 init|add|create|remove|rm) _wtw_register_aliases ;;
@@ -79,13 +111,16 @@ wtw() {
             ;;
         # List — delegate to pwsh (ANSI output passes through)
         list|ls)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@" ;;
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Open — delegate to pwsh
         open)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@" ;;
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Help
         help|-h|--help)
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw @args" -args "$@" ;;
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Unknown: try as implicit "go" (same as pwsh behavior)
         *)
             _wtw_go "$1" ;;
@@ -98,7 +133,7 @@ _wtw_register_aliases() {
     local _wtw_output
     _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
         Import-Module '${_wtw_module}' -DisableNameChecking
-        Invoke-Wtw __aliases
+        Invoke-Wtw __aliases --shell zsh
     " 2>/dev/null) || return
     [ -z "$_wtw_output" ] && return
 
@@ -112,9 +147,13 @@ _wtw_register_aliases() {
         _wtw_p="${_wtw_p//\'/\'\\\'\'}"
         _wtw_c="${_wtw_c//\'/\'\\\'\'}"
         _wtw_t="${_wtw_t//\'/\'\\\'\'}"
+        _wtw_s="${_wtw_s//\'/\'\\\'\'}"
         _wtw_defs+="function ${_wtw_a}() {"$'\n'
         _wtw_defs+="  cd '${_wtw_p}' || return 1"$'\n'
         _wtw_defs+="  _wtw_set_terminal '${_wtw_c}' '${_wtw_t}'"$'\n'
+        if [ -n "$_wtw_s" ]; then
+            _wtw_defs+="  _wtw_run_script '${_wtw_p}/${_wtw_s}'"$'\n'
+        fi
         _wtw_defs+="}"$'\n'
     done <<< "$_wtw_output"
 

@@ -142,24 +142,27 @@ function Invoke-Wtw {
         '__resolve' {
             # Output: path\tcolor\ttitle\tstartup_script
             # Used by wtw.zsh/wtw.bash — must be clean stdout (no Write-Host noise)
-            # Redirect stream 6 (Information/Write-Host) to $null to suppress fuzzy match messages
-            if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name>"; return }
+            # Optional: --shell zsh|bash to resolve per-shell session script
+            if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name> [--shell zsh|bash]"; return }
+            $shellType = $splat['Shell'] ?? ''
             $target = & { Resolve-WtwTarget $pos[0] } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             $c = if ($target.WorktreeEntry) { $target.WorktreeEntry.color } else { (Get-WtwColors).assignments."$($target.RepoName)/main" }
             $t = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
-            $s = $target.RepoEntry.sessionScript ?? ''
+            $s = Resolve-WtwSessionScript -RepoEntry $target.RepoEntry -Shell $shellType
             Write-Output "${p}`t${c}`t${t}`t${s}"
         }
         '__aliases' {
             # Output shell alias definitions: one per line as "alias_name\tpath\tcolor\ttitle\tstartup_script"
+            # Optional: --shell zsh|bash to resolve per-shell session scripts
+            $shellType = $splat['Shell'] ?? ''
             $registry = Get-WtwRegistry
             $colors = Get-WtwColors
             foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
                 $repo = $registry.repos.$repoName
                 $aliases = Get-WtwRepoAliases $repo
-                $ss = $repo.sessionScript ?? ''
+                $ss = Resolve-WtwSessionScript -RepoEntry $repo -Shell $shellType
                 $mainColor = $colors.assignments."$repoName/main" ?? ''
                 foreach ($a in $aliases) {
                     Write-Output "${a}`t$($repo.mainPath)`t${mainColor}`t${repoName}`t${ss}"
