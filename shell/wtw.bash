@@ -127,6 +127,8 @@ wtw() {
 }
 
 # Register aliases from the registry
+_wtw_registered_aliases=()
+
 _wtw_register_aliases() {
     [ ! -f "$_wtw_module" ] && return
     local _wtw_output
@@ -135,6 +137,20 @@ _wtw_register_aliases() {
         Invoke-Wtw __aliases --shell bash
     " 2>/dev/null) || return
     [ -z "$_wtw_output" ] && return
+
+    # Remove stale aliases
+    local _wtw_new_names=()
+    while IFS=$'\t' read -r _n _rest; do
+        [ -n "$_n" ] && _wtw_new_names+=("$_n")
+    done <<< "$_wtw_output"
+    for _old in "${_wtw_registered_aliases[@]}"; do
+        local _found=false
+        for _new in "${_wtw_new_names[@]}"; do
+            [ "$_old" = "$_new" ] && _found=true && break
+        done
+        $_found || unset -f "$_old" 2>/dev/null
+    done
+    _wtw_registered_aliases=()
 
     local _wtw_defs=""
     local _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s _wtw_wid _wtw_widx
@@ -153,6 +169,7 @@ _wtw_register_aliases() {
             _wtw_defs+="  _wtw_run_script '${_wtw_p}/${_wtw_s}'"$'\n'
         fi
         _wtw_defs+="}"$'\n'
+        _wtw_registered_aliases+=("${_wtw_a}")
     done <<< "$_wtw_output"
 
     eval "$_wtw_defs"

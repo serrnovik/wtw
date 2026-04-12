@@ -242,7 +242,7 @@ If `--template` points to a real `.code-workspace` file (no `{{WTW_*}}` placehol
 
 `wtw list` shows all registered repos and their worktrees in a compact table. The **Color** column renders with actual ANSI true-color backgrounds in supported terminals:
 
-```
+```text
   Kind  Repo         Aliases                Branch          Color    Path                              Workspace
   ----  -----------  ---------------------  --------------  -------  --------------------------------  ----------------------------
   repo  my-app       app, my-app            main            #2285a6  /home/user/projects/my-app        my-app.code-workspace

@@ -18,6 +18,12 @@ function Initialize-WtwConfig {
         Name of a PowerShell script in the repo root to run on session entry
         (e.g. "start-repository-session.ps1"). Overrides auto-detection.
         Worktrees inherit this from the parent repo.
+    .PARAMETER StartupScriptZsh
+        Name of a zsh-specific session script (e.g. "start-session.zsh").
+        Used as the per-shell override when entering a worktree from zsh.
+    .PARAMETER StartupScriptBash
+        Name of a bash-specific session script (e.g. "start-session.bash").
+        Used as the per-shell override when entering a worktree from bash.
     .EXAMPLE
         wtw init "app,my-app" --template ./workspace.template
         Register the current repo with aliases "app" and "my-app", using a local template file.

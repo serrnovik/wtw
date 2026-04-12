@@ -1,9 +1,19 @@
-# Set worktree environment variables for dev tooling integration.
-# Sets both WTW_* (wtw-specific) and DEV_WORKTREE_* (generic, tool-agnostic) variables.
 function Set-WtwWorktreeEnv {
+    <#
+    .SYNOPSIS
+        Set worktree environment variables for dev tooling integration.
+    .DESCRIPTION
+        Sets both WTW_* (wtw-specific) and DEV_WORKTREE_* (generic, tool-agnostic)
+        environment variables based on the current worktree session. For worktree
+        sessions, computes a port offset from the worktree index. For main repo
+        sessions, clears all worktree variables.
+    .PARAMETER TaskName
+        The worktree task/branch name. Null or empty for the main repo session.
+    .PARAMETER RepoEntry
+        The registry repo object used to determine worktree index ordering.
+    #>
     [CmdletBinding()]
     param(
-        [string] $RepoName,
         [string] $TaskName,      # null/empty for main repo
         [PSObject] $RepoEntry
     )

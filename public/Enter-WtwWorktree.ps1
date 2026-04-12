@@ -10,6 +10,12 @@ function Enter-WtwWorktree {
     .EXAMPLE
         wtw go auth
         Switch to the "auth" worktree directory and initialize the session.
+    .NOTES
+        Side effects:
+        - Changes the current location (Set-Location) to the worktree directory.
+        - Sets WTW_* and DEV_WORKTREE_* environment variables for tooling integration.
+        - May run a repo session script (e.g. start-repository-session.ps1) if configured.
+        - Sets terminal tab color and title via escape sequences when no session script handles it.
     #>
     [CmdletBinding()]
     param(
@@ -47,7 +53,7 @@ function Enter-WtwWorktree {
     }
 
     # Set worktree environment variables (WTW_*, DEV_WORKTREE_*)
-    Set-WtwWorktreeEnv -RepoName $target.RepoName -TaskName $target.TaskName -RepoEntry $repo
+    Set-WtwWorktreeEnv -TaskName $target.TaskName -RepoEntry $repo
 
     # Use Set-GitRepo if available (from user profile), otherwise direct approach
     if (Get-Command 'Set-GitRepo' -ErrorAction SilentlyContinue) {

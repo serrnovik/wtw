@@ -148,6 +148,8 @@ wtw() {
 }
 
 # Register aliases from the registry — called on shell startup and after create/remove
+_wtw_registered_aliases=()
+
 _wtw_register_aliases() {
     [ ! -f "$_wtw_module" ] && return
     local _wtw_output
@@ -156,6 +158,23 @@ _wtw_register_aliases() {
         Invoke-Wtw __aliases --shell zsh
     " 2>/dev/null) || return
     [ -z "$_wtw_output" ] && return
+
+    # Remove previously registered aliases that are no longer in the registry
+    local _wtw_new_names=()
+    local _wtw_line_scan
+    while IFS=$'\t' read -r _wtw_line_scan _rest; do
+        [ -n "$_wtw_line_scan" ] && _wtw_new_names+=("$_wtw_line_scan")
+    done <<< "$_wtw_output"
+    for _old in "${_wtw_registered_aliases[@]}"; do
+        local _found=false
+        for _new in "${_wtw_new_names[@]}"; do
+            [ "$_old" = "$_new" ] && _found=true && break
+        done
+        if ! $_found; then
+            unset -f "$_old" 2>/dev/null
+        fi
+    done
+    _wtw_registered_aliases=()
 
     # Generate a block of function definitions and eval it in the current shell
     local _wtw_defs=""
@@ -175,6 +194,7 @@ _wtw_register_aliases() {
             _wtw_defs+="  _wtw_run_script '${_wtw_p}/${_wtw_s}'"$'\n'
         fi
         _wtw_defs+="}"$'\n'
+        _wtw_registered_aliases+=("${_wtw_a}")
     done <<< "$_wtw_output"
 
     eval "$_wtw_defs"

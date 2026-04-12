@@ -81,8 +81,15 @@ Write-Host ''
 
 # --- Clone or update wtw ---
 if (Test-Path (Join-Path $WtwDir '.git')) {
-    Write-Host '  Updating wtw source...' -ForegroundColor Cyan
-    git -C $WtwDir pull --ff-only --quiet
+    $originUrl = git -C $WtwDir config --get remote.origin.url
+    if ($originUrl -ne $WtwRepo) {
+        Write-Host "  Existing clone points to different remote ($originUrl), recloning..." -ForegroundColor Yellow
+        Remove-Item $WtwDir -Recurse -Force
+        git clone --depth 1 --quiet $WtwRepo $WtwDir
+    } else {
+        Write-Host '  Updating wtw source...' -ForegroundColor Cyan
+        git -C $WtwDir pull --ff-only --quiet
+    }
 } else {
     Write-Host '  Cloning wtw...' -ForegroundColor Cyan
     if (Test-Path $WtwDir) { Remove-Item $WtwDir -Recurse -Force }
