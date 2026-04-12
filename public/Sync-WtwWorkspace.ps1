@@ -89,6 +89,34 @@ function Resolve-WtwWorkspaceFile {
 }
 
 function Sync-WtwWorkspace {
+    <#
+    .SYNOPSIS
+        Re-apply template settings to managed workspace files.
+    .DESCRIPTION
+        Regenerates workspace files from their template while preserving colors.
+        Can target a single workspace by name/path, or sync all managed workspaces
+        with --All. Supports dry-run mode and template overrides.
+    .PARAMETER Target
+        Workspace name, alias, or file path to sync. Detects from cwd if omitted.
+    .PARAMETER All
+        Sync all managed workspaces across registered repos.
+    .PARAMETER DryRun
+        Preview what would be synced without writing any files.
+    .PARAMETER Force
+        Sync even if the workspace is not marked as wtw-managed.
+    .PARAMETER Template
+        Override the template source path for this sync operation.
+    .PARAMETER Repo
+        Limit --All scope to a specific repo alias or name.
+    .PARAMETER ColorSource
+        Choose color precedence: 'Json' (colors.json first) or 'Workspace' (peacock.color first). Omit to prompt interactively.
+    .EXAMPLE
+        wtw sync --all --dry-run
+        Preview syncing all managed workspaces without making changes.
+    .EXAMPLE
+        wtw sync auth --color-source json
+        Sync the "auth" workspace using colors.json as the color authority.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]

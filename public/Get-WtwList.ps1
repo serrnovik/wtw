@@ -1,4 +1,19 @@
 function Get-WtwList {
+    <#
+    .SYNOPSIS
+        List all registered repos and worktrees.
+    .DESCRIPTION
+        Displays a table of all repos and their worktrees with ANSI-colored
+        swatches. Detailed mode shows a card layout with clickable file links
+        and settings file paths.
+    .PARAMETER Repo
+        Filter the listing to a specific repo by name or alias.
+    .PARAMETER Detailed
+        Show card-style output with clickable file links and settings paths.
+    .EXAMPLE
+        wtw list -d
+        Show all repos and worktrees in detailed card layout.
+    #>
     [CmdletBinding()]
     param(
         [string] $Repo,

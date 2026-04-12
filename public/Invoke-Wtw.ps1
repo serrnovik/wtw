@@ -1,4 +1,18 @@
 function Convert-WtwArgsToSplat {
+    <#
+    .SYNOPSIS
+        Parse CLI arguments into a PowerShell splatting hashtable.
+    .DESCRIPTION
+        Converts --kebab-case flags to PascalCase parameter names and determines
+        whether each flag is a switch or a key-value pair by peeking at the next
+        argument. Returns a hashtable with Splat (named params) and Positional
+        (remaining args) keys.
+    .PARAMETER ArgList
+        Raw argument array from the CLI invocation.
+    .EXAMPLE
+        Convert-WtwArgsToSplat @('myTask', '--dry-run', '--repo', 'app')
+        Returns @{ Splat = @{ DryRun = [switch]::Present; Repo = 'app' }; Positional = @('myTask') }
+    #>
     param([object[]] $ArgList)
 
     $splat = [ordered]@{}
@@ -35,6 +49,21 @@ function Convert-WtwArgsToSplat {
 }
 
 function Invoke-Wtw {
+    <#
+    .SYNOPSIS
+        Main CLI dispatcher for wtw.
+    .DESCRIPTION
+        Routes subcommands (create, list, sync, clean, etc.) to their handler
+        functions. Parses raw CLI arguments via Convert-WtwArgsToSplat and splats
+        them to the target command. Does not use [CmdletBinding()] because it
+        relies on automatic $args for flexible dispatch.
+    .EXAMPLE
+        wtw create auth --open
+        Creates a worktree and workspace for "auth" and opens it in the editor.
+    .EXAMPLE
+        wtw sync --all --dry-run
+        Preview-syncs all managed workspaces.
+    #>
     $Command = $null
     $rawArgs = @()
 
@@ -56,9 +85,11 @@ function Invoke-Wtw {
         Write-Host '    list [-d|--detailed]  List registered worktrees'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
         Write-Host '    open [name]       Open workspace in editor (default: current)'
-        Write-Host '    cursor [name]     Open in Cursor   (alias: cur)'
-        Write-Host '    code [name]       Open in VS Code  (alias: co)'
+        Write-Host '    cursor [name]     Open in Cursor      (alias: cur)'
+        Write-Host '    code [name]       Open in VS Code     (alias: co)'
         Write-Host '    antigravity [name] Open in Antigravity (alias: anti)'
+        Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
+        Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
         Write-Host '    remove <task>     Remove worktree + workspace'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'

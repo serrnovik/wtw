@@ -1,4 +1,25 @@
 function New-WtwWorktree {
+    <#
+    .SYNOPSIS
+        Create a new git worktree with workspace and color assignment.
+    .DESCRIPTION
+        Creates a git worktree for the given task, generates a VS Code workspace
+        file from the repo template, assigns a unique color, and registers it
+        in the wtw registry.
+    .PARAMETER Task
+        Branch or task name for the new worktree.
+    .PARAMETER Branch
+        Override the git branch name (defaults to the task name).
+    .PARAMETER Repo
+        Target repo alias if not auto-detected from cwd.
+    .PARAMETER Open
+        Open the workspace in the configured editor after creation.
+    .PARAMETER NoBranch
+        Attach to an existing branch instead of creating a new one.
+    .EXAMPLE
+        wtw create auth
+        Create a worktree and branch named "auth" for the current repo.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
@@ -89,11 +110,6 @@ function New-WtwWorktree {
     }
     $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
-
-    # Superset integration disabled — Superset manages its own worktrees via subtrees
-    # if (Test-WtwSupersetInstalled) {
-    #     Sync-WtwSupersetProject -RepoPath $worktreePath -Name "${repoName}_${Task}" -Color $color
-    # }
 
     if ($Open) {
         Open-WtwWorkspace -Name $Task -Repo $repoName

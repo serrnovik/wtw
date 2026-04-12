@@ -1,4 +1,21 @@
 function Remove-WtwWorktree {
+    <#
+    .SYNOPSIS
+        Remove a worktree, its workspace file, git branch, and recycle its color.
+    .DESCRIPTION
+        Removes the git worktree directory, deletes the associated workspace file,
+        prunes the worktree reference, unregisters it from the registry, and
+        recycles the color assignment.
+    .PARAMETER Name
+        The worktree to remove (task name or alias-task combo).
+    .PARAMETER Repo
+        Specify the parent repo when the name alone is ambiguous.
+    .PARAMETER Force
+        Skip the confirmation prompt.
+    .EXAMPLE
+        wtw remove auth --force
+        Remove the "auth" worktree without asking for confirmation.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
@@ -81,11 +98,6 @@ function Remove-WtwWorktree {
         $colors.assignments = $newAssignments
         Save-WtwColors $colors
     }
-
-    # Superset integration disabled — Superset manages its own worktrees via subtrees
-    # if (Test-WtwSupersetInstalled -and $wt.path) {
-    #     Remove-WtwSupersetProject -RepoPath $wt.path
-    # }
 
     Write-Host ''
     Write-Host "  Removed '$Task' from $repoName." -ForegroundColor Green

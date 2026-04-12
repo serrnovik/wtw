@@ -1,3 +1,4 @@
+# Persist the wtw config object to ~/.wtw/config.json.
 function Save-WtwConfig {
     [CmdletBinding()]
     param(

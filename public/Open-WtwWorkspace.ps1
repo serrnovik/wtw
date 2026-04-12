@@ -1,4 +1,21 @@
 function Open-WtwWorkspace {
+    <#
+    .SYNOPSIS
+        Open a workspace file in the configured editor.
+    .DESCRIPTION
+        Opens the VS Code workspace file for the given target. Falls back to
+        opening the directory if no workspace file exists. Auto-detects the
+        target from cwd when no name is provided.
+    .PARAMETER Name
+        Target repo alias or task name (default: detected from cwd).
+    .PARAMETER Repo
+        Specify the parent repo when the name alone is ambiguous.
+    .PARAMETER Editor
+        Override the editor command (defaults to config or "code").
+    .EXAMPLE
+        wtw open auth
+        Open the workspace for the "auth" worktree in the default editor.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]

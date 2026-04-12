@@ -1,3 +1,4 @@
+# Read the wtw registry of repos and worktrees (~/.wtw/registry.json).
 $script:WtwRegistryPath = Join-Path $HOME '.wtw' 'registry.json'
 
 function Get-WtwRegistry {

@@ -1,3 +1,4 @@
+# Resolve a repo alias to its registry name and entry, falling back to cwd detection.
 function Resolve-WtwRepo {
     [CmdletBinding()]
     param(

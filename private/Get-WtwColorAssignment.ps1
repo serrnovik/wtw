@@ -1,3 +1,4 @@
+# Manage the color palette and per-worktree color assignments (~/.wtw/colors.json).
 $script:WtwColorsPath = Join-Path $HOME '.wtw' 'colors.json'
 
 $script:WtwDefaultPalette = @(

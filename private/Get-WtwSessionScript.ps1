@@ -1,3 +1,4 @@
+# Find a session initialization script in a repo directory.
 function Get-WtwSessionScript {
     [CmdletBinding()]
     param(

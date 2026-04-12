@@ -2,6 +2,31 @@
 
 PowerShell 7+ module that manages git worktrees together with VS Code/Cursor `.code-workspace` files.
 
+## Why
+
+If you run several AI coding agents in parallel — say five at once — you already know the pain. Each one wants its own branch, and juggling `git worktree` from the shell gets old fast. Sometimes an agent creates a worktree for you; you still need to open it, wire it into your editor, and find it again tomorrow. Tracking what lives where becomes a job in itself.
+
+Underneath the clutter, the deeper pain is context switching: which checkout, which branch, which editor window. wtw reduces that friction by automating worktree lifecycle and `.code-workspace` wiring, and by giving each workspace a distinct color so you can orient at a glance instead of decoding paths.
+
+Git worktrees are the right primitive, but using them raw is tedious. Creating one properly means: `git worktree add`, then craft a `.code-workspace` file, configure folder paths, set up terminal profiles, and remember the path. Removing one means reversing all of that. This should be one command, not six.
+
+Then there's the visual problem. With five workspaces open, they all look identical — same title bar, same activity bar, same terminal tabs. You alt-tab and have no idea where you landed. wtw auto-assigns a unique Peacock color from a 20-color palette so your title bar, activity bar, and status bar instantly tell you which branch you're in.
+
+That's what wtw does: **one command, everything wired.**
+
+- `wtw create auth` — git worktree, workspace file, unique color, shell aliases. Ready.
+- `wtw auth` — switch to it.
+- `wtw remove auth` — clean up worktree, workspace, branch, color. Gone.
+
+No manual bookkeeping. No stale directories. No identical-looking windows.
+
+## Prerequisites
+
+- **PowerShell 7+** — required
+- **Git** — required
+- **[Peacock extension](https://marketplace.visualstudio.com/items?itemName=johnpapa.vscode-peacock)** — recommended for workspace colors in VS Code, Cursor, Windsurf, etc. `wtw install` will detect your editors and offer to install it.
+- **iTerm2** (macOS) or **Windows Terminal** (Windows) — recommended for colored terminal tabs. wtw sets tab color automatically via escape sequences when switching worktrees. Other terminals get the window title but may not support tab colors.
+
 ## Install
 
 ```powershell
@@ -10,7 +35,8 @@ Import-Module ./devops/worktree-workspace/wtw.psm1 -Force
 wtw install
 ```
 
-This copies the module to `~/.wtw/module/` and adds a loader to your PowerShell profile.
+This copies the module to `~/.wtw/module/`, adds a loader to your PowerShell profile, detects installed editors, and offers to install the Peacock extension.
+
 Re-run `wtw install` from the repo source after pulling updates. Running `wtw install` from the global copy is blocked (it would delete itself).
 
 ## Quick Start
@@ -39,7 +65,6 @@ This creates:
 - Branch `auth`
 - Workspace file `my-app_auth.code-workspace` from your template
 - Unique Peacock color
-- Superset project (if installed)
 
 ### 3. Work in it
 
@@ -52,13 +77,13 @@ wtw code auth             # open in VS Code (or: wtw co auth)
 ### 4. Done with it
 
 ```powershell
-wtw remove auth           # removes worktree + workspace + branch + Superset project
+wtw remove auth           # removes worktree + workspace + branch
 ```
 
 ### 5. Clean up stale AI worktrees
 
 ```powershell
-wtw clean --dry-run       # preview (codex, cursor, superset worktrees)
+wtw clean --dry-run       # preview (codex, cursor, conductor worktrees)
 wtw clean                 # interactive selection + removal
 ```
 
@@ -76,13 +101,15 @@ wtw clean                 # interactive selection + removal
 | `wtw cursor [name]` | Open in Cursor (aliases: `cur`) |
 | `wtw code [name]` | Open in VS Code (aliases: `co`) |
 | `wtw antigravity [name]` | Open in Antigravity (aliases: `anti`, `ag`) |
+| `wtw windsurf [name]` | Open in Windsurf (aliases: `wind`, `ws`) |
+| `wtw codium [name]` | Open in VSCodium (aliases: `vscodium`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
 | `wtw workspace <name> [--main] [--worktree-path X]` | Generate workspace file only (no git worktree) |
 | `wtw copy <name> [--code-folder X]` | Standalone workspace copy from template |
 | `wtw color [name] [hex\|random]` | Set workspace color |
 | `wtw sync --all [--dry-run] [--repo X]` | Re-apply template to all managed workspaces |
-| `wtw clean [--dry-run] [--force]` | Clean stale AI worktrees (codex, cursor, superset) |
+| `wtw clean [--dry-run] [--force]` | Clean stale AI worktrees (codex, cursor, conductor) |
 | `wtw install [--skip-profile]` | Install/update globally to `~/.wtw/module/` |
 
 ## Importing Existing Worktrees
@@ -265,15 +292,27 @@ Each generated workspace:
 ## Colors
 
 20-color palette auto-assigned per worktree. Colors are recycled when worktrees are removed. Colors are applied to:
-- VS Code/Cursor Peacock color customizations (title bar, activity bar, status bar)
-- Superset project sidebar (if installed)
-- iTerm2 / Windows Terminal tab colors (via session scripts)
+- **Editor** — VS Code/Cursor/Windsurf/VSCodium Peacock color customizations (title bar, activity bar, status bar) via the [Peacock extension](https://marketplace.visualstudio.com/items?itemName=johnpapa.vscode-peacock)
+- **Terminal tabs** — iTerm2 and Windows Terminal tab colors, set automatically via escape sequences when you `wtw go` into a worktree
 
-## Superset Integration
+## Startup Scripts
 
-When [Superset](https://superset.sh) is installed (`~/.superset/local.db` exists), wtw automatically:
-- Creates/updates a Superset project on `wtw init` and `wtw create` with matching color
-- Removes the Superset project on `wtw remove`
+When you `wtw go <name>`, wtw changes to the worktree directory and then:
+
+1. If a **startup script** is configured (via `--startup-script` on `wtw init` or auto-detected), it runs that script. The script can handle terminal coloring, environment setup, etc.
+2. If **no startup script** is found, wtw sets the terminal tab color and window title itself using escape sequences (iTerm2, Windows Terminal).
+
+Auto-detected script names: `start-repository-session.ps1`, `start-tools-session.ps1`.
+
+```powershell
+# Register with a custom startup script:
+wtw init "app" --startup-script my-session-init.ps1
+
+# Or let wtw auto-detect (looks for start-repository-session.ps1):
+wtw init "app"
+
+# Worktrees inherit the startup script from their parent repo.
+```
 
 ## Profile Integration
 

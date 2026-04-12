@@ -1,3 +1,4 @@
+# Render a hex color as an ANSI true-color swatch with contrasting foreground text.
 function Format-WtwColorSwatch {
     param([string] $Hex)
     if ($Hex -notmatch '^#[0-9a-fA-F]{6}$') { return $Hex }

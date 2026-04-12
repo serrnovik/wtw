@@ -1,3 +1,4 @@
+# Create a default wtw config object with sensible defaults.
 function New-WtwDefaultConfig {
     [CmdletBinding()]
     param()
@@ -14,7 +15,6 @@ function New-WtwDefaultConfig {
         staleWorktreePaths = @(
             (Join-Path -Path $HOME -ChildPath '.codex' -AdditionalChildPath 'worktrees'),
             (Join-Path -Path $HOME -ChildPath '.cursor' -AdditionalChildPath 'worktrees'),
-            (Join-Path -Path $HOME -ChildPath '.superset' -AdditionalChildPath 'worktrees'),
             (Join-Path -Path $HOME -ChildPath 'conductor' -AdditionalChildPath 'workspaces')
         )
     }

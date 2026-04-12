@@ -1,3 +1,4 @@
+# Persist the wtw registry object to ~/.wtw/registry.json.
 function Save-WtwRegistry {
     [CmdletBinding()]
     param(

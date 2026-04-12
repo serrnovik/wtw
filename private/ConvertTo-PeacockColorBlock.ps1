@@ -1,3 +1,4 @@
+# Generate the full VS Code Peacock color customizations block from a base color.
 function ConvertTo-PeacockColorBlock {
     [CmdletBinding()]
     param(

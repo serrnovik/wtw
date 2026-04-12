@@ -1,3 +1,4 @@
+# Darken a hex color by a factor (0.0–1.0).
 function ConvertTo-DarkerHexColor {
     param(
         [Parameter(Mandatory)]

@@ -1,4 +1,15 @@
 function Register-WtwProfile {
+    <#
+    .SYNOPSIS
+        Create shell aliases for all registered repos and worktrees.
+    .DESCRIPTION
+        Iterates through the wtw registry and creates global PowerShell functions
+        and aliases for quick navigation to repos and worktrees. Called automatically
+        on shell startup after installation via the profile loader.
+    .EXAMPLE
+        Register-WtwProfile
+        Called internally by the wtw profile loader on shell startup.
+    #>
     [CmdletBinding()]
     param()
 
@@ -19,22 +30,31 @@ function Register-WtwProfile {
         $sessionScript = $repo.sessionScript
 
         $goMainBlock = {
-            param($p, $s)
+            param($p, $s, $color, $title)
             if (Get-Command 'Set-GitRepo' -ErrorAction SilentlyContinue) {
                 $tool = if ($s) { $s } else { 'start-repository-session.ps1' }
                 Set-GitRepo -gitRoot $p -toolName $tool
             } else {
                 Set-Location $p
-                $script = Join-Path $p ($s ?? 'start-repository-session.ps1')
-                if (Test-Path $script) { & $script }
+                $scriptRan = $false
+                if ($s) {
+                    $script = Join-Path $p $s
+                    if (Test-Path $script) { & $script; $scriptRan = $true }
+                }
+                if (-not $scriptRan -and (Get-Command 'Set-WtwTerminalColor' -ErrorAction SilentlyContinue)) {
+                    Set-WtwTerminalColor -Color $color -Title $title
+                }
             }
         }.GetNewClosure()
+
+        # Resolve main repo color
+        $mainColor = (Get-WtwColors).assignments."$repoName/main"
 
         # Create function + aliases for main repo (one function, multiple aliases)
         $primaryAlias = $aliases[0]
         $fnName = "WtwGo-$primaryAlias"
         Set-Item -Path "function:global:$fnName" -Value {
-            $goMainBlock.Invoke($mainPath, $sessionScript)
+            $goMainBlock.Invoke($mainPath, $sessionScript, $mainColor, $repoName)
         }.GetNewClosure()
 
         foreach ($a in $aliases) {
@@ -46,10 +66,12 @@ function Register-WtwProfile {
             foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
                 $wt = $repo.worktrees.$taskName
                 $wtPath = $wt.path
+                $wtColor = $wt.color
+                $wtTitle = "$repoName/$taskName"
                 $wtFnName = "WtwGo-$primaryAlias-$taskName"
 
                 Set-Item -Path "function:global:$wtFnName" -Value {
-                    $goMainBlock.Invoke($wtPath, $sessionScript)
+                    $goMainBlock.Invoke($wtPath, $sessionScript, $wtColor, $wtTitle)
                 }.GetNewClosure()
 
                 foreach ($a in $aliases) {

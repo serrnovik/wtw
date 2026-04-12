@@ -1,4 +1,23 @@
 function Copy-WtwWorkspace {
+    <#
+    .SYNOPSIS
+        Create a standalone (unmanaged) copy of a workspace from template.
+    .DESCRIPTION
+        Unlike New-WtwWorkspace, the copy is not tracked by wtw sync. It resolves
+        template placeholders into a concrete workspace file with a fresh color
+        assignment, but writes no wtw.managed metadata.
+    .PARAMETER Name
+        Name for the new workspace file (used as filename and display label).
+    .PARAMETER Repo
+        Repo alias or name to copy from. Resolved via the wtw registry.
+    .PARAMETER CodeFolder
+        Override the code folder path instead of using the repo main path.
+    .PARAMETER Open
+        Open the workspace in the configured editor after creation.
+    .EXAMPLE
+        wtw copy playground --repo app
+        Creates an unmanaged workspace named "playground" from the "app" repo template.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]

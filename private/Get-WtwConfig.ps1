@@ -1,3 +1,4 @@
+# Read the wtw global config (~/.wtw/config.json).
 $script:WtwConfigDir = Join-Path $HOME '.wtw'
 $script:WtwConfigPath = Join-Path $script:WtwConfigDir 'config.json'
 

@@ -1,3 +1,4 @@
+# Lighten a hex color by blending toward white by a factor (0.0–1.0).
 function Lighten-HexColor {
     param(
         [string] $Hex,
