@@ -1,7 +1,7 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
     # Dot-source the public file containing Convert-WtwArgsToSplat (it's not exported but defined in public/)
-    . "$PSScriptRoot/../public/Invoke-Wtw.ps1"
+    . "$PSScriptRoot/../private/Convert-WtwArgsToSplat.ps1"
 }
 
 Describe 'Convert-WtwArgsToSplat' {
