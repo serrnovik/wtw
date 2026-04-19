@@ -32,7 +32,14 @@ function Set-WtwColor {
         [switch] $NoSync
     )
 
+    # Allow `wtw color random` or `wtw color #689b59` without an explicit name
+    if ($Name -and -not $Color -and ($Name -eq 'random' -or $Name -match '^#?[0-9a-fA-F]{6}$')) {
+        $Color = $Name
+        $Name = $null
+    }
+
     # Detect from cwd if no name given
+    $nameFromCwd = -not $Name
     if (-not $Name) {
         $Name = Resolve-WtwCurrentTarget
         if (-not $Name) {
@@ -108,6 +115,23 @@ function Set-WtwColor {
             Write-Host "  No workspace file to sync." -ForegroundColor DarkGray
         }
     }
+
+    # Apply color to the current terminal tab immediately if this target is active here
+    $applyNow = $nameFromCwd
+    if (-not $applyNow) {
+        $currentName = Resolve-WtwCurrentTarget
+        if ($currentName) {
+            $currentTarget = Resolve-WtwTarget $currentName
+            if ($currentTarget) {
+                $currentKey = if ($currentTarget.TaskName) { "$($currentTarget.RepoName)/$($currentTarget.TaskName)" } else { "$($currentTarget.RepoName)/main" }
+                $applyNow = $currentKey -eq $colorKey
+            }
+        }
+    }
+    if ($applyNow) {
+        Set-WtwTerminalColor -Color $newColor
+    }
+
     Write-Host ''
 }
 
