@@ -49,6 +49,7 @@ function Get-WtwList {
             Color     = (Get-WtwColors).assignments."$name/main" ?? '-'
             Path      = $repoEntry.mainPath
             Workspace = $wsDisplay
+            Created   = '-'
         }
 
         # Worktrees
@@ -60,6 +61,21 @@ function Get-WtwList {
                 $wtAliases = ($aliases | ForEach-Object { "$_-$taskName" }) -join ', '
                 $pathDisplay = if ($exists) { $wt.path } else { "$($wt.path) (MISSING)" }
 
+                # Created date: from registry, then git fallback
+                $createdStr = '-'
+                if ($wt.created) {
+                    try { $createdStr = ([datetime]$wt.created).ToString('yyyy-MM-dd') } catch {}
+                }
+                if ($createdStr -eq '-') {
+                    if ($exists) {
+                        $gitDate = git -C $wt.path log --reverse --format='%cs' 2>$null | Select-Object -First 1
+                        if ($gitDate) { $createdStr = $gitDate }
+                    } elseif ($repoEntry.mainPath -and $wt.branch) {
+                        $gitDate = git -C $repoEntry.mainPath log --reverse --format='%cs' $wt.branch 2>$null | Select-Object -First 1
+                        if ($gitDate) { $createdStr = $gitDate }
+                    }
+                }
+
                 $items += [PSCustomObject]@{
                     Kind      = '  wt'
                     Repo      = ''
@@ -68,6 +84,7 @@ function Get-WtwList {
                     Color     = $wt.color ?? '-'
                     Path      = $pathDisplay
                     Workspace = $wtWsDisplay
+                    Created   = $createdStr
                 }
             }
         }
@@ -77,7 +94,7 @@ function Get-WtwList {
         Format-WtwDetailedList $items
     } else {
         Write-Host ''
-        Format-WtwTable $items @('Kind', 'Repo', 'Aliases', 'Branch', 'Color', 'Path', 'Workspace')
+        Format-WtwTable $items @('Kind', 'Repo', 'Aliases', 'Branch', 'Color', 'Path', 'Workspace', 'Created')
         Write-Host ''
     }
 }
@@ -134,6 +151,7 @@ function Format-WtwDetailedList {
             Write-Host "      Aliases   : $($item.Aliases)" -ForegroundColor DarkGray
             Write-Host "      Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor DarkGray
             Write-Host "      Workspace : $($item.Workspace)" -ForegroundColor DarkGray
+            Write-Host "      Created   : $($item.Created)" -ForegroundColor DarkGray
             Write-Host ''
         }
     }

@@ -125,6 +125,12 @@ function Resolve-WtwTarget {
         }
         if ($prefixFound.Count -eq 1) { return $prefixFound[0] }
         if ($prefixFound.Count -gt 1) {
+            # Prefer exact match; also treat emoji-suffixed names as exact (e.g. "018-019️" == "018-019")
+            $exactMatch = @($prefixFound | Where-Object {
+                $_.TaskName -eq $taskPrefix -or
+                ($_.TaskName -replace '[^\x00-\x7F]', '') -eq $taskPrefix
+            })
+            if ($exactMatch.Count -eq 1) { return $exactMatch[0] }
             $names = ($prefixFound | ForEach-Object { $_.TaskName }) -join ', '
             Write-Error "Ambiguous prefix '$Name'. Matches: $names"
             return $null
@@ -150,6 +156,11 @@ function Resolve-WtwTarget {
 
     if ($prefixFound.Count -eq 1) { return $prefixFound[0] }
     if ($prefixFound.Count -gt 1) {
+        $exactMatch = @($prefixFound | Where-Object {
+            $_.TaskName -eq $Name -or
+            ($_.TaskName -replace '[^\x00-\x7F]', '') -eq $Name
+        })
+        if ($exactMatch.Count -eq 1) { return $exactMatch[0] }
         $names = ($prefixFound | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
         Write-Error "Ambiguous prefix '$Name'. Matches: $names"
         return $null
