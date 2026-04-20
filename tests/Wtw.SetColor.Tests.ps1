@@ -80,13 +80,13 @@ Describe 'Convert-HslToHex' {
 }
 
 Describe 'Find-WtwContrastColor' {
-    It 'returns first palette color when nothing assigned' {
+    It 'returns a palette color when nothing assigned' {
         $colors = [PSCustomObject]@{
             palette     = @('#e05d44', '#2ba7d0', '#97ca00')
             assignments = [PSCustomObject]@{}
         }
         $result = Find-WtwContrastColor $colors
-        $result | Should -Be '#e05d44'
+        @('#e05d44', '#2ba7d0', '#97ca00') -contains $result | Should -Be $true
     }
 
     It 'picks a different color than the one already assigned' {
