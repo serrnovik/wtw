@@ -19,6 +19,9 @@ function New-WtwWorktree {
     .EXAMPLE
         wtw create auth
         Create a worktree and branch named "auth" for the current repo.
+    .EXAMPLE
+        wtw create "my feature name"
+        Normalizes to my_feature_name for branch, folder, and registry key.
     #>
     [CmdletBinding()]
     param(
@@ -30,6 +33,17 @@ function New-WtwWorktree {
         [switch] $Open,
         [switch] $NoBranch
     )
+
+    $rawTask = $Task
+    $Task = ConvertTo-WtwBranchSafeName -Name $Task
+    if ([string]::IsNullOrWhiteSpace($Task)) {
+        Write-Error "Task name is empty or invalid after normalization (input: '$rawTask')."
+        return
+    }
+    if ($rawTask -ne $Task) {
+        Write-Host "  Normalized task/branch: $Task" -ForegroundColor DarkCyan
+        Write-Host "    (from: $rawTask)" -ForegroundColor DarkGray
+    }
 
     $repoName, $repoEntry = Resolve-WtwRepo -RepoAlias $Repo
     if (-not $repoName) { return }
