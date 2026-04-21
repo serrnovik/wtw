@@ -33,7 +33,7 @@ function Invoke-Wtw {
         Write-Host '  Commands:' -ForegroundColor Yellow
         Write-Host '    init [aliases]    Register current repo (--template <alias> to share settings)'
         Write-Host '    add [path]        Add existing repo/worktree to registry'
-        Write-Host '    create <task>     Create worktree + workspace'
+        Write-Host '    create <task>     Create worktree + workspace (quoted / multi-word → branch-safe)'
         Write-Host '    list [-d|--detailed]  List registered worktrees'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
         Write-Host '    open [name]       Open workspace in editor (default: current)'
@@ -42,7 +42,7 @@ function Invoke-Wtw {
         Write-Host '    antigravity [name] Open in Antigravity (alias: anti)'
         Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
         Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
-        Write-Host '    remove <task>     Remove worktree + workspace'
+        Write-Host '    remove <task>     Remove worktree + workspace  (alias: rm, delete, del)'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'
         Write-Host '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
@@ -73,13 +73,20 @@ function Invoke-Wtw {
     switch ($Command) {
         'init'    { if ($pos.Count -gt 0) { $splat['Alias'] = $pos[0] }; Initialize-WtwConfig @splat }
         'add'     { if ($pos.Count -gt 0) { $splat['Path'] = $pos[0] }; Add-WtwEntry @splat }
-        'create'  { if ($pos.Count -gt 0) { $splat['Task'] = $pos[0] }; New-WtwWorktree @splat }
+        'create'  {
+            if ($pos.Count -gt 0) {
+                $splat['Task'] = if ($pos.Count -eq 1) { $pos[0] } else { $pos -join ' ' }
+            }
+            New-WtwWorktree @splat
+        }
         'list'    { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
         'ls'      { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
         'go'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Enter-WtwWorktree @splat }
         'open'    { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Open-WtwWorkspace @splat }
         'remove'  { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
         'rm'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
+        'delete'  { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
+        'del'     { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
         'workspace' { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
         'ws'        { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
         'copy'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Copy-WtwWorkspace @splat }

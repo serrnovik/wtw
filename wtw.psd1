@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.1.1'
+    ModuleVersion     = '0.1.2'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -37,3 +37,4 @@
         }
     }
 }
+

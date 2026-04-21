@@ -5,6 +5,7 @@ function Resolve-WtwTarget {
     .DESCRIPTION
         Unified resolution logic used by Enter, Remove, Open, etc.
         Resolution order:
+          0. Absolute path (exact or prefix) -> matches worktree by filesystem path
           1. Exact repo alias match       -> returns repo (no worktree)
           1b. Repo name/alias prefix match -> unique prefix on repo names and aliases
           2. "alias-task" exact match      -> returns repo + worktree
@@ -24,6 +25,50 @@ function Resolve-WtwTarget {
     )
 
     $registry = Get-WtwRegistry
+
+    # 0. Absolute path resolution (exact then prefix)
+    if ([System.IO.Path]::IsPathRooted($Name)) {
+        $normInput = $Name.TrimEnd('/', '\')
+
+        # 0a. Exact path match against repo main or worktree path
+        foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+            $repo = $registry.repos.$repoName
+            if ($repo.mainPath -and $repo.mainPath.TrimEnd('/', '\') -eq $normInput) {
+                return [PSCustomObject]@{ RepoName=$repoName; RepoEntry=$repo; TaskName=$null; WorktreeEntry=$null }
+            }
+            if ($repo.worktrees) {
+                foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+                    $wt = $repo.worktrees.$taskName
+                    if ($wt.path -and $wt.path.TrimEnd('/', '\') -eq $normInput) {
+                        return [PSCustomObject]@{ RepoName=$repoName; RepoEntry=$repo; TaskName=$taskName; WorktreeEntry=$wt }
+                    }
+                }
+            }
+        }
+
+        # 0b. Path prefix match
+        $pathMatches = @()
+        foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+            $repo = $registry.repos.$repoName
+            if ($repo.worktrees) {
+                foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+                    $wt = $repo.worktrees.$taskName
+                    if ($wt.path -and $wt.path.StartsWith($normInput)) {
+                        $pathMatches += [PSCustomObject]@{ RepoName=$repoName; RepoEntry=$repo; TaskName=$taskName; WorktreeEntry=$wt }
+                    }
+                }
+            }
+        }
+        if ($pathMatches.Count -eq 1) { return $pathMatches[0] }
+        if ($pathMatches.Count -gt 1) {
+            $names = ($pathMatches | ForEach-Object { $_.WorktreeEntry.path }) -join ', '
+            Write-Error "Ambiguous path '$Name'. Matches: $names"
+            return $null
+        }
+
+        Write-Error "No worktree found at path '$Name'. Run 'wtw list' to see available targets."
+        return $null
+    }
 
     # 1. Exact repo alias -> main repo
     foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
@@ -125,6 +170,12 @@ function Resolve-WtwTarget {
         }
         if ($prefixFound.Count -eq 1) { return $prefixFound[0] }
         if ($prefixFound.Count -gt 1) {
+            # Prefer exact match; also treat emoji-suffixed names as exact (e.g. "018-019️" == "018-019")
+            $exactMatch = @($prefixFound | Where-Object {
+                $_.TaskName -eq $taskPrefix -or
+                ($_.TaskName -replace '[^\x00-\x7F]', '') -eq $taskPrefix
+            })
+            if ($exactMatch.Count -eq 1) { return $exactMatch[0] }
             $names = ($prefixFound | ForEach-Object { $_.TaskName }) -join ', '
             Write-Error "Ambiguous prefix '$Name'. Matches: $names"
             return $null
@@ -150,6 +201,11 @@ function Resolve-WtwTarget {
 
     if ($prefixFound.Count -eq 1) { return $prefixFound[0] }
     if ($prefixFound.Count -gt 1) {
+        $exactMatch = @($prefixFound | Where-Object {
+            $_.TaskName -eq $Name -or
+            ($_.TaskName -replace '[^\x00-\x7F]', '') -eq $Name
+        })
+        if ($exactMatch.Count -eq 1) { return $exactMatch[0] }
         $names = ($prefixFound | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
         Write-Error "Ambiguous prefix '$Name'. Matches: $names"
         return $null
