@@ -36,7 +36,8 @@ wtw <name>                                             # Same as go (implicit)
 wtw open <name>                                        # Open workspace in editor
 wtw list                                               # Show all repos and worktrees (table)
 wtw list -d                                            # Detailed view with color swatches + settings links
-wtw remove <task> [--force]                            # Remove worktree + workspace
+wtw remove <task> [--force]                            # Remove worktree + workspace (git + disk)
+wtw unregister <name> [--force] [--repo X]             # Drop repo or worktree from registry only (pairs with init / add)
 wtw color [name] [hex|random]                          # Set or show workspace color
 wtw clean [--dry-run]                                  # Interactive cleanup of stale AI worktrees
 wtw workspace <name> [--main]                          # Generate workspace file without git worktree

@@ -14,6 +14,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'go';     Tip = 'Switch to worktree' }
             @{ Name = 'open';   Tip = 'Open workspace in editor' }
             @{ Name = 'remove'; Tip = 'Remove worktree + workspace' }
+            @{ Name = 'unregister'; Tip = 'Drop repo/worktree from wtw registry only' }
+            @{ Name = 'unreg'; Tip = 'Alias for unregister' }
             @{ Name = 'clean';  Tip = 'Clean stale AI worktrees' }
             @{ Name = 'skill';  Tip = 'Install AI skill into current repo' }
             @{ Name = 'help';   Tip = 'Show help' }
@@ -27,7 +29,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     $subCommand = $tokens[1]
 
     # Complete targets for go/open/remove (position 2)
-    if ($subCommand -in @('go', 'open', 'remove', 'rm') -and $tokenCount -le 3) {
+    if ($subCommand -in @('go', 'open', 'remove', 'rm', 'unregister', 'unreg') -and $tokenCount -le 3) {
         $registryPath = Join-Path $HOME '.wtw' 'registry.json'
         if (-not (Test-Path $registryPath)) { return }
         $registry = Get-Content $registryPath -Raw | ConvertFrom-Json
@@ -61,6 +63,9 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'create' { @('--branch', '--repo', '--open', '--no-branch') }
             'clean'  { @('--dry-run', '--force') }
             'remove' { @('--repo', '--force') }
+            'rm'     { @('--repo', '--force') }
+            'unregister' { @('--repo', '--force') }
+            'unreg'      { @('--repo', '--force') }
             'open'   { @('--repo', '--editor') }
             'list'   { @('--repo', '--detailed', '-d') }
             default  { @() }

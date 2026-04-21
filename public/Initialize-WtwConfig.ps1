@@ -5,6 +5,7 @@ function Initialize-WtwConfig {
     .DESCRIPTION
         Creates config, detects session script, sets up workspace template,
         and registers the repo in the wtw registry with alias and color assignment.
+        To stop tracking this repo in wtw without deleting anything, use wtw unregister.
     .PARAMETER Alias
         Comma-separated aliases for the repo (e.g. "app,my-app").
     .PARAMETER WorkspacesDir
