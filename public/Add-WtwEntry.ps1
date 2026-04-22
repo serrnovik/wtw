@@ -6,6 +6,8 @@ function Add-WtwEntry {
         Registers an existing directory as a worktree in the wtw registry.
         Auto-detects the parent repo from the .git file for worktrees. Assigns
         a color and links any existing workspace file.
+        To drop a listing without deleting the checkout, use wtw unregister; for full
+        removal (git worktree + folder + workspace), use wtw remove.
     .PARAMETER Path
         Path to the repo or worktree directory (default: current directory).
     .PARAMETER Repo

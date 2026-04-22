@@ -43,6 +43,7 @@ function Invoke-Wtw {
         Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
         Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
         Write-Host '    remove <task>     Remove worktree + workspace  (alias: rm, delete, del)'
+        Write-Host '    unregister <name> Drop repo or worktree from wtw registry only (alias: unreg)'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'
         Write-Host '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
@@ -87,6 +88,8 @@ function Invoke-Wtw {
         'rm'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
         'delete'  { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
         'del'     { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
+        'unregister' { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Unregister-WtwEntry @splat }
+        'unreg'   { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Unregister-WtwEntry @splat }
         'workspace' { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
         'ws'        { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
         'copy'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Copy-WtwWorkspace @splat }

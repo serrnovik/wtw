@@ -35,8 +35,11 @@ pwsh -Command "wtw go <name>"
 pwsh -Command "wtw list"
 pwsh -Command "wtw list -d"   # detailed view with color swatches
 
-# Remove a worktree
+# Remove a worktree (git + workspace + registry)
 pwsh -Command "wtw remove <task> [--force]"
+
+# Unregister from wtw only (registry + colors; no git/disk) — pairs with init / add
+pwsh -Command "wtw unregister <name> [--repo X] [--force]"
 
 # Set workspace color
 pwsh -Command "wtw color [name] [hex|random]"

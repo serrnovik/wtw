@@ -10,7 +10,7 @@ Describe 'wtw module loading' {
     It 'exports all public functions' {
         $expected = @(
             'Invoke-Wtw', 'Initialize-WtwConfig', 'New-WtwWorktree', 'Get-WtwList',
-            'Enter-WtwWorktree', 'Open-WtwWorkspace', 'Remove-WtwWorktree',
+            'Enter-WtwWorktree', 'Open-WtwWorkspace', 'Remove-WtwWorktree', 'Unregister-WtwEntry',
             'Invoke-WtwClean', 'New-WtwWorkspace', 'Copy-WtwWorkspace',
             'Sync-WtwWorkspace', 'Install-Wtw', 'Register-WtwProfile'
         )
