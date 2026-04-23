@@ -65,12 +65,14 @@ wtw color auth --no-sync         # Set color without updating workspace file
 ```
 
 Colors are auto-assigned from a 20-color palette. `random` picks the color with maximum perceptual distance from all others in the repo. Colors apply to:
+
 - VS Code/Cursor Peacock (title bar, activity bar, status bar)
 - iTerm2 / Windows Terminal / Kitty / tmux tab colors
 
 ## Name resolution
 
 wtw resolves names in this order:
+
 1. Exact repo alias (`proj` → main repo)
 2. Repo/alias prefix (`pr` → `proj` if unique)
 3. `alias-task` format (`proj-auth` → worktree)
@@ -82,12 +84,15 @@ wtw resolves names in this order:
 ## Important Patterns
 
 ### One active code folder per workspace
+
 Each generated workspace has exactly one code folder (the worktree) plus stable context folders. Do NOT add multiple worktrees to a single workspace.
 
 ### Worktree naming
+
 Worktrees are siblings to the main repo: `{repoBaseName}_{task}`
 
 ### Config location
+
 All config in `~/.wtw/`: `config.json`, `registry.json`, `colors.json`
 
 ## Safety Rules
@@ -101,27 +106,32 @@ All config in `~/.wtw/`: `config.json`, `registry.json`, `colors.json`
 ## Common Workflows
 
 ### Start a new feature
+
 ```powershell
 wtw create auth --open     # creates worktree, workspace, opens in editor
 ```
 
 ### Switch between tasks
+
 ```powershell
 wtw go auth                # or just: wtw auth
 ```
 
 ### Change workspace color
+
 ```powershell
 wtw color auth random      # max-contrast auto-pick
 ```
 
 ### After template changes
+
 ```powershell
 wtw sync --all --dry-run   # preview
 wtw sync --all             # apply
 ```
 
 ### Reclaim disk from AI tools
+
 ```powershell
 wtw clean --dry-run        # see what's stale
 wtw clean                  # interactive selection
@@ -131,15 +141,16 @@ wtw clean                  # interactive selection
 
 When switching to a worktree, wtw exports environment variables that build/deploy tools can use for isolation:
 
-| Variable | In worktree | In main repo |
-|----------|------------|-------------|
-| `DEV_WORKTREE_ID` | `auth` | *(empty)* |
-| `DEV_WORKTREE_DASHED_POSTFIX` | `-auth` | *(empty)* |
-| `DEV_WORKTREE_PORT_OFFSET` | `100` | `0` |
-| `DEV_WORKTREE_INDEX` | `1` | `0` |
+| Variable                      | In worktree | In main repo |
+| ----------------------------- | ----------- | ------------ |
+| `DEV_WORKTREE_ID`             | `auth`      | _(empty)_    |
+| `DEV_WORKTREE_DASHED_POSTFIX` | `-auth`     | _(empty)_    |
+| `DEV_WORKTREE_PORT_OFFSET`    | `100`       | `0`          |
+| `DEV_WORKTREE_INDEX`          | `1`         | `0`          |
 
 These are generic (tool-agnostic). Use them in jaxfiles or deploy scripts:
+
 ```yaml
 # Namespace with optional worktree suffix
-namespace: "{{ boss.suite.name }}{{ env.DEV_WORKTREE_DASHED_POSTFIX }}"
+namespace: '{{ boss.suite.name }}{{ env.DEV_WORKTREE_DASHED_POSTFIX }}'
 ```

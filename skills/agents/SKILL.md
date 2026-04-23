@@ -65,6 +65,7 @@ pwsh -Command "wtw install"
 ## Name Resolution
 
 wtw resolves names flexibly:
+
 1. Exact repo alias (`app` → main repo)
 2. Repo/alias prefix (`pr` → `proj` if unique)
 3. `alias-task` format (`app-auth` → worktree)
@@ -87,12 +88,14 @@ pwsh -Command "wtw color auth random"
 ```
 
 Colors from a 20-color palette are auto-assigned on `wtw create`. They apply to:
+
 - VS Code/Cursor Peacock extension (title bar, activity bar, status bar)
 - Terminal tabs (iTerm2, Windows Terminal, Kitty, Konsole, tmux)
 
 ## Config
 
 All config lives in `~/.wtw/`:
+
 - `config.json` — editor preference, workspaces directory
 - `registry.json` — repos, aliases, worktrees, templates
 - `colors.json` — palette and per-worktree color assignments
@@ -107,21 +110,25 @@ All config lives in `~/.wtw/`:
 ## Common Workflows
 
 ### Start a new feature
+
 ```bash
 pwsh -Command "wtw create auth --open"
 ```
 
 ### Switch between tasks
+
 ```bash
 pwsh -Command "wtw go auth"
 ```
 
 ### Change workspace color
+
 ```bash
 pwsh -Command "wtw color auth random"
 ```
 
 ### Reclaim disk from AI tools
+
 ```bash
 pwsh -Command "wtw clean --dry-run"
 ```
