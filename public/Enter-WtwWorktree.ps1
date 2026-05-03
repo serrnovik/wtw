@@ -80,9 +80,15 @@ function Enter-WtwWorktree {
             }
         }
         # If no session script handled the terminal, set color and title ourselves
+        $prNumber = $null
         if (-not $scriptRan) {
-            Set-WtwTerminalColor -Color $targetColor -Title $targetTitle
+            $prNumber = Get-WtwCurrentPrNumber
+            $titleWithPr = if ($prNumber) { "$targetTitle #$prNumber" } else { $targetTitle }
+            Set-WtwTerminalColor -Color $targetColor -Title $titleWithPr
         }
         Write-Host "  Switched to: $targetPath" -ForegroundColor Green
+        if ($prNumber) {
+            Write-Host "  PR 🔗: #$prNumber" -ForegroundColor DarkCyan
+        }
     }
 }
