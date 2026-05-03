@@ -82,4 +82,7 @@ function Register-WtwProfile {
     }
 
     Write-Verbose "wtw: Registered profile aliases for $($repoNames.Count) repo(s)."
+
+    # Re-apply tab color on every prompt so it survives dark/light mode switches in iTerm2
+    Install-WtwItermPromptHook
 }

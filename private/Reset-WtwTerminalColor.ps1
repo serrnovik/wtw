@@ -27,6 +27,7 @@ function Reset-WtwTerminalColor {
         } catch { Write-Verbose "tmux color: $_" }
     } elseif ($env:TERM_PROGRAM -eq 'iTerm.app') {
         Write-Host "${esc}]6;1;bg;*;default${bel}" -NoNewline
+        $env:WTW_TAB_COLOR = ''
     } elseif ($env:WT_SESSION) {
         Write-Host "${esc}]9;9;${esc}\" -NoNewline
     } elseif ($env:KITTY_PID -or $env:TERM_PROGRAM -eq 'kitty') {
