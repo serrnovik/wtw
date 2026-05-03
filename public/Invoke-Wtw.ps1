@@ -51,6 +51,8 @@ function Invoke-Wtw {
         Write-Host '    clean             Clean stale AI worktrees'
         Write-Host '    install           Install/update wtw globally (~/.wtw/module/)'
         Write-Host '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
+        Write-Host '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
+        Write-Host '                      Launch AI sandbox (sbx) with workspace folders mounted'
         Write-Host ''
         Write-Host '  Options:' -ForegroundColor Yellow
         Write-Host '    --help, -h        Show this help'
@@ -103,6 +105,10 @@ function Invoke-Wtw {
         'install'   { Install-Wtw @splat }
         'update'    { Install-Wtw @splat }
         'skill'     { Install-WtwSkill @splat }
+        'sbx'       {
+            if ($pos.Count -gt 0) { $splat['Instruction'] = $pos -join ' ' }
+            Invoke-WtwSbx @splat
+        }
         'help'    { Invoke-Wtw }
         # Internal commands for shell integration (zsh/bash wrappers call these)
         '__resolve' {
@@ -166,6 +172,10 @@ function Invoke-Wtw {
                 Open-WtwWorkspace @splat
             } else {
                 # Fallback: treat unknown command as "go <name>"
+                Write-Host "  → " -ForegroundColor DarkGray -NoNewline
+                Write-Host "wtw $Command" -ForegroundColor White -NoNewline
+                Write-Host "  interpreted as  " -ForegroundColor DarkGray -NoNewline
+                Write-Host "wtw go $Command" -ForegroundColor Cyan
                 Enter-WtwWorktree -Name $Command
             }
         }
