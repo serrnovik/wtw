@@ -121,12 +121,12 @@ wtw() {
         "")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
         # Commands that modify registry — delegate fully to pwsh
-        init|add|create|remove|rm|unregister|unreg|workspace|ws|copy|sync|color|clean|install|update|skill)
+        init|add|create|remove|rm|delete|del|unregister|unreg|workspace|ws|copy|sync|color|clean|install|update|skill)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
             # Regenerate aliases after commands that change the registry
             case "$1" in
-                init|add|create|remove|rm|unregister|unreg) _wtw_register_aliases ;;
+                init|add|create|remove|rm|delete|del|unregister|unreg) _wtw_register_aliases ;;
             esac
             ;;
         # List — delegate to pwsh (ANSI output passes through)
@@ -135,6 +135,10 @@ wtw() {
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Open — delegate to pwsh
         open)
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
+        # Editor shortcuts — delegate to pwsh (cursor/cur, code/co, antigravity/anti/ag, windsurf/wind, codium/vscodium, sourcegit/sgit/sg)
+        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Help
