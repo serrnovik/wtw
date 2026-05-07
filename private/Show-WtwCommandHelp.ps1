@@ -26,7 +26,8 @@ function Show-WtwCommandHelp {
             # Check if it's an editor command
             $resolved = Resolve-WtwEditorCommand $Command
             if ($resolved) {
-                @("wtw $Command [name]", "Open workspace/directory in $resolved.", '', 'Arguments:', '  name    Target to open (default: detected from cwd)', '', 'Falls back to opening the directory if no workspace file exists.')
+                $displayName = if ($resolved -is [hashtable]) { $resolved.appName } else { $resolved }
+                @("wtw $Command [name]", "Open workspace/directory in $displayName.", '', 'Arguments:', '  name    Target to open (default: detected from cwd)', '', 'Falls back to opening the directory if no workspace file exists.')
             } else {
                 $null
             }
