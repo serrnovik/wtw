@@ -111,14 +111,18 @@ wtw() {
             shift; _wtw_go "$@" ;;
         "")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
-        init|add|create|remove|rm|unregister|unreg|workspace|ws|copy|sync|color|clean|install|update|skill)
+        init|add|create|remove|rm|delete|del|unregister|unreg|workspace|ws|copy|sync|color|clean|install|update|skill)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
             case "$1" in
-                init|add|create|remove|rm|unregister|unreg) _wtw_register_aliases ;;
+                init|add|create|remove|rm|delete|del|unregister|unreg) _wtw_register_aliases ;;
             esac
             ;;
         list|ls|open|help|-h|--help)
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
+        # Editor shortcuts — delegate to pwsh (cursor/cur, code/co, antigravity/anti/ag, windsurf/wind, codium/vscodium, sourcegit/sgit/sg, codex, claude/cowork, claudecode/ccode, t3/t3code)
+        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|claude|cowork|claudecode|ccode|t3|t3code)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         *)
