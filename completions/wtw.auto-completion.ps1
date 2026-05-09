@@ -95,13 +95,17 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
         'workspace', 'ws', 'copy', 'sync', 'color', 'clean', 'install', 'update', 'skill', 'help',
         '__resolve', '__aliases',
         'cursor', 'cur', 'code', 'co', 'antigravity', 'anti', 'ag', 'windsurf', 'wind',
-        'codium', 'vscodium', 'sourcegit', 'sgit', 'sg'
+        'codium', 'vscodium', 'sourcegit', 'sgit', 'sg',
+        'codex', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
+        'ss', 'superset', 'supersetsh'
     )
 
     $targetSubcommands = @(
         'go', 'open', 'remove', 'rm', 'unregister', 'unreg', 'sync', 'color',
         'cursor', 'cur', 'code', 'co', 'antigravity', 'anti', 'ag', 'windsurf', 'wind',
         'codium', 'vscodium', 'sourcegit', 'sgit', 'sg',
+        'codex', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
+        'ss', 'superset', 'supersetsh',
         'workspace', 'ws'
     )
 
@@ -117,9 +121,14 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'remove'; Tip = 'Remove worktree + workspace' }
             @{ Name = 'unregister'; Tip = 'Drop repo/worktree from wtw registry only' }
             @{ Name = 'unreg'; Tip = 'Alias for unregister' }
-            @{ Name = 'clean';  Tip = 'Clean stale AI worktrees' }
-            @{ Name = 'skill';  Tip = 'Install AI skill into current repo' }
-            @{ Name = 'help';   Tip = 'Show help' }
+            @{ Name = 'clean';       Tip = 'Clean stale AI worktrees' }
+            @{ Name = 'skill';       Tip = 'Install AI skill into current repo' }
+            @{ Name = 'codex';       Tip = 'Open in Codex' }
+            @{ Name = 'claude';      Tip = 'Open Claude.ai app' }
+            @{ Name = 'claudecode';  Tip = 'Open Claude Code desktop' }
+            @{ Name = 't3';          Tip = 'Open T3 Code (Alpha)' }
+            @{ Name = 'ss';          Tip = 'Find & open matching Superset workspace' }
+            @{ Name = 'help';        Tip = 'Show help' }
         )
         $prefix = $wordToComplete
         $subcommands | Where-Object { $_.Name -like "$prefix*" } | ForEach-Object {

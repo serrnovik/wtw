@@ -22,7 +22,7 @@ function Open-WtwWorkspace {
         [string] $Name,
 
         [string] $Repo,
-        [string] $Editor
+        [object] $Editor  # string for CLI editors; hashtable @{type='macapp'; appName=...} for open-app style
     )
 
     # If no name given, detect from cwd
@@ -40,6 +40,25 @@ function Open-WtwWorkspace {
 
     $target = Resolve-WtwTarget $Name
     if (-not $target) { return }
+
+    # Superset — look up matching workspace by branch/task and open the Superset app
+    if ($editorCmd -is [hashtable] -and $editorCmd.type -eq 'superset') {
+        Open-WtwSupersetWorkspace -Target $target
+        return
+    }
+
+    # macOS open-app style (Codex, Claude, T3 Code, etc.) — always opens directory
+    if ($editorCmd -is [hashtable] -and $editorCmd.type -eq 'macapp') {
+        $appName = $editorCmd.appName
+        $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+        if ($dir -and (Test-Path $dir)) {
+            Write-Host "  Opening in ${appName}: $dir" -ForegroundColor Green
+            & open -a $appName $dir
+        } else {
+            Write-Error "No directory found for '$Name'."
+        }
+        return
+    }
 
     if ($target.WorktreeEntry) {
         $wsFile = $target.WorktreeEntry.workspace
