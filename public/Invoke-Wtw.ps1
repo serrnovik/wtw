@@ -46,6 +46,7 @@ function Invoke-Wtw {
         Write-Host '    claude [name]     Open Claude.ai app  (alias: cowork)'
         Write-Host '    claudecode [name] Open Claude Code    (alias: ccode)'
         Write-Host '    t3 [name]         Open T3 Code Alpha  (alias: t3code)'
+        Write-Host '    ss [name]         Find & open matching Superset workspace (alias: superset, supersetsh)'
         Write-Host '    remove <task>     Remove worktree + workspace  (alias: rm, delete, del)'
         Write-Host '    unregister <name> Drop repo or worktree from wtw registry only (alias: unreg)'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
@@ -55,6 +56,8 @@ function Invoke-Wtw {
         Write-Host '    clean             Clean stale AI worktrees'
         Write-Host '    install           Install/update wtw globally (~/.wtw/module/)'
         Write-Host '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
+        Write-Host '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
+        Write-Host '                      Launch AI sandbox (sbx) with workspace folders mounted'
         Write-Host ''
         Write-Host '  Options:' -ForegroundColor Yellow
         Write-Host '    --help, -h        Show this help'
@@ -107,6 +110,10 @@ function Invoke-Wtw {
         'install'   { Install-Wtw @splat }
         'update'    { Install-Wtw @splat }
         'skill'     { Install-WtwSkill @splat }
+        'sbx'       {
+            if ($pos.Count -gt 0) { $splat['Instruction'] = $pos -join ' ' }
+            Invoke-WtwSbx @splat
+        }
         'help'    { Invoke-Wtw }
         # Internal commands for shell integration (zsh/bash wrappers call these)
         '__resolve' {
@@ -170,6 +177,10 @@ function Invoke-Wtw {
                 Open-WtwWorkspace @splat
             } else {
                 # Fallback: treat unknown command as "go <name>"
+                Write-Host "  → " -ForegroundColor DarkGray -NoNewline
+                Write-Host "wtw $Command" -ForegroundColor White -NoNewline
+                Write-Host "  interpreted as  " -ForegroundColor DarkGray -NoNewline
+                Write-Host "wtw go $Command" -ForegroundColor Cyan
                 Enter-WtwWorktree -Name $Command
             }
         }

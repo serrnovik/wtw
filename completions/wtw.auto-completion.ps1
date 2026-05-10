@@ -96,7 +96,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
         '__resolve', '__aliases',
         'cursor', 'cur', 'code', 'co', 'antigravity', 'anti', 'ag', 'windsurf', 'wind',
         'codium', 'vscodium', 'sourcegit', 'sgit', 'sg',
-        'codex', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code'
+        'codex', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
+        'ss', 'superset', 'supersetsh'
     )
 
     $targetSubcommands = @(
@@ -104,6 +105,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
         'cursor', 'cur', 'code', 'co', 'antigravity', 'anti', 'ag', 'windsurf', 'wind',
         'codium', 'vscodium', 'sourcegit', 'sgit', 'sg',
         'codex', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
+        'ss', 'superset', 'supersetsh',
         'workspace', 'ws'
     )
 
@@ -125,6 +127,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'claude';      Tip = 'Open Claude.ai app' }
             @{ Name = 'claudecode';  Tip = 'Open Claude Code desktop' }
             @{ Name = 't3';          Tip = 'Open T3 Code (Alpha)' }
+            @{ Name = 'ss';          Tip = 'Find & open matching Superset workspace' }
             @{ Name = 'help';        Tip = 'Show help' }
         )
         $prefix = $wordToComplete

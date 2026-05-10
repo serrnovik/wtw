@@ -41,6 +41,12 @@ function Open-WtwWorkspace {
     $target = Resolve-WtwTarget $Name
     if (-not $target) { return }
 
+    # Superset — look up matching workspace by branch/task and open the Superset app
+    if ($editorCmd -is [hashtable] -and $editorCmd.type -eq 'superset') {
+        Open-WtwSupersetWorkspace -Target $target
+        return
+    }
+
     # macOS/cross-platform open-app style (Codex, Claude, T3 Code, etc.) — always opens directory
     if ($editorCmd -is [hashtable] -and $editorCmd.type -eq 'macapp') {
         $appName = $editorCmd.appName

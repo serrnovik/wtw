@@ -16,6 +16,8 @@ function Resolve-WtwEditorCommand {
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }
         @{ prefixes = @('claudecode', 'ccode'); type = 'macapp'; appName = 'Claude Code'; appNameCandidates = @('Claude Code') }
         @{ prefixes = @('t3', 't3code');        type = 'macapp'; appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
+        # Superset — find matching workspace and open Superset app, or print hints
+        @{ prefixes = @('ss', 'superset', 'supersetsh'); type = 'superset'; appName = 'Superset' }
     )
 
     # 1. Exact + prefix match
@@ -23,7 +25,8 @@ function Resolve-WtwEditorCommand {
         foreach ($prefix in $editor.prefixes) {
             if ($prefix -eq $Name -or $prefix.StartsWith($Name, [System.StringComparison]::OrdinalIgnoreCase)) {
                 if ($editor.ContainsKey('type')) {
-                    $result = @{ type = $editor.type; appName = $editor.appName; appNameCandidates = $editor.appNameCandidates }
+                    $result = @{ type = $editor.type; appName = $editor.appName }
+                    if ($editor.ContainsKey('appNameCandidates')) { $result.appNameCandidates = $editor.appNameCandidates }
                     if ($editor.ContainsKey('winCmd')) { $result.winCmd = $editor.winCmd }
                     return $result
                 }

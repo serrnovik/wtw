@@ -66,6 +66,8 @@ function Set-WtwTerminalColor {
             Write-Host "${esc}]6;1;bg;red;brightness;${r}${bel}" -NoNewline
             Write-Host "${esc}]6;1;bg;green;brightness;${g}${bel}" -NoNewline
             Write-Host "${esc}]6;1;bg;blue;brightness;${b}${bel}" -NoNewline
+            # Persist so the prompt hook can re-apply after dark/light mode switches
+            $env:WTW_TAB_COLOR = "#${hex}"
         } elseif ($env:WT_SESSION) {
             # Windows Terminal - OSC 9;9
             Write-Host "${esc}]9;9;rgb:$($hex.Substring(0,2))/$($hex.Substring(2,2))/$($hex.Substring(4,2))${esc}\" -NoNewline

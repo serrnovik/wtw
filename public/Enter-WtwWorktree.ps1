@@ -36,7 +36,17 @@ function Enter-WtwWorktree {
     }
 
     if (-not (Test-Path $targetPath)) {
-        Write-Error "Path does not exist: $targetPath"
+        $resolvedLabel = if ($target.TaskName) { "$($target.RepoName) / $($target.TaskName)" } else { $target.RepoName }
+        Write-Host ''
+        Write-Host '  ✗  Worktree path not found' -ForegroundColor Red
+        Write-Host ''
+        Write-Host "  Resolved:  $resolvedLabel" -ForegroundColor DarkGray
+        Write-Host "  Path:      $targetPath" -ForegroundColor DarkGray
+        Write-Host ''
+        Write-Host '  The worktree is registered but its directory no longer exists.' -ForegroundColor Yellow
+        Write-Host "  To recreate:    wtw create $Name" -ForegroundColor Cyan
+        Write-Host "  To unregister:  wtw remove $Name" -ForegroundColor Cyan
+        Write-Host ''
         return
     }
 
@@ -70,9 +80,15 @@ function Enter-WtwWorktree {
             }
         }
         # If no session script handled the terminal, set color and title ourselves
+        $prNumber = $null
         if (-not $scriptRan) {
-            Set-WtwTerminalColor -Color $targetColor -Title $targetTitle
+            $prNumber = Get-WtwCurrentPrNumber
+            $titleWithPr = if ($prNumber) { "$targetTitle #$prNumber" } else { $targetTitle }
+            Set-WtwTerminalColor -Color $targetColor -Title $titleWithPr
         }
         Write-Host "  Switched to: $targetPath" -ForegroundColor Green
+        if ($prNumber) {
+            Write-Host "  PR 🔗: #$prNumber" -ForegroundColor DarkCyan
+        }
     }
 }
