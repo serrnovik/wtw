@@ -47,15 +47,31 @@ function Open-WtwWorkspace {
         return
     }
 
-    # macOS open-app style (Codex, Claude, T3 Code, etc.) — always opens directory
+    # macOS/cross-platform open-app style (Codex, Claude, T3 Code, etc.) — always opens directory
     if ($editorCmd -is [hashtable] -and $editorCmd.type -eq 'macapp') {
         $appName = $editorCmd.appName
         $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
-        if ($dir -and (Test-Path $dir)) {
-            Write-Host "  Opening in ${appName}: $dir" -ForegroundColor Green
-            & open -a $appName $dir
-        } else {
+        if (-not ($dir -and (Test-Path $dir))) {
             Write-Error "No directory found for '$Name'."
+            return
+        }
+
+        if ($IsMacOS) {
+            $candidates = $editorCmd.appNameCandidates ?? @($appName)
+            $found = $candidates | Where-Object { Test-Path "/Applications/$_.app" } | Select-Object -First 1
+            if (-not $found) {
+                $tried = ($candidates | ForEach-Object { "$_.app" }) -join ', '
+                Write-Error "$appName is not installed. Tried: $tried"
+                return
+            }
+            Write-Host "  Opening in ${found}: $dir" -ForegroundColor Green
+            & open -a $found $dir
+        } elseif ($IsWindows -and $editorCmd.winCmd) {
+            Write-Host "  Opening in $($editorCmd.winCmd): $dir" -ForegroundColor Green
+            & $editorCmd.winCmd $dir
+        } else {
+            $platform = if ($IsWindows) { 'Windows' } elseif ($IsLinux) { 'Linux' } else { 'this platform' }
+            Write-Warning "'$appName' app launch is not supported on $platform."
         }
         return
     }
