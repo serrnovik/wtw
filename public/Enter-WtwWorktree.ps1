@@ -66,28 +66,60 @@ function Enter-WtwWorktree {
     $prNumber = Get-WtwCurrentPrNumber
     $titleWithPr = if ($prNumber) { "$targetTitle #$prNumber" } else { $targetTitle }
 
-    # --new-tab: spawn a fresh Windows Terminal tab with a real tab color. WT does
-    # not support runtime tab color via escape sequences, so the only way to get
-    # a coloured tab on Windows is to spawn it via `wt new-tab --tabColor ...`.
+    # --new-tab: spawn a fresh tab in whatever terminal we're currently in.
+    # Detection is by env var (WT_SESSION, WEZTERM_PANE, ConEmuPID, ...), so we
+    # don't accidentally pop a Windows Terminal window when the user is running
+    # pwsh inside WezTerm or ConEmu.
     if ($NewTab) {
-        if (-not $IsWindows -or -not $env:WT_SESSION) {
-            Write-Host '  --new-tab requires Windows Terminal on Windows; falling back to in-place switch.' -ForegroundColor Yellow
-        } else {
-            $aliases = Get-WtwRepoAliases $repo
-            $primaryAlias = if ($aliases -and $aliases.Count -gt 0) { $aliases[0] } else { $target.RepoName }
-            $nameArg = if ($target.TaskName) { "$primaryAlias-$($target.TaskName)" } else { $primaryAlias }
-            $wtArgs = @(
-                '-w', '0',
-                'new-tab',
-                '--tabColor', $targetColor,
-                '--title',    $titleWithPr,
-                '-d',         $targetPath,
-                'pwsh', '-NoLogo', '-NoExit',
-                '-Command',   "wtw go $nameArg"
-            )
-            & wt.exe @wtArgs
-            return
+        $term = Get-WtwTerminal
+        $aliases = Get-WtwRepoAliases $repo
+        $primaryAlias = if ($aliases -and $aliases.Count -gt 0) { $aliases[0] } else { $target.RepoName }
+        $nameArg = if ($target.TaskName) { "$primaryAlias-$($target.TaskName)" } else { $primaryAlias }
+        $innerCmd = "wtw go $nameArg"
+
+        $spawned = $false
+        switch ($term.Id) {
+            'wt' {
+                if (Get-Command wt.exe -ErrorAction SilentlyContinue) {
+                    & wt.exe -w 0 new-tab `
+                        --tabColor $targetColor `
+                        --title    $titleWithPr `
+                        -d         $targetPath `
+                        pwsh -NoLogo -NoExit -Command $innerCmd
+                    $spawned = $true
+                }
+            }
+            'wezterm' {
+                # WezTerm sets initial title via the inner pwsh's OSC 0. Tab
+                # background colour requires user Lua config — out of scope here.
+                if (Get-Command wezterm -ErrorAction SilentlyContinue) {
+                    & wezterm cli spawn --cwd $targetPath -- pwsh -NoLogo -NoExit -Command $innerCmd
+                    Write-Host '  Note: WezTerm tab background colour requires user Lua config.' -ForegroundColor DarkGray
+                    $spawned = $true
+                }
+            }
+            'conemu' {
+                # ConEmu: -reuse opens a new tab in the existing window. There is
+                # no portable escape for runtime tab color in ConEmu.
+                $conemuExe = Get-Command ConEmu64.exe -ErrorAction SilentlyContinue
+                if (-not $conemuExe) { $conemuExe = Get-Command ConEmu.exe -ErrorAction SilentlyContinue }
+                if ($conemuExe) {
+                    & $conemuExe.Path -reuse -dir $targetPath -cmd pwsh -NoLogo -NoExit -Command $innerCmd
+                    Write-Host '  Note: ConEmu tab colour must be configured per-Task in ConEmu settings.' -ForegroundColor DarkGray
+                    $spawned = $true
+                }
+            }
         }
+
+        if ($spawned) { return }
+
+        if (-not $term.CanSpawn) {
+            Write-Host "  --new-tab not automatable in this terminal ($($term.Name))." -ForegroundColor Yellow
+        } else {
+            Write-Host "  Could not locate the spawn CLI for $($term.Name)." -ForegroundColor Yellow
+        }
+        Write-Host "  Open a new tab manually, then run:  wtw go $nameArg" -ForegroundColor DarkGray
+        Write-Host '  Falling back to in-place switch.' -ForegroundColor DarkGray
     }
 
     # Set worktree environment variables (WTW_*, DEV_WORKTREE_*)

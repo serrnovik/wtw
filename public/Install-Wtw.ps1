@@ -120,6 +120,44 @@ if (Test-Path $_wtwModule) {
         }
     }
 
+    # Windows: install a cmd.exe shim so `wtw` works from cmd as well as pwsh.
+    if ($IsWindows) {
+        $cmdShimSrc = Join-Path $sourceDir 'shell' 'wtw.cmd'
+        if (Test-Path $cmdShimSrc) {
+            $cmdInstallDir = Join-Path $HOME '.wtw' 'cmd'
+            if (-not (Test-Path $cmdInstallDir)) {
+                New-Item -Path $cmdInstallDir -ItemType Directory -Force | Out-Null
+            }
+            Copy-Item -Path $cmdShimSrc -Destination (Join-Path $cmdInstallDir 'wtw.cmd') -Force
+            Write-Host "  cmd.exe shim installed: $(Join-Path $cmdInstallDir 'wtw.cmd')" -ForegroundColor Green
+
+            if (-not $SkipProfile) {
+                # Ensure the shim dir is on the user PATH (HKCU). Use the
+                # registry-style EnvironmentVariableTarget API so it persists
+                # across sessions; current session is patched separately.
+                $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+                if ($null -eq $userPath) { $userPath = '' }
+                $pathEntries = $userPath -split ';' | Where-Object { $_ -ne '' }
+                $alreadyOnPath = $pathEntries | Where-Object {
+                    try { [System.IO.Path]::GetFullPath($_) -ieq [System.IO.Path]::GetFullPath($cmdInstallDir) }
+                    catch { $false }
+                }
+                if (-not $alreadyOnPath) {
+                    $newUserPath = if ($userPath) { "$userPath;$cmdInstallDir" } else { $cmdInstallDir }
+                    [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
+                    Write-Host "  Added to user PATH: $cmdInstallDir" -ForegroundColor Green
+                    Write-Host '  Open a new cmd.exe / PowerShell window for PATH to take effect.' -ForegroundColor DarkGray
+                } else {
+                    Write-Host '  cmd shim dir already on user PATH — skipping.' -ForegroundColor DarkGray
+                }
+                # Patch current session too, so the user can test without restarting
+                if (-not ($env:Path -split ';' | Where-Object { $_ -ieq $cmdInstallDir })) {
+                    $env:Path = "$env:Path;$cmdInstallDir"
+                }
+            }
+        }
+    }
+
     # Offer zsh/bash shell integration (non-Windows)
     if (-not $SkipProfile -and -not $IsWindows) {
         $shellFile = Join-Path $HOME '.wtw' 'shell'
