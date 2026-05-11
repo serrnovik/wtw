@@ -69,8 +69,12 @@ function Set-WtwTerminalColor {
             # Persist so the prompt hook can re-apply after dark/light mode switches
             $env:WTW_TAB_COLOR = "#${hex}"
         } elseif ($env:WT_SESSION) {
-            # Windows Terminal - OSC 9;9
-            Write-Host "${esc}]9;9;rgb:$($hex.Substring(0,2))/$($hex.Substring(2,2))/$($hex.Substring(4,2))${esc}\" -NoNewline
+            # Windows Terminal does not support setting tab background color from
+            # inside the tab — see https://github.com/microsoft/terminal/issues/3327.
+            # Tab color can only be set at spawn time:
+            #   wt new-tab --tabColor "#RRGGBB"
+            # That path is handled by Enter-WtwWorktree's --new-tab mode.
+            # The tab title was already set above via OSC 0, which WT respects.
         } elseif ($env:KITTY_PID -or $termProgram -eq 'kitty') {
             # Kitty - OSC 30 sets the tab/window title bar color
             Write-Host "${esc}]30;#${hex}${bel}" -NoNewline

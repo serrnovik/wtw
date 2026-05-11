@@ -20,7 +20,9 @@ function Enter-WtwWorktree {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
-        [string] $Name
+        [string] $Name,
+
+        [switch] $NewTab
     )
 
     $target = Resolve-WtwTarget $Name
@@ -61,9 +63,40 @@ function Enter-WtwWorktree {
     } else {
         $target.RepoName
     }
+    $prNumber = Get-WtwCurrentPrNumber
+    $titleWithPr = if ($prNumber) { "$targetTitle #$prNumber" } else { $targetTitle }
+
+    # --new-tab: spawn a fresh Windows Terminal tab with a real tab color. WT does
+    # not support runtime tab color via escape sequences, so the only way to get
+    # a coloured tab on Windows is to spawn it via `wt new-tab --tabColor ...`.
+    if ($NewTab) {
+        if (-not $IsWindows -or -not $env:WT_SESSION) {
+            Write-Host '  --new-tab requires Windows Terminal on Windows; falling back to in-place switch.' -ForegroundColor Yellow
+        } else {
+            $aliases = Get-WtwRepoAliases $repo
+            $primaryAlias = if ($aliases -and $aliases.Count -gt 0) { $aliases[0] } else { $target.RepoName }
+            $nameArg = if ($target.TaskName) { "$primaryAlias-$($target.TaskName)" } else { $primaryAlias }
+            $wtArgs = @(
+                '-w', '0',
+                'new-tab',
+                '--tabColor', $targetColor,
+                '--title',    $titleWithPr,
+                '-d',         $targetPath,
+                'pwsh', '-NoLogo', '-NoExit',
+                '-Command',   "wtw go $nameArg"
+            )
+            & wt.exe @wtArgs
+            return
+        }
+    }
 
     # Set worktree environment variables (WTW_*, DEV_WORKTREE_*)
     Set-WtwWorktreeEnv -TaskName $target.TaskName -RepoEntry $repo
+
+    # Always set tab title (and color where supported) BEFORE running the session
+    # script. The script's own prompt hook may overwrite the title afterwards —
+    # that's expected and fine; this guarantees something sensible if it doesn't.
+    Set-WtwTerminalColor -Color $targetColor -Title $titleWithPr
 
     # Use Set-GitRepo if available (from user profile), otherwise direct approach
     if (Get-Command 'Set-GitRepo' -ErrorAction SilentlyContinue) {
@@ -71,20 +104,9 @@ function Enter-WtwWorktree {
         Set-GitRepo -gitRoot $targetPath -toolName $toolName
     } else {
         Set-Location $targetPath
-        $scriptRan = $false
         if ($sessionScript) {
             $scriptPath = Join-Path $targetPath $sessionScript
-            if (Test-Path $scriptPath) {
-                & $scriptPath
-                $scriptRan = $true
-            }
-        }
-        # If no session script handled the terminal, set color and title ourselves
-        $prNumber = $null
-        if (-not $scriptRan) {
-            $prNumber = Get-WtwCurrentPrNumber
-            $titleWithPr = if ($prNumber) { "$targetTitle #$prNumber" } else { $targetTitle }
-            Set-WtwTerminalColor -Color $targetColor -Title $titleWithPr
+            if (Test-Path $scriptPath) { & $scriptPath }
         }
         Write-Host "  Switched to: $targetPath" -ForegroundColor Green
         if ($prNumber) {

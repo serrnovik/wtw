@@ -181,7 +181,7 @@ function Invoke-Wtw {
                 Write-Host "wtw $Command" -ForegroundColor White -NoNewline
                 Write-Host "  interpreted as  " -ForegroundColor DarkGray -NoNewline
                 Write-Host "wtw go $Command" -ForegroundColor Cyan
-                Enter-WtwWorktree -Name $Command
+                Enter-WtwWorktree -Name $Command @splat
             }
         }
     }

@@ -130,6 +130,13 @@ function Set-WtwColor {
     }
     if ($applyNow) {
         Set-WtwTerminalColor -Color $newColor
+        # Windows Terminal cannot repaint a tab from inside it. Tell the user
+        # how to actually see the new color.
+        if ($IsWindows -and $env:WT_SESSION) {
+            $alias = $colorKey -replace '/main$', '' -replace '/', '-'
+            Write-Host "  Windows Terminal can't recolor this tab in place." -ForegroundColor DarkYellow
+            Write-Host "  Spawn a new tab to see it:  wtw go $alias --new-tab" -ForegroundColor Cyan
+        }
     }
 
     Write-Host ''
