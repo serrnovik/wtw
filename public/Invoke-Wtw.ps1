@@ -116,6 +116,16 @@ function Invoke-Wtw {
         }
         'help'    { Invoke-Wtw }
         # Internal commands for shell integration (zsh/bash wrappers call these)
+        '__resolve_path' {
+            # Output: just the absolute path to the target (single line, no
+            # tabs). Used by wtw.cmd so cmd.exe can `cd /d` to it cleanly
+            # without parsing tab-delimited fields.
+            if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve_path <name>"; return }
+            $target = & { Resolve-WtwTarget $pos[0] } 6>$null
+            if (-not $target) { exit 1 }
+            $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+            Write-Output $p
+        }
         '__resolve' {
             # Output: path\tcolor\ttitle\tstartup_script\tworktree_id\tworktree_index
             # Used by wtw.zsh/wtw.bash — must be clean stdout (no Write-Host noise)
@@ -181,7 +191,7 @@ function Invoke-Wtw {
                 Write-Host "wtw $Command" -ForegroundColor White -NoNewline
                 Write-Host "  interpreted as  " -ForegroundColor DarkGray -NoNewline
                 Write-Host "wtw go $Command" -ForegroundColor Cyan
-                Enter-WtwWorktree -Name $Command
+                Enter-WtwWorktree -Name $Command @splat
             }
         }
     }
