@@ -61,21 +61,26 @@ function Invoke-WtwSbx {
         $targetPath   = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
         $workspaceFile = if ($target.WorktreeEntry) { $target.WorktreeEntry.workspace } else { $target.RepoEntry.templateWorkspace }
     } else {
-        $targetPath = (Get-Location).Path
+        $root = Resolve-WtwRepoRoot
+        $targetPath = $root ?? (Get-Location).Path
         $repoName, $repoEntry = Get-WtwRepoFromCwd
-        if ($repoName -and $repoEntry) {
-            $cwd = [System.IO.Path]::GetFullPath($targetPath)
+        if ($repoName -and $repoEntry -and $root) {
+            $rootResolved = [System.IO.Path]::GetFullPath($root)
             if ($repoEntry.worktrees) {
                 foreach ($taskName in $repoEntry.worktrees.PSObject.Properties.Name) {
                     $wt = $repoEntry.worktrees.$taskName
-                    if ($wt.path -and [System.IO.Path]::GetFullPath($wt.path) -eq $cwd) {
+                    if ($wt.path -and [System.IO.Path]::GetFullPath($wt.path) -eq $rootResolved) {
                         $workspaceFile = $wt.workspace
+                        # Use the worktree path as targetPath to ensure consistency
+                        $targetPath = $wt.path
                         break
                     }
                 }
             }
             if (-not $workspaceFile) {
                 $workspaceFile = $repoEntry.templateWorkspace
+                # Use the main repo path as targetPath
+                $targetPath = $repoEntry.mainPath
             }
         }
     }
