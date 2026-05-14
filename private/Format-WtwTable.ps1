@@ -31,6 +31,54 @@ function Format-WtwColorSwatch {
     return "${esc}[38;2;${fr};${fg2};${fb}m${esc}[48;2;${r};${g};${b}m ${Hex} ${esc}[0m"
 }
 
+function Get-WtwVisibleStringLength {
+    <#
+    .SYNOPSIS
+        Length of a string as displayed in a terminal (ANSI SGR sequences stripped).
+    #>
+    param([string] $Text)
+    if ([string]::IsNullOrEmpty($Text)) {
+        return 0
+    }
+    $esc = [regex]::Escape([char]27)
+    $stripped = [regex]::Replace($Text, "$esc\[[0-9;]*m", '')
+    return $stripped.Length
+}
+
+function Split-WtwTableCellIntoLines {
+    <#
+    .NOTES
+        Do not use `-split "`n", [StringSplitOptions]::None` — in PowerShell the second
+        -split operand is *max substrings* (int); None = 0 and breaks the split, leaving a
+        scalar string so `$s[$i]` indexes chars and PadRight fails.
+    #>
+    param([string] $Value)
+    if ($null -eq $Value) {
+        return @('')
+    }
+    $normalized = "$Value"
+    if ($normalized -eq '') {
+        return @('')
+    }
+    $parts = $normalized.Split("`n", [StringSplitOptions]::None)
+    return [string[]]$parts
+}
+
+function ConvertTo-WtwTableCellLineArray {
+    <#
+    .SYNOPSIS
+        Ensures a cell line collection is a string[] (scalar string → one row, never char-wise).
+    #>
+    param($CellLines)
+    if ($null -eq $CellLines) {
+        return @('')
+    }
+    if ($CellLines -is [string]) {
+        return @([string]$CellLines)
+    }
+    return [string[]]@($CellLines | ForEach-Object { "$_" })
+}
+
 <#
 .SYNOPSIS
     Prints a table of objects to the host with aligned columns.
@@ -38,6 +86,7 @@ function Format-WtwColorSwatch {
 .DESCRIPTION
     Computes column widths, writes a header and separator, then each row. When a column
     is named 'Color' and the value matches a six-digit hex, Format-WtwColorSwatch is used.
+    Cell values may contain newline (`n) characters; each line stacks in the same column.
 
 .PARAMETER Items
     Array of objects (e.g., PSCustomObject rows) to display.
@@ -70,40 +119,83 @@ function Format-WtwTable {
         $Columns = $Items[0].PSObject.Properties.Name
     }
 
-    # Calculate column widths
+    $columnSeparatorWidth = 2
+
+    # Calculate column widths (support multiline cells; Color uses visible swatch width)
     $widths = @{}
     foreach ($col in $Columns) {
-        $widths[$col] = $col.Length
+        $widths[$col] = [Math]::Max($col.Length, 0)
         foreach ($item in $Items) {
             $val = "$($item.$col)"
-            if ($val.Length -gt $widths[$col]) {
-                $widths[$col] = $val.Length
+            $isHexColorCell = $col -eq 'Color' -and ((ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val)).Count -eq 1) -and $val -match '^#[0-9a-fA-F]{6}$'
+            if ($isHexColorCell) {
+                $swatchText = Format-WtwColorSwatch $val
+                $visibleSwatchWidth = Get-WtwVisibleStringLength $swatchText
+                $candidateWidth = [Math]::Max($val.Length, $visibleSwatchWidth)
+                if ($candidateWidth -gt $widths[$col]) {
+                    $widths[$col] = $candidateWidth
+                }
+                continue
+            }
+            foreach ($line in (ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val))) {
+                $lineLength = "$line".Length
+                if ($lineLength -gt $widths[$col]) {
+                    $widths[$col] = $lineLength
+                }
             }
         }
     }
 
     # Header
-    $header = ($Columns | ForEach-Object { $_.PadRight($widths[$_]) }) -join '  '
+    $header = ($Columns | ForEach-Object { $_.PadRight($widths[$_]) }) -join (' ' * $columnSeparatorWidth)
     Write-Host "  $header" -ForegroundColor Cyan
-    $sep = ($Columns | ForEach-Object { '-' * $widths[$_] }) -join '  '
+    $sep = ($Columns | ForEach-Object { '-' * $widths[$_] }) -join (' ' * $columnSeparatorWidth)
     Write-Host "  $sep" -ForegroundColor DarkGray
 
-    # Rows
+    # Rows (each logical row may span multiple terminal lines)
     foreach ($item in $Items) {
-        $segments = @()
+        $columnLineArrays = [ordered]@{}
+        $maxLineCount = 1
         foreach ($col in $Columns) {
             $val = "$($item.$col)"
-            $padded = $val.PadRight($widths[$col])
-            if ($col -eq 'Color' -and $val -match '^#[0-9a-fA-F]{6}$') {
-                $segments += Format-WtwColorSwatch $val
-                # Swatch visible width = val.Length + 2 (spaces around hex), compensate
-                $extra = $widths[$col] - $val.Length - 2
-                if ($extra -gt 0) { $segments += ' ' * $extra }
+            $linesPreview = ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val)
+            $hexColorForCell = $col -eq 'Color' -and $linesPreview.Count -eq 1 -and $val -match '^#[0-9a-fA-F]{6}$'
+            if ($hexColorForCell) {
+                $columnLineArrays[$col] = @([string]$val)
             } else {
-                $segments += $padded
+                $lines = ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val)
+                $columnLineArrays[$col] = $lines
+                if ($lines.Count -gt $maxLineCount) {
+                    $maxLineCount = $lines.Count
+                }
             }
         }
-        $row = $segments -join '  '
-        Write-Host "  $row"
+
+        for ($lineIndex = 0; $lineIndex -lt $maxLineCount; $lineIndex++) {
+            $segments = [System.Collections.Generic.List[string]]::new()
+            foreach ($col in $Columns) {
+                $linesForColumn = @(ConvertTo-WtwTableCellLineArray $columnLineArrays[$col])
+                $hexColorForCell = $col -eq 'Color' -and $linesForColumn.Count -eq 1 -and ($linesForColumn[0] -match '^#[0-9a-fA-F]{6}$')
+                if ($hexColorForCell) {
+                    if ($lineIndex -eq 0) {
+                        $swatchText = Format-WtwColorSwatch $linesForColumn[0]
+                        $padToWidth = $widths[$col] - (Get-WtwVisibleStringLength $swatchText)
+                        if ($padToWidth -gt 0) {
+                            $segments.Add($swatchText + (' ' * $padToWidth))
+                        } else {
+                            $segments.Add($swatchText)
+                        }
+                    } else {
+                        $segments.Add(' ' * $widths[$col])
+                    }
+                    continue
+                }
+
+                $pieceText = if ($lineIndex -lt $linesForColumn.Count) { [string]$linesForColumn[$lineIndex] } else { '' }
+                $segments.Add($pieceText.PadRight($widths[$col]))
+            }
+            $rowText = ($segments.ToArray() -join (' ' * $columnSeparatorWidth))
+            Write-Host "  $rowText"
+        }
     }
 }

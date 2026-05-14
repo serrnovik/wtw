@@ -10,16 +10,27 @@ function Get-WtwList {
         Filter the listing to a specific repo by name or alias.
     .PARAMETER Detailed
         Show card-style output with clickable file links and settings paths.
+    .PARAMETER Wide
+        Table mode: show every alias variant, full paths, and untruncated branches.
+        Default table uses abbreviated aliases (one fuzzy target per worktree),
+        ~-shortened paths with middle ellipsis, and truncated branch names.
     .EXAMPLE
         wtw list -d
         Show all repos and worktrees in detailed card layout.
+    .EXAMPLE
+        wtw list --wide
+        Full table columns without shortening (legacy-style density).
     #>
     [CmdletBinding()]
     param(
         [string] $Repo,
 
+        [string] $Task,
+
         [Alias('d')]
-        [switch] $Detailed
+        [switch] $Detailed,
+
+        [switch] $Wide
     )
 
     $registry = Get-WtwRegistry
@@ -44,7 +55,8 @@ function Get-WtwList {
         $items += [PSCustomObject]@{
             Kind      = 'repo'
             Repo      = $name
-            Aliases   = ($aliases -join ', ')
+            Task      = '-'
+            Aliases   = ($aliases -join "`n")
             Branch    = (git -C $repoEntry.mainPath branch --show-current 2>$null) ?? '?'
             Color     = (Get-WtwColors).assignments."$name/main" ?? '-'
             Path      = $repoEntry.mainPath
@@ -55,10 +67,11 @@ function Get-WtwList {
         # Worktrees
         if ($repoEntry.worktrees) {
             foreach ($taskName in $repoEntry.worktrees.PSObject.Properties.Name) {
+                if ($Task -and $taskName -ne $Task) { continue }
                 $wt = $repoEntry.worktrees.$taskName
                 $exists = Test-Path $wt.path
                 $wtWsDisplay = if ($wt.workspace -and (Test-Path $wt.workspace)) { Split-Path $wt.workspace -Leaf } else { '-' }
-                $wtAliases = ($aliases | ForEach-Object { "$_-$taskName" }) -join ', '
+                $wtAliases = ($aliases | ForEach-Object { "$_-$taskName" }) -join "`n"
                 $pathDisplay = if ($exists) { $wt.path } else { "$($wt.path) (MISSING)" }
 
                 # Created date: from registry, then git fallback
@@ -77,8 +90,9 @@ function Get-WtwList {
                 }
 
                 $items += [PSCustomObject]@{
-                    Kind      = '  wt'
-                    Repo      = ''
+                    Kind      = 'wt'
+                    Repo      = $name
+                    Task      = $taskName
                     Aliases   = $wtAliases
                     Branch    = $wt.branch
                     Color     = $wt.color ?? '-'
@@ -93,9 +107,62 @@ function Get-WtwList {
     if ($Detailed) {
         Format-WtwDetailedList $items
     } else {
+        $tableColumns = if ($Wide) {
+            @('Kind', 'Repo', 'Task', 'Aliases', 'Branch', 'Color', 'Path', 'Workspace', 'Created')
+        } else {
+            @('Kind', 'Repo', 'Task', 'Aliases', 'Branch', 'Color', 'Path', 'Created')
+        }
+        $tableRows = Get-WtwListRowsForTable -FullItems $items -Wide:$Wide
         Write-Host ''
-        Format-WtwTable $items @('Kind', 'Repo', 'Aliases', 'Branch', 'Color', 'Path', 'Workspace', 'Created')
+        Format-WtwTable -Items $tableRows -Columns $tableColumns
+        if (-not $Wide) {
+            Write-Host '  Tip: wtw list --wide  for full aliases, paths, workspace, and branch names.' -ForegroundColor DarkGray
+        }
         Write-Host ''
+    }
+}
+
+function Show-WtwInfo {
+    [CmdletBinding()]
+    param([string] $Name)
+
+    if (-not $Name) {
+        Get-WtwList -Detailed
+        return
+    }
+
+    $target = & { Resolve-WtwTarget $Name } 6>$null
+    if (-not $target) {
+        Write-Host "  No repo or worktree found matching '$Name'" -ForegroundColor Yellow
+        return
+    }
+
+    if ($target.TaskName) {
+        Get-WtwList -Repo $target.RepoName -Task $target.TaskName -Detailed
+    } else {
+        Get-WtwList -Repo $target.RepoName -Detailed
+    }
+}
+
+function Write-WtwDetailedAliasesBlock {
+    param(
+        [string] $Indent,
+        [string] $Aliases,
+        [string] $ForegroundColor = 'Gray'
+    )
+    $lines = if ([string]::IsNullOrEmpty($Aliases)) {
+        @('')
+    } else {
+        @($Aliases -split "`n", [StringSplitOptions]::None)
+    }
+    $nonEmptyLines = @($lines | ForEach-Object { $_.TrimEnd() } | Where-Object { $_ })
+    if ($nonEmptyLines.Count -eq 0) {
+        Write-Host "${Indent}Aliases   : " -ForegroundColor $ForegroundColor
+        return
+    }
+    Write-Host "${Indent}Aliases   : $($nonEmptyLines[0])" -ForegroundColor $ForegroundColor
+    for ($aliasLineIndex = 1; $aliasLineIndex -lt $nonEmptyLines.Count; $aliasLineIndex++) {
+        Write-Host "${Indent}            $($nonEmptyLines[$aliasLineIndex])" -ForegroundColor $ForegroundColor
     }
 }
 
@@ -131,7 +198,7 @@ function Format-WtwDetailedList {
             }
             Write-Host "  $swatch" -NoNewline
             Write-Host "  $($item.Branch)" -ForegroundColor Yellow
-            Write-Host "    Aliases   : $($item.Aliases)" -ForegroundColor Gray
+            Write-WtwDetailedAliasesBlock -Indent '    ' -Aliases $item.Aliases -ForegroundColor Gray
             Write-Host "    Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor Gray
             Write-Host "    Workspace : $($item.Workspace)" -ForegroundColor Gray
             Write-Host ''
@@ -148,7 +215,8 @@ function Format-WtwDetailedList {
             }
             Write-Host "    ${swatch} " -NoNewline
             Write-Host "$($item.Branch)" -ForegroundColor Yellow
-            Write-Host "      Aliases   : $($item.Aliases)" -ForegroundColor DarkGray
+            Write-Host "      Task      : $($item.Task)" -ForegroundColor DarkGray
+            Write-WtwDetailedAliasesBlock -Indent '      ' -Aliases $item.Aliases -ForegroundColor DarkGray
             Write-Host "      Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor DarkGray
             Write-Host "      Workspace : $($item.Workspace)" -ForegroundColor DarkGray
             Write-Host "      Created   : $($item.Created)" -ForegroundColor DarkGray

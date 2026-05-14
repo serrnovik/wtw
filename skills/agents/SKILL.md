@@ -32,8 +32,9 @@ pwsh -Command "wtw create <task> [--branch X] [--open]"
 pwsh -Command "wtw go <name>"
 
 # List all repos and worktrees
-pwsh -Command "wtw list"
-pwsh -Command "wtw list -d"   # detailed view with color swatches
+pwsh -Command "wtw list"          # compact table
+pwsh -Command "wtw list --wide"   # full columns when debugging alias resolution
+pwsh -Command "wtw list -d"       # detailed view with color swatches
 
 # Remove a worktree (git + workspace + registry)
 pwsh -Command "wtw remove <task> [--force]"
