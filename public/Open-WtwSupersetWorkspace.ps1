@@ -101,8 +101,13 @@ function Open-WtwSupersetWorkspace {
         if (Test-Path $supersetPath) {
             Write-Host "    path:    $supersetPath" -ForegroundColor DarkGray
         }
-        Write-Host '  Opening Superset app...' -ForegroundColor Cyan
-        & open -a Superset
+        Write-Host '  Opening Superset workspace...' -ForegroundColor Cyan
+        $openResult = & superset ws open $ws.id 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  Superset: ws open failed: $openResult" -ForegroundColor Yellow
+            Write-Host '  Falling back to launching the app...' -ForegroundColor DarkGray
+            & open -a Superset
+        }
         return
     }
 

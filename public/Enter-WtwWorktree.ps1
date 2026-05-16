@@ -141,8 +141,5 @@ function Enter-WtwWorktree {
             if (Test-Path $scriptPath) { & $scriptPath }
         }
         Write-Host "  Switched to: $targetPath" -ForegroundColor Green
-        if ($prNumber) {
-            Write-Host "  PR 🔗: #$prNumber" -ForegroundColor DarkCyan
-        }
     }
 }

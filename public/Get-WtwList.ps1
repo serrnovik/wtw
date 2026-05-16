@@ -99,6 +99,8 @@ function Get-WtwList {
                     Path      = $pathDisplay
                     Workspace = $wtWsDisplay
                     Created   = $createdStr
+                    PrettyName = $wt.prettyName
+                    SupersetId = $wt.supersetWorkspaceId
                 }
             }
         }
@@ -197,6 +199,9 @@ function Format-WtwDetailedList {
                 $swatch = "  $($item.Repo)"
             }
             Write-Host "  $swatch" -NoNewline
+            if ($color -match '^#[0-9a-fA-F]{6}$') {
+                Write-Host " $color" -ForegroundColor DarkGray -NoNewline
+            }
             Write-Host "  $($item.Branch)" -ForegroundColor Yellow
             Write-WtwDetailedAliasesBlock -Indent '    ' -Aliases $item.Aliases -ForegroundColor Gray
             Write-Host "    Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor Gray
@@ -214,12 +219,21 @@ function Format-WtwDetailedList {
                 $swatch = '  '
             }
             Write-Host "    ${swatch} " -NoNewline
+            if ($color -match '^#[0-9a-fA-F]{6}$') {
+                Write-Host "$color " -ForegroundColor DarkGray -NoNewline
+            }
             Write-Host "$($item.Branch)" -ForegroundColor Yellow
+            if ($item.PrettyName) {
+                Write-Host "      Name      : $($item.PrettyName)" -ForegroundColor DarkGray
+            }
             Write-Host "      Task      : $($item.Task)" -ForegroundColor DarkGray
             Write-WtwDetailedAliasesBlock -Indent '      ' -Aliases $item.Aliases -ForegroundColor DarkGray
             Write-Host "      Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor DarkGray
             Write-Host "      Workspace : $($item.Workspace)" -ForegroundColor DarkGray
             Write-Host "      Created   : $($item.Created)" -ForegroundColor DarkGray
+            if ($item.SupersetId) {
+                Write-Host "      Superset  : $($item.SupersetId)" -ForegroundColor DarkGray
+            }
             Write-Host ''
         }
     }
@@ -242,3 +256,4 @@ function Format-WtwDetailedList {
     }
     Write-Host ''
 }
+

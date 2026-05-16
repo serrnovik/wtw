@@ -16,12 +16,22 @@ function New-WtwWorktree {
         Open the workspace in the configured editor after creation.
     .PARAMETER NoBranch
         Attach to an existing branch instead of creating a new one.
+    .PARAMETER PrettyName
+        Human-readable display name stored in the registry and used as the
+        Superset workspace name (e.g. "035 Context Building 🔵").
+    .PARAMETER FolderName
+        Override the worktree folder suffix (default: $Task).
+        Final folder is "${repoName}_${FolderName}". Useful for long branch
+        names: --folder p2 → snowmain1_p2.
     .EXAMPLE
         wtw create auth
         Create a worktree and branch named "auth" for the current repo.
     .EXAMPLE
         wtw create "my feature name"
         Normalizes to my_feature_name for branch, folder, and registry key.
+    .EXAMPLE
+        wtw create 035-context-building-function --name "035 Context Building 🔵"
+        Creates the worktree and registers a pretty name used for Superset.
     #>
     [CmdletBinding()]
     param(
@@ -30,6 +40,8 @@ function New-WtwWorktree {
 
         [string] $Branch,
         [string] $Repo,
+        [string] $PrettyName,
+        [string] $FolderName,
         [switch] $Open,
         [switch] $NoBranch
     )
@@ -53,7 +65,13 @@ function New-WtwWorktree {
         return
     }
 
-    $worktreePath = Join-Path $repoEntry.worktreeParent "${repoName}_${Task}"
+    # Folder suffix (default: $Task). Normalized so spaces/casing don't sneak into paths.
+    $folderSuffix = if ($FolderName) { ConvertTo-WtwBranchSafeName -Name $FolderName } else { $Task }
+    if ($FolderName -and $folderSuffix -ne $FolderName) {
+        Write-Host "  Normalized folder name: $folderSuffix" -ForegroundColor DarkCyan
+        Write-Host "    (from: $FolderName)" -ForegroundColor DarkGray
+    }
+    $worktreePath = Join-Path $repoEntry.worktreeParent "${repoName}_${folderSuffix}"
 
     if (Test-Path $worktreePath) {
         Write-Error "Path already exists: $worktreePath"
@@ -95,11 +113,11 @@ function New-WtwWorktree {
     if ($config -and $templatePath) {
         $wsDir = $config.workspacesDir.Replace('~', $HOME)
         $wsDir = [System.IO.Path]::GetFullPath($wsDir)
-        $wsFile = Join-Path $wsDir "${repoName}_${Task}.code-workspace"
+        $wsFile = Join-Path $wsDir "${repoName}_${folderSuffix}.code-workspace"
 
         New-WtwWorkspaceFile `
             -RepoName $repoName `
-            -Name "${repoName}_${Task}" `
+            -Name "${repoName}_${folderSuffix}" `
             -CodeFolderPath $worktreePath `
             -TemplatePath $templatePath `
             -OutputPath $wsFile `
@@ -116,14 +134,23 @@ function New-WtwWorktree {
     # Register in registry
     $registry = Get-WtwRegistry
     $wtEntry = [PSCustomObject]@{
-        path      = $worktreePath
-        branch    = $Branch
-        workspace = $wsFile
-        color     = $color
-        created   = (Get-Date -Format 'o')
+        path                = $worktreePath
+        branch              = $Branch
+        workspace           = $wsFile
+        color               = $color
+        created             = (Get-Date -Format 'o')
+        prettyName          = $PrettyName
+        supersetWorkspaceId = $null
     }
     $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
+
+    # Create Superset workspace (no-op when CLI absent or project not found)
+    $supersetWsId = New-WtwSupersetWorkspace -RepoName $repoName -Branch $Branch -PrettyName $PrettyName
+    if ($supersetWsId) {
+        $registry.repos.$repoName.worktrees.$Task.supersetWorkspaceId = $supersetWsId
+        Save-WtwRegistry $registry
+    }
 
     if ($Open) {
         Open-WtwWorkspace -Name $Task -Repo $repoName

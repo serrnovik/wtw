@@ -4,7 +4,27 @@ function Show-WtwCommandHelp {
     $help = switch ($Command) {
         'init'        { @('wtw init [aliases...]', 'Register current repo with wtw.', '', 'Options:', '  --template <alias|path>     Share workspace settings from another repo or file', '  --startup-script <name>     Script to run on session entry (overrides auto-detect)', '  --startup-script-zsh <name> Zsh-specific session script (e.g. start-session.zsh)', '  --startup-script-bash <name> Bash-specific session script', '  --workspaces-dir <path>     Override workspace files directory', '  --name <key>                Override the registry key', '', 'Session scripts are detected by extension:', '  .ps1  -> run with pwsh       (default for PowerShell sessions)', '  .zsh  -> sourced in zsh      .sh/.bash -> sourced in bash/zsh') }
         'add'         { @('wtw add [path]', 'Add an existing repo or worktree to the registry.', '', 'Arguments:', '  path    Path to repo (default: current directory)') }
-        'create'      { @('wtw create <task>', 'Create a new git worktree + workspace for a task/branch.', '', 'Arguments:', '  task    Branch/task name for the worktree') }
+        'create'      { @(
+            'wtw create <task> [options]',
+            'Create a new git worktree + workspace for a task/branch.',
+            '',
+            'Arguments:',
+            '  task    Branch/task name for the worktree (used as registry key)',
+            '',
+            'Options:',
+            '  --name <pretty>     Display name (shown in `list -d`; used as Superset workspace title)',
+            '  --folder <name>     Override the folder suffix (default: <task>).',
+            '                      e.g. --folder p2 → snowmain1_p2',
+            '  --branch <name>     Override git branch (default: <task>)',
+            '  --repo <alias>      Target repo when not auto-detected from cwd',
+            '  --open              Open the workspace in the default editor after creating',
+            '  --no-branch         Attach to an existing branch instead of creating a new one',
+            '',
+            'Examples:',
+            '  wtw create auth',
+            '  wtw create 008-product-polish-and-distribution-phase-2 --folder p2 \',
+            '             --name "📦 008 Product Polish Phase 2"'
+        ) }
         'list'        { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)', '', 'Options:', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)') }
         'ls'          { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)', '', 'Options:', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)') }
         'info'        { @('wtw info <name>', 'Show full details for a repo or all its worktrees.', '', 'Arguments:', '  name    Anything wtw go accepts: repo alias, task name, alias-task combo, prefix, or fuzzy', '', 'Alias: wtw show') }
@@ -47,3 +67,4 @@ function Show-WtwCommandHelp {
         Invoke-Wtw
     }
 }
+

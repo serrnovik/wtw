@@ -33,7 +33,7 @@ function Invoke-Wtw {
         Write-Host '  Commands:' -ForegroundColor Yellow
         Write-Host '    init [aliases]    Register current repo (--template <alias> to share settings)'
         Write-Host '    add [path]        Add existing repo/worktree to registry'
-        Write-Host '    create <task>     Create worktree + workspace (quoted / multi-word → branch-safe)'
+        Write-Host '    create <task> [--name <pretty>] [--folder <suffix>]  Create worktree + workspace'
         Write-Host '    list [repo] [-d|--detailed] [--wide]  List repos/worktrees'
         Write-Host '    info <name>       Show full details for a repo or worktree  (alias: show)'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
@@ -85,6 +85,11 @@ function Invoke-Wtw {
         'create'  {
             if ($pos.Count -gt 0) {
                 $splat['Task'] = if ($pos.Count -eq 1) { $pos[0] } else { $pos -join ' ' }
+            }
+            # --name <pretty> → PrettyName param (avoids clash with positional Name resolution)
+            if ($splat.ContainsKey('Name')) {
+                $splat['PrettyName'] = $splat['Name']
+                $splat.Remove('Name')
             }
             New-WtwWorktree @splat
         }
@@ -199,3 +204,4 @@ function Invoke-Wtw {
         }
     }
 }
+
