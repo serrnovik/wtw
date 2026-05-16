@@ -129,7 +129,7 @@ wtw clean                 # interactive selection + removal
 | `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X]` | Register current repo with aliases, template, and per-shell session scripts |
 | `wtw add [path] [--repo X --task X]` | Import an existing worktree into the registry |
 | `wtw create <task> [--branch X] [--open] [--no-branch]` | Create worktree + workspace + branch |
-| `wtw list [-d\|--detailed] [--repo alias]` | List all repos and worktrees with paths and aliases |
+| `wtw list [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`--wide` = full aliases and paths) |
 | `wtw <name>` | Switch to repo/worktree — implicit `go` (cd + session init) |
 | `wtw go <name>` | Same as above, explicit |
 | `wtw open [name] [--editor X]` | Open workspace in editor (defaults to current repo/worktree) |
@@ -240,19 +240,29 @@ If `--template` points to a real `.code-workspace` file (no `{{WTW_*}}` placehol
 
 ### Standard view
 
-`wtw list` shows all registered repos and their worktrees in a compact table. The **Color** column renders with actual ANSI true-color backgrounds in supported terminals:
+`wtw list` shows registered repos and worktrees in a **compact** table so terminal width stays usable:
+
+- **Task**: worktree slug ( `-` on the main repo row ).
+- **Aliases**: in **wide** mode (and detailed view), each alias is on its own line inside the cell. In **compact** mode, worktrees show one `alias-task` line; the main repo shows up to two alias lines plus a `(+N)` line when more aliases exist.
+- **Branch**: truncated with an ellipsis when very long.
+- **Path**: `$HOME` shortened to `~`, with a middle ellipsis when still long.
+
+Use **`wtw list --wide`** for the previous density on paths and branches, with **every** alias permutation listed (still **one alias per line** in the Aliases column). The **Color** column uses ANSI true-color swatches; for color hex cells, the swatch appears only on the first sub-line of a row.
+
+Example (values abbreviated; alias cells may span several screen lines):
 
 ```text
-  Kind  Repo         Aliases                Branch          Color    Path                              Workspace
-  ----  -----------  ---------------------  --------------  -------  --------------------------------  ----------------------------
-  repo  my-app       app, my-app            main            #2285a6  /home/user/projects/my-app        my-app.code-workspace
-    wt               app-auth, my-app-auth  auth            #e05d44  /home/user/projects/my-app_auth   my-app_auth.code-workspace
-  repo  api-service  api, api-service       develop         #97ca00  /home/user/projects/api-service   api-service.code-workspace
+  Kind  Repo    Task   Aliases       Branch       Color    Path              Workspace
+  ----  ------  -----  ----------    -----------  -------  ----------------  ------------------
+  repo  my-app  -      app           main         (swatch)  ~/projects/...    my-app.code-workspace
+                      my-app
+                      (+1)
+  wt    my-app  auth   app-auth      auth-branch  (swatch)  ~/projects/...    my-app_auth.code-workspace
 ```
 
-- **Kind**: `repo` = main repo, `wt` = worktree (indented)
-- **Aliases**: what you type in `wtw go` / `wtw cursor` / shell shortcuts
-- **Color**: rendered as a colored swatch with contrasting text
+- **Kind**: `repo` = main repo, `wt` = worktree
+- **Aliases** (compact): primary match target; use `--wide` for the full cross-product list
+- **Color**: colored swatch with contrasting text
 
 ### Detailed view
 
@@ -268,12 +278,14 @@ If `--template` points to a real `.code-workspace` file (no `{{WTW_*}}` placehol
   ╚══════════════════════════════════════════╝
 
     my-app    main
-    Aliases   : app, my-app
+    Aliases   : app
+                my-app
     Path      : /home/user/projects/my-app
     Workspace : my-app.code-workspace
 
       ██ auth
-      Aliases   : app-auth, my-app-auth
+      Aliases   : app-auth
+                my-app-auth
       Path      : /home/user/projects/my-app_auth
       Workspace : my-app_auth.code-workspace
 
