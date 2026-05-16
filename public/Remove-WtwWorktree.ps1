@@ -53,6 +53,11 @@ function Remove-WtwWorktree {
         }
     }
 
+    # Remove Superset workspace if one is registered
+    if ($wt.supersetWorkspaceId) {
+        Remove-WtwSupersetWorkspace -WorkspaceId $wt.supersetWorkspaceId
+    }
+
     # Remove git worktree
     if (Test-Path $wt.path) {
         Write-Host '  Removing git worktree...' -ForegroundColor Cyan
