@@ -85,8 +85,11 @@ function Invoke-Wtw {
             if ($pos.Count -gt 0) {
                 $splat['Task'] = if ($pos.Count -eq 1) { $pos[0] } else { $pos -join ' ' }
             }
-            # --name <pretty> → PrettyName param (avoids clash with positional Name resolution)
-            if ($splat.ContainsKey('Name')) {
+            # --name <pretty> → PrettyName param (avoids clash with positional Name resolution).
+            # `$splat` is an ordered dictionary (`[ordered] @{ ... }`), which exposes
+            # `Contains()` rather than `ContainsKey()` — calling the latter would throw
+            # at runtime the moment `wtw create --name <pretty>` is invoked.
+            if ($splat.Contains('Name')) {
                 $splat['PrettyName'] = $splat['Name']
                 $splat.Remove('Name')
             }

@@ -22,8 +22,7 @@ function Show-WtwCommandHelp {
             '',
             'Examples:',
             '  wtw create auth',
-            '  wtw create 008-product-polish-and-distribution-phase-2 --folder p2 \',
-            '             --name "📦 008 Product Polish Phase 2"'
+            '  wtw create 008-product-polish-and-distribution-phase-2 --folder p2 --name "📦 008 Product Polish Phase 2"'
         ) }
         'list'        { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)') }
         'ls'          { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)') }

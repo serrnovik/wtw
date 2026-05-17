@@ -67,6 +67,13 @@ function New-WtwWorktree {
 
     # Folder suffix (default: $Task). Normalized so spaces/casing don't sneak into paths.
     $folderSuffix = if ($FolderName) { ConvertTo-WtwBranchSafeName -Name $FolderName } else { $Task }
+    # Reject a normalized empty suffix early — otherwise we'd build a path
+    # like `${repoName}_` and silently collide with anything that already
+    # uses the bare repo prefix.
+    if ($FolderName -and [string]::IsNullOrWhiteSpace($folderSuffix)) {
+        Write-Error "Folder name is empty or invalid after normalization (input: '$FolderName')."
+        return
+    }
     if ($FolderName -and $folderSuffix -ne $FolderName) {
         Write-Host "  Normalized folder name: $folderSuffix" -ForegroundColor DarkCyan
         Write-Host "    (from: $FolderName)" -ForegroundColor DarkGray

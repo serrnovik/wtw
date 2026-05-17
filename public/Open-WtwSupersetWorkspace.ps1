@@ -137,7 +137,9 @@ function Open-WtwSupersetWorkspace {
         }
         Write-Host ''
         Write-Host '  To create one in Superset (run from the main repo root, not a worktree):' -ForegroundColor DarkGray
-        Write-Host "    cd $mainRepoPath" -ForegroundColor DarkGray
+        # Quote the path so the suggested `cd` survives copy/paste when
+        # the repo lives under a directory with spaces.
+        Write-Host "    cd `"$mainRepoPath`"" -ForegroundColor DarkGray
         Write-Host "    superset workspaces create --local --project $($project.id) --name <name> --branch <new-branch> --base-branch $suggestedBase" -ForegroundColor DarkGray
     } finally {
         Pop-Location
