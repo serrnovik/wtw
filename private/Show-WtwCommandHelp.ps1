@@ -24,8 +24,10 @@ function Show-WtwCommandHelp {
             '  wtw create auth',
             '  wtw create 008-product-polish-and-distribution-phase-2 --folder p2 --name "📦 008 Product Polish Phase 2"'
         ) }
-        'list'        { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)') }
-        'ls'          { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)') }
+        'list'        { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)', '', 'Options:', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)') }
+        'ls'          { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)', '', 'Options:', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)') }
+        'info'        { @('wtw info <name>', 'Show full details for a repo or all its worktrees.', '', 'Arguments:', '  name    Anything wtw go accepts: repo alias, task name, alias-task combo, prefix, or fuzzy', '', 'Alias: wtw show') }
+        'show'        { @('wtw info <name>', 'Show full details for a repo or all its worktrees.', '', 'Arguments:', '  name    Anything wtw go accepts: repo alias, task name, alias-task combo, prefix, or fuzzy', '', 'Alias: wtw show') }
         'go'          { @('wtw go <name>', 'Switch to a worktree (cd + session init).', '', 'Arguments:', '  name    Repo alias, task name, or alias-task combo') }
         'open'        { @('wtw open [name]', 'Open workspace in default editor.', '', 'Arguments:', '  name    Target to open (default: detected from cwd)', '', 'Falls back to opening the directory if no workspace file exists.') }
         'remove'      { @('wtw remove <task>', 'Remove a worktree and its workspace file.', '', 'Arguments:', '  task    Name of the worktree to remove') }
@@ -64,3 +66,4 @@ function Show-WtwCommandHelp {
         Invoke-Wtw
     }
 }
+

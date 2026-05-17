@@ -33,8 +33,9 @@ function Invoke-Wtw {
         Write-Host '  Commands:' -ForegroundColor Yellow
         Write-Host '    init [aliases]    Register current repo (--template <alias> to share settings)'
         Write-Host '    add [path]        Add existing repo/worktree to registry'
-        Write-Host '    create <task> [--name <pretty>]  Create worktree + workspace; --name sets display name & Superset workspace title'
-        Write-Host '    list [-d|--detailed]  List registered worktrees'
+        Write-Host '    create <task> [--name <pretty>] [--folder <suffix>]  Create worktree + workspace'
+        Write-Host '    list [repo] [-d|--detailed] [--wide]  List repos/worktrees'
+        Write-Host '    info <name>       Show full details for a repo or worktree  (alias: show)'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
         Write-Host '    open [name]       Open workspace in editor (default: current)'
         Write-Host '    cursor [name]     Open in Cursor      (alias: cur)'
@@ -97,6 +98,8 @@ function Invoke-Wtw {
         }
         'list'    { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
         'ls'      { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
+        'info'    { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Show-WtwInfo @splat }
+        'show'    { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Show-WtwInfo @splat }
         'go'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Enter-WtwWorktree @splat }
         'open'    { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Open-WtwWorkspace @splat }
         'remove'  { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
@@ -204,3 +207,4 @@ function Invoke-Wtw {
         }
     }
 }
+

@@ -53,11 +53,9 @@ function Remove-WtwWorktree {
         }
     }
 
-    # Remove Superset workspace if one is registered.
-    # Run from main repo root — superset CLI fails on missing-cwd otherwise, and the
-    # worktree we're about to delete may already be gone by the time delete is retried.
+    # Remove Superset workspace if one is registered
     if ($wt.supersetWorkspaceId) {
-        Remove-WtwSupersetWorkspace -WorkspaceId $wt.supersetWorkspaceId -MainRepoPath $repoEntry.mainPath
+        Remove-WtwSupersetWorkspace -WorkspaceId $wt.supersetWorkspaceId
     }
 
     # Remove git worktree
