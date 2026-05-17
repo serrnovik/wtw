@@ -145,8 +145,14 @@ function New-WtwWorktree {
     $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
 
-    # Create Superset workspace (no-op when CLI absent or project not found)
-    $supersetWsId = New-WtwSupersetWorkspace -RepoName $repoName -Branch $Branch -PrettyName $PrettyName
+    # Create Superset workspace (no-op when CLI absent or project not found).
+    # MainRepoPath is required — the superset CLI runs simple-git on the cwd and
+    # fails ("directory does not exist") when invoked from a worktree path.
+    $supersetWsId = New-WtwSupersetWorkspace `
+        -RepoName $repoName `
+        -MainRepoPath $mainRepo `
+        -Branch $Branch `
+        -PrettyName $PrettyName
     if ($supersetWsId) {
         $registry.repos.$repoName.worktrees.$Task.supersetWorkspaceId = $supersetWsId
         Save-WtwRegistry $registry
