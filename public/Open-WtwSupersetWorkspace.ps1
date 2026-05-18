@@ -101,7 +101,9 @@ function Open-WtwSupersetWorkspace {
         if (Test-Path $supersetPath) {
             Write-Host "    path:    $supersetPath" -ForegroundColor DarkGray
         }
+        Repair-WtwSupersetProjectPath -ProjectId $project.id -ExpectedRepoPath $Target.RepoEntry.mainPath
         Write-Host '  Opening Superset workspace...' -ForegroundColor Cyan
+        Write-Host "    $ superset ws open $($ws.id)" -ForegroundColor DarkGray
         $openResult = & superset ws open $ws.id 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  Superset: ws open failed: $openResult" -ForegroundColor Yellow
