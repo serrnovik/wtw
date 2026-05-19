@@ -87,15 +87,20 @@ function Set-WtwColor {
 
     # Also update registry worktree entry if applicable
     if ($target.WorktreeEntry) {
+        # Refresh the leading color-circle emoji on the stored pretty name so the registry,
+        # Superset, and SourceGit all show the new color's circle.
+        $basePretty = $target.WorktreeEntry.prettyName
+        if (-not $basePretty) { $basePretty = $target.TaskName }
+        $newPretty = Format-WtwPrettyNameWithCircle -Hex $newColor -Name $basePretty
+
         $target.WorktreeEntry | Add-Member -NotePropertyName 'color' -NotePropertyValue $newColor -Force
+        $target.WorktreeEntry | Add-Member -NotePropertyName 'prettyName' -NotePropertyValue $newPretty -Force
         $registry = Get-WtwRegistry
         $registry.repos.$($target.RepoName).worktrees.$($target.TaskName) = $target.WorktreeEntry
         Save-WtwRegistry $registry
 
-        # Keep SourceGit's bookmark in sync with the new color
-        Add-WtwSourceGitRepository -Path $target.WorktreeEntry.path `
-            -Name ($target.WorktreeEntry.prettyName ?? "$($target.RepoName)/$($target.TaskName)") `
-            -Hex $newColor
+        # Keep SourceGit's bookmark + display name in sync with the new color
+        Add-WtwSourceGitRepository -Path $target.WorktreeEntry.path -Name $newPretty -Hex $newColor
     }
 
     Write-Host ''

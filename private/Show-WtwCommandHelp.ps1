@@ -16,13 +16,19 @@ function Show-WtwCommandHelp {
             '  --folder <name>     Override the folder suffix (default: <task>).',
             '                      e.g. --folder p2 → snowmain1_p2',
             '  --branch <name>     Override git branch (default: <task>)',
+            '  --color <hex|name|random>',
+            '                      Workspace color. Hex (#rrggbb / rrggbb), color name from the',
+            '                      bundled palette (case- and separator-insensitive, e.g.',
+            '                      "forest green", "navy"), or "random". Defaults to random.',
             '  --repo <alias>      Target repo when not auto-detected from cwd',
             '  --open              Open the workspace in the default editor after creating',
             '  --no-branch         Attach to an existing branch instead of creating a new one',
             '',
             'Examples:',
             '  wtw create auth',
-            '  wtw create 008-product-polish-and-distribution-phase-2 --folder p2 --name "📦 008 Product Polish Phase 2"'
+            '  wtw create 008-product-polish-and-distribution-phase-2 --folder p2 --name "📦 008 Product Polish Phase 2"',
+            '  wtw create auth --color "forest green"',
+            '  wtw create payments --color "#689b59"'
         ) }
         'list'        { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)', '', 'Options:', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)') }
         'ls'          { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)', '', 'Options:', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)') }

@@ -132,6 +132,13 @@ function New-WtwWorktree {
 
     Write-Host "  Color:    $color" -ForegroundColor Green
 
+    # Pretty name: default to the folder suffix (i.e. path without the `${repoName}_` prefix);
+    # always prepend a color-circle emoji that matches the assigned color so it surfaces in
+    # SourceGit/Superset and any other UI that reads `prettyName`.
+    if (-not $PrettyName) { $PrettyName = $folderSuffix }
+    $PrettyName = Format-WtwPrettyNameWithCircle -Hex $color -Name $PrettyName
+    Write-Host "  Pretty:   $PrettyName" -ForegroundColor Green
+
     # Generate workspace file
     $wsFile = $null
     $config = Get-WtwConfig
@@ -184,8 +191,7 @@ function New-WtwWorktree {
 
     # Register in SourceGit's managed repository list (no-op when app absent).
     # Pass the assigned hex so SourceGit's Bookmark gets the nearest of its 7 palette slots.
-    $sourceGitName = if ($PrettyName) { $PrettyName } else { "${repoName}_${folderSuffix}" }
-    Add-WtwSourceGitRepository -Path $worktreePath -Name $sourceGitName -Hex $color
+    Add-WtwSourceGitRepository -Path $worktreePath -Name $PrettyName -Hex $color
 
     if ($Open) {
         Open-WtwWorkspace -Name $Task -Repo $repoName
