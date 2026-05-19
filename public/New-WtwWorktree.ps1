@@ -23,6 +23,12 @@ function New-WtwWorktree {
         Override the worktree folder suffix (default: $Task).
         Final folder is "${repoName}_${FolderName}". Useful for long branch
         names: --folder p2 → snowmain1_p2.
+    .PARAMETER Color
+        Color assignment for the new workspace. Accepts:
+          - 'random' (default when omitted): max-contrast pick from the palette
+          - '#rrggbb' or 'rrggbb': literal hex
+          - color name: looked up in the bundled colornames table (case-insensitive,
+            spaces/hyphens ignored) — e.g. 'forest green', 'navy', 'sunset orange'.
     .EXAMPLE
         wtw create auth
         Create a worktree and branch named "auth" for the current repo.
@@ -42,6 +48,7 @@ function New-WtwWorktree {
         [string] $Repo,
         [string] $PrettyName,
         [string] $FolderName,
+        [string] $Color,
         [switch] $Open,
         [switch] $NoBranch
     )
@@ -98,8 +105,24 @@ function New-WtwWorktree {
     Write-Host "  Worktree: $worktreePath" -ForegroundColor Green
     Write-Host "  Branch:   $Branch" -ForegroundColor Green
 
-    # Pick color
-    $color = New-WtwColor -RepoName $repoName -TaskName $Task
+    # Pick color: explicit hex/name/random, else default to random max-contrast pick.
+    $colorKey = "$repoName/$Task"
+    if ($Color) {
+        $color = Resolve-WtwColorInput -Color $Color -ExcludeKey $colorKey
+        if (-not $color) {
+            Write-Error "Invalid --color '$Color'. Use 'random', a hex (#rrggbb / rrggbb), or a known color name."
+            git -C $mainRepo worktree remove $worktreePath --force 2>$null | Out-Null
+            return
+        }
+    } else {
+        $color = Resolve-WtwColorInput -Color 'random' -ExcludeKey $colorKey
+    }
+
+    # Persist assignment so colors.json and registry stay in sync
+    $colorsState = Get-WtwColors
+    $colorsState.assignments | Add-Member -NotePropertyName $colorKey -NotePropertyValue $color -Force
+    Save-WtwColors $colorsState
+
     Write-Host "  Color:    $color" -ForegroundColor Green
 
     # Generate workspace file
@@ -151,6 +174,11 @@ function New-WtwWorktree {
         $registry.repos.$repoName.worktrees.$Task.supersetWorkspaceId = $supersetWsId
         Save-WtwRegistry $registry
     }
+
+    # Register in SourceGit's managed repository list (no-op when app absent).
+    # Pass the assigned hex so SourceGit's Bookmark gets the nearest of its 7 palette slots.
+    $sourceGitName = if ($PrettyName) { $PrettyName } else { "${repoName}_${folderSuffix}" }
+    Add-WtwSourceGitRepository -Path $worktreePath -Name $sourceGitName -Hex $color
 
     if ($Open) {
         Open-WtwWorkspace -Name $Task -Repo $repoName

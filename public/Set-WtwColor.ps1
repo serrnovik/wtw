@@ -73,16 +73,13 @@ function Set-WtwColor {
         return
     }
 
-    # Resolve color
-    if ($Color -eq 'random') {
-        $newColor = Find-WtwContrastColor $colors -ExcludeKey $colorKey
-        Write-Host "  Picked: $newColor" -ForegroundColor DarkGray
-    } elseif ($Color -match '^#?[0-9a-fA-F]{6}$') {
-        $newColor = if ($Color.StartsWith('#')) { $Color } else { "#$Color" }
-    } else {
-        Write-Error "Invalid color '$Color'. Use '#rrggbb' or 'random'."
+    # Resolve color — hex, 'random', or a named color from the bundled palette
+    $newColor = Resolve-WtwColorInput -Color $Color -ExcludeKey $colorKey
+    if (-not $newColor) {
+        Write-Error "Invalid color '$Color'. Use '#rrggbb', 'random', or a known color name."
         return
     }
+    if ($Color -ieq 'random') { Write-Host "  Picked: $newColor" -ForegroundColor DarkGray }
 
     # Save to colors.json
     $colors.assignments | Add-Member -NotePropertyName $colorKey -NotePropertyValue $newColor -Force
@@ -94,6 +91,11 @@ function Set-WtwColor {
         $registry = Get-WtwRegistry
         $registry.repos.$($target.RepoName).worktrees.$($target.TaskName) = $target.WorktreeEntry
         Save-WtwRegistry $registry
+
+        # Keep SourceGit's bookmark in sync with the new color
+        Add-WtwSourceGitRepository -Path $target.WorktreeEntry.path `
+            -Name ($target.WorktreeEntry.prettyName ?? "$($target.RepoName)/$($target.TaskName)") `
+            -Hex $newColor
     }
 
     Write-Host ''

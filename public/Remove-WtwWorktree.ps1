@@ -58,6 +58,9 @@ function Remove-WtwWorktree {
         Remove-WtwSupersetWorkspace -WorkspaceId $wt.supersetWorkspaceId
     }
 
+    # Drop from SourceGit's managed repository list (macOS only, no-op when app absent)
+    Remove-WtwSourceGitRepository -Path $wt.path
+
     # Remove git worktree
     if (Test-Path $wt.path) {
         Write-Host '  Removing git worktree...' -ForegroundColor Cyan
