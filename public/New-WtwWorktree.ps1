@@ -153,7 +153,7 @@ function New-WtwWorktree {
     Save-WtwRegistry $registry
 
     # Create Superset workspace (no-op when CLI absent or project not found)
-    $supersetWsId = New-WtwSupersetWorkspace -RepoName $repoName -Branch $Branch -PrettyName $PrettyName
+    $supersetWsId = New-WtwSupersetWorkspace -RepoName $repoName -Branch $Branch -PrettyName $PrettyName -MainRepoPath $registry.repos.$repoName.mainPath
     if ($supersetWsId) {
         $registry.repos.$repoName.worktrees.$Task.supersetWorkspaceId = $supersetWsId
         Save-WtwRegistry $registry

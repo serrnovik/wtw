@@ -32,6 +32,35 @@ function Invoke-WtwClean {
     Write-Host ''
     Write-Host '  Scanning for stale worktrees...' -ForegroundColor Cyan
 
+    # Build a guard set of live Superset workspace dirs so we never delete an
+    # active checkout. Superset materializes worktrees at:
+    #   ~/.superset/worktrees/<project-slug>/<workspace-name>
+    #   ~/.superset/worktrees/<project-id>/<workspace-name>
+    $supersetGuard = @{}
+    if (Get-Command superset -ErrorAction SilentlyContinue) {
+        $projJson = & superset projects list --json 2>$null
+        $projExit = $LASTEXITCODE
+        $wsJson   = & superset workspaces list --json 2>$null
+        $wsExit   = $LASTEXITCODE
+        if ($projExit -eq 0 -and $wsExit -eq 0 -and $projJson -and $wsJson) {
+            try {
+                $projs = $projJson | ConvertFrom-Json
+                $ws    = $wsJson | ConvertFrom-Json
+                $projById = @{}
+                foreach ($p in $projs) { $projById[$p.id] = $p }
+                foreach ($w in $ws) {
+                    $p = $projById[$w.projectId]
+                    if (-not $p) { continue }
+                    foreach ($key in @($p.slug, $p.id)) {
+                        if (-not $key) { continue }
+                        $supersetGuard[(Join-Path $HOME ".superset/worktrees/$key/$($w.name)")] = $true
+                        $supersetGuard[(Join-Path $HOME ".superset/worktrees/$key/$($w.branch)")] = $true
+                    }
+                }
+            } catch { }
+        }
+    }
+
     $staleItems = @()
 
     # 1. Scan stale worktree paths (AI tools)
@@ -51,6 +80,7 @@ function Invoke-WtwClean {
             $repoDirs = Get-ChildItem -Path $dir.FullName -Directory -ErrorAction SilentlyContinue
             if ($repoDirs) {
                 foreach ($repoDir in $repoDirs) {
+                    if ($supersetGuard.ContainsKey($repoDir.FullName)) { continue }
                     $gitFile = Join-Path $repoDir.FullName '.git'
                     if (Test-Path $gitFile) {
                         $size = Get-DirectorySize $repoDir.FullName
@@ -66,6 +96,7 @@ function Invoke-WtwClean {
                     }
                 }
             } else {
+                if ($supersetGuard.ContainsKey($dir.FullName)) { continue }
                 # Might be a flat worktree dir
                 $gitFile = Join-Path $dir.FullName '.git'
                 if (Test-Path $gitFile) {

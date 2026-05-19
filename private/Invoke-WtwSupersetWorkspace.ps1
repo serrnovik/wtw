@@ -10,7 +10,8 @@ function New-WtwSupersetWorkspace {
     param(
         [string] $RepoName,
         [string] $Branch,
-        [string] $PrettyName
+        [string] $PrettyName,
+        [string] $MainRepoPath
     )
 
     if (-not (Get-Command superset -ErrorAction SilentlyContinue)) {
@@ -36,6 +37,10 @@ function New-WtwSupersetWorkspace {
     if (-not $project) {
         Write-Host "  Superset: no project matches repo '$RepoName' — skipping workspace creation." -ForegroundColor Yellow
         return $null
+    }
+
+    if ($MainRepoPath) {
+        Repair-WtwSupersetProjectPath -ProjectId $project.id -ExpectedRepoPath $MainRepoPath
     }
 
     $wsName = if ($PrettyName) { $PrettyName } else { $Branch }
