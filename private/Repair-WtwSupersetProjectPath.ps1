@@ -55,7 +55,7 @@ function Repair-WtwSupersetProjectPath {
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  Superset: repoPath relocated to $ExpectedRepoPath." -ForegroundColor Green
     } else {
-        Write-Host "  Superset: self-heal failed: $($heal | Out-String).Trim()" -ForegroundColor Yellow
+        Write-Host "  Superset: self-heal failed: $(( $heal | Out-String ).Trim())" -ForegroundColor Yellow
         Write-Host "    Manual fix: superset projects setup $ProjectId --local --import $ExpectedRepoPath --allow-relocate" -ForegroundColor DarkGray
     }
 }

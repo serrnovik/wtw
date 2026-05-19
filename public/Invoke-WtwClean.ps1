@@ -39,8 +39,10 @@ function Invoke-WtwClean {
     $supersetGuard = @{}
     if (Get-Command superset -ErrorAction SilentlyContinue) {
         $projJson = & superset projects list --json 2>$null
+        $projExit = $LASTEXITCODE
         $wsJson   = & superset workspaces list --json 2>$null
-        if ($LASTEXITCODE -eq 0 -and $projJson -and $wsJson) {
+        $wsExit   = $LASTEXITCODE
+        if ($projExit -eq 0 -and $wsExit -eq 0 -and $projJson -and $wsJson) {
             try {
                 $projs = $projJson | ConvertFrom-Json
                 $ws    = $wsJson | ConvertFrom-Json
