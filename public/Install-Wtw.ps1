@@ -200,30 +200,86 @@ if (Test-Path $_wtwModule) {
     Write-Host ''
     Write-Host '  Checking editors...' -ForegroundColor Cyan
 
+    # Editor candidates. `CmdCandidates` is a fallback chain so a CLI rename
+    # (e.g. Antigravity v1 `antigravity` → v2 `antigravity-ide`) is handled
+    # without separate detection entries. First candidate that resolves AND
+    # runs `--version` cleanly is treated as the editor's CLI.
     $editorDefs = @(
-        @{ Name = 'VS Code';      Cmd = 'code';        ExtCmd = 'code' }
-        @{ Name = 'Cursor';       Cmd = 'cursor';      ExtCmd = 'cursor' }
-        @{ Name = 'Antigravity';  Cmd = 'antigravity';  ExtCmd = 'antigravity' }
-        @{ Name = 'Windsurf';     Cmd = 'windsurf';    ExtCmd = 'windsurf' }
-        @{ Name = 'VSCodium';     Cmd = 'codium';      ExtCmd = 'codium' }
+        @{ Name = 'VS Code';      CmdCandidates = @('code') }
+        @{ Name = 'Cursor';       CmdCandidates = @('cursor') }
+        @{ Name = 'Antigravity';  CmdCandidates = @('antigravity-ide', 'antigravity') }
+        @{ Name = 'Windsurf';     CmdCandidates = @('windsurf') }
+        @{ Name = 'VSCodium';     CmdCandidates = @('codium') }
     )
+
+    # Probe a CLI: must (1) resolve via Get-Command and (2) actually run
+    # `--version` without erroring. Catches dangling symlinks like the
+    # `~/.antigravity/antigravity/bin/antigravity` stub that v1 leaves on
+    # PATH when v2 ships at a different app bundle.
+    function Test-EditorCli {
+        param([string]$Cmd)
+        $found = Get-Command $Cmd -ErrorAction SilentlyContinue
+        if (-not $found) { return $false }
+        try {
+            $null = & $Cmd --version 2>$null
+            return ($LASTEXITCODE -eq 0)
+        } catch {
+            return $false
+        }
+    }
 
     $peacockExtId = 'johnpapa.vscode-peacock'
     $installedEditors = @()
 
-    foreach ($ed in $editorDefs) {
-        $found = Get-Command $ed.Cmd -ErrorAction SilentlyContinue
-        if ($found) {
-            $installedEditors += $ed
-            Write-Host "    $($ed.Name) ($($ed.Cmd))" -ForegroundColor Green -NoNewline
+    # macOS app-bundle probes: if the CLI isn't on PATH but the app is
+    # installed, point the user at the "Shell Command: Install … in PATH"
+    # palette entry rather than silently skipping.
+    $macAppHints = @{
+        'Antigravity' = @(
+            @{ App = '/Applications/Antigravity IDE.app'; Bin = '/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide'; Name = 'antigravity-ide' }
+            @{ App = '/Applications/Antigravity.app';     Bin = '/Applications/Antigravity.app/Contents/Resources/app/bin/antigravity';        Name = 'antigravity' }
+        )
+        'VS Code' = @(
+            @{ App = '/Applications/Visual Studio Code.app'; Bin = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'; Name = 'code' }
+        )
+        'Cursor' = @(
+            @{ App = '/Applications/Cursor.app'; Bin = '/Applications/Cursor.app/Contents/Resources/app/bin/cursor'; Name = 'cursor' }
+        )
+    }
 
-            # Check if Peacock is already installed
-            $extensions = & $ed.ExtCmd --list-extensions 2>$null
-            if ($extensions -and ($extensions -match $peacockExtId)) {
-                Write-Host "  — Peacock installed" -ForegroundColor DarkGray
-            } else {
-                Write-Host "  — Peacock NOT installed" -ForegroundColor Yellow
+    foreach ($ed in $editorDefs) {
+        $workingCmd = $null
+        foreach ($candidate in $ed.CmdCandidates) {
+            if (Test-EditorCli -Cmd $candidate) { $workingCmd = $candidate; break }
+        }
+        if (-not $workingCmd) {
+            # Case A: CLI is on PATH but broken (dangling symlink / stale stub).
+            $anyFound = $ed.CmdCandidates | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue }
+            if ($anyFound) {
+                $stub = ($anyFound | Select-Object -First 1)
+                Write-Host "    $($ed.Name) — CLI '$stub' on PATH but not runnable (likely a stale stub from an old install)" -ForegroundColor Yellow
             }
+            # Case B: CLI not on PATH but app bundle exists — point at the
+            # IDE's "Install in PATH" command palette entry.
+            if ($IsMacOS -and $macAppHints.ContainsKey($ed.Name)) {
+                $installedApp = $macAppHints[$ed.Name] | Where-Object { Test-Path $_.App -and (Test-Path $_.Bin) } | Select-Object -First 1
+                if ($installedApp) {
+                    Write-Host "    $($ed.Name) — installed at $($installedApp.App), but '$($installedApp.Name)' is not on PATH." -ForegroundColor Yellow
+                    Write-Host "      Fix: open $($ed.Name) → Cmd-Shift-P → 'Shell Command: Install ''$($installedApp.Name)'' command in PATH'" -ForegroundColor DarkGray
+                }
+            }
+            continue
+        }
+
+        $installedEditors += @{ Name = $ed.Name; Cmd = $workingCmd; ExtCmd = $workingCmd }
+        Write-Host "    $($ed.Name) ($workingCmd)" -ForegroundColor Green -NoNewline
+
+        # Check if Peacock is already installed
+        $extensions = & $workingCmd --list-extensions 2>$null
+        if ($extensions -and ($extensions -match $peacockExtId)) {
+            Write-Host "  — Peacock installed" -ForegroundColor DarkGray
+        } else {
+            Write-Host "  — Peacock NOT installed" -ForegroundColor Yellow
         }
     }
 
