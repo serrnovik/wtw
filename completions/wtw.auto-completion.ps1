@@ -216,7 +216,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'init'   { @('--template', '--startup-script', '--startup-script-zsh', '--startup-script-bash', '--workspaces-dir', '--name') }
             'skill'  { @('--agent') }
             'add'    { @('--repo', '--task', '--branch') }
-            'create' { @('--name', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from') }
+            'create' { @('--name', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track') }
             'clean'  { @('--dry-run', '--force') }
             'remove' { @('--repo', '--force') }
             'rm'     { @('--repo', '--force') }
