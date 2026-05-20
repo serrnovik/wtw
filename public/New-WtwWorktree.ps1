@@ -29,6 +29,13 @@ function New-WtwWorktree {
           - '#rrggbb' or 'rrggbb': literal hex
           - color name: looked up in the bundled colornames table (case-insensitive,
             spaces/hyphens ignored) — e.g. 'forest green', 'navy', 'sunset orange'.
+    .PARAMETER From
+        Start-point for the new branch. Any git ref reachable from the main
+        repo: a branch name (local or `origin/<name>`), tag, or commit SHA.
+        When omitted, git uses the main repo's current HEAD (typically the
+        default branch). Pass a feature branch to stack the new worktree on
+        top of in-flight work — Graphite-style stacked PRs. Ignored when
+        -NoBranch is set (you're attaching to an existing branch).
     .EXAMPLE
         wtw create auth
         Create a worktree and branch named "auth" for the current repo.
@@ -38,6 +45,11 @@ function New-WtwWorktree {
     .EXAMPLE
         wtw create 035-context-building-function --name "035 Context Building 🔵"
         Creates the worktree and registers a pretty name used for Superset.
+    .EXAMPLE
+        wtw create initiative-016-home --from MS-phase-5-swim-polish
+        Stack initiative-016-home on top of MS-phase-5-swim-polish so the
+        new branch + worktree start from that branch's tip (Graphite-style
+        stack base).
     #>
     [CmdletBinding()]
     param(
@@ -49,6 +61,7 @@ function New-WtwWorktree {
         [string] $PrettyName,
         [string] $FolderName,
         [string] $Color,
+        [string] $From,
         [switch] $Open,
         [switch] $NoBranch
     )
@@ -98,8 +111,25 @@ function New-WtwWorktree {
     Write-Host "  Creating worktree..." -ForegroundColor Cyan
     $mainRepo = $repoEntry.mainPath
 
+    # Resolve -From upfront so we fail fast with a clear message rather
+    # than letting `git worktree add` complain mid-flight.
+    if ($From) {
+        if ($NoBranch) {
+            Write-Error "--from is only meaningful when creating a new branch; drop -NoBranch or omit --from."
+            return
+        }
+        $resolved = git -C $mainRepo rev-parse --verify "$From^{commit}" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "--from '$From' is not a valid ref in $repoName : $resolved"
+            return
+        }
+        Write-Host "  Stack base: $From ($($resolved.Substring(0, 12)))" -ForegroundColor Cyan
+    }
+
     if ($NoBranch) {
         $result = git -C $mainRepo worktree add $worktreePath $Branch 2>&1
+    } elseif ($From) {
+        $result = git -C $mainRepo worktree add -b $Branch $worktreePath $From 2>&1
     } else {
         $result = git -C $mainRepo worktree add -b $Branch $worktreePath 2>&1
     }
