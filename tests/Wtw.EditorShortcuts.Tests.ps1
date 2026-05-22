@@ -29,11 +29,20 @@ Describe 'Resolve-WtwEditorCommand' {
     }
 
     It 'resolves "sg" prefix to sourcegit' {
-        Resolve-WtwEditorCommand 'sg' | Should -Be 'sourcegit'
+        $command = Resolve-WtwEditorCommand 'sg'
+
+        $command.type | Should -Be 'macapp'
+        $command.appName | Should -Be 'SourceGit'
+        $command.winCmd | Should -Be 'SourceGit'
+        $command.linuxCmd | Should -Be 'sourcegit'
+        $command.macArgsViaCli | Should -Be $true
     }
 
     It 'resolves "sgit" to sourcegit' {
-        Resolve-WtwEditorCommand 'sgit' | Should -Be 'sourcegit'
+        $command = Resolve-WtwEditorCommand 'sgit'
+
+        $command.type | Should -Be 'macapp'
+        $command.appName | Should -Be 'SourceGit'
     }
 
     It 'returns null for unknown editor' {

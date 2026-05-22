@@ -9,7 +9,12 @@ function Resolve-WtwEditorCommand {
         @{ prefixes = @('antigravity', 'anti', 'ag'); cmd = 'antigravity' }
         @{ prefixes = @('windsurf', 'wind', 'ws'); cmd = 'windsurf' }
         @{ prefixes = @('codium', 'vscodium'); cmd = 'codium' }
-        @{ prefixes = @('sourcegit', 'sgit', 'sg'); cmd = 'sourcegit' }
+        # SourceGit — cross-platform. Pass repo dir as positional argv; SourceGit's IPC channel
+        # routes a second-instance launch to the running one (see src/App.axaml.cs TryLaunchAsNormal).
+        # macArgsViaCli=true → uses `open -n -a App --args <dir>` so argv actually carries the path.
+        @{ prefixes = @('sourcegit', 'sgit', 'sg'); type = 'macapp';
+           appName = 'SourceGit'; appNameCandidates = @('SourceGit'); macArgsViaCli = $true;
+           winCmd = 'SourceGit'; linuxCmd = 'sourcegit' }
         # macOS open-app style — always opens directory, uses: open -a "AppName" <dir>
         # appNameCandidates: ordered list tried at runtime so name changes (Alpha→Beta→stable) work automatically
         @{ prefixes = @('codex');               type = 'macapp'; appName = 'Codex';       appNameCandidates = @('Codex') }
@@ -27,7 +32,9 @@ function Resolve-WtwEditorCommand {
                 if ($editor.ContainsKey('type')) {
                     $result = @{ type = $editor.type; appName = $editor.appName }
                     if ($editor.ContainsKey('appNameCandidates')) { $result.appNameCandidates = $editor.appNameCandidates }
-                    if ($editor.ContainsKey('winCmd')) { $result.winCmd = $editor.winCmd }
+                    if ($editor.ContainsKey('winCmd'))        { $result.winCmd        = $editor.winCmd }
+                    if ($editor.ContainsKey('linuxCmd'))      { $result.linuxCmd      = $editor.linuxCmd }
+                    if ($editor.ContainsKey('macArgsViaCli')) { $result.macArgsViaCli = $editor.macArgsViaCli }
                     return $result
                 }
                 return $editor.cmd

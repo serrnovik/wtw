@@ -65,10 +65,39 @@ function Open-WtwWorkspace {
                 return
             }
             Write-Host "  Opening in ${found}: $dir" -ForegroundColor Green
-            & open -a $found $dir
+            if ($editorCmd.macArgsViaCli) {
+                # `open -a` routes paths as Apple "open file" events; many Avalonia apps don't handle them,
+                # and `open -n --args` silently drops --args when LSMultipleInstancesProhibited is set.
+                # Invoke the inner Mach-O directly so argv reaches main() — for IPC-aware apps (e.g.
+                # SourceGit), the spawned second instance forwards the path to the running first instance
+                # via its named-pipe IPC and exits.
+                $bin = "/Applications/$found.app/Contents/MacOS/$found"
+                if (Test-Path $bin) {
+                    Start-Process -FilePath $bin -ArgumentList $dir
+                } else {
+                    Write-Warning "Binary not found at $bin — falling back to 'open -a'."
+                    & open -a $found $dir
+                }
+            } else {
+                & open -a $found $dir
+            }
         } elseif ($IsWindows -and $editorCmd.winCmd) {
-            Write-Host "  Opening in $($editorCmd.winCmd): $dir" -ForegroundColor Green
-            & $editorCmd.winCmd $dir
+            $exe = (Get-Command $editorCmd.winCmd -ErrorAction SilentlyContinue)?.Source
+            if (-not $exe) {
+                $probe = @(
+                    (Join-Path ${env:LOCALAPPDATA} "$($editorCmd.winCmd)/$($editorCmd.winCmd).exe"),
+                    (Join-Path ${env:ProgramFiles}   "$($editorCmd.winCmd)/$($editorCmd.winCmd).exe")
+                ) | Where-Object { $_ -and (Test-Path $_) }
+                $exe = $probe | Select-Object -First 1
+            }
+            if (-not $exe) { Write-Error "$appName not found on PATH or in standard locations."; return }
+            Write-Host "  Opening in ${appName}: $dir" -ForegroundColor Green
+            Start-Process -FilePath $exe -ArgumentList $dir
+        } elseif ($IsLinux -and $editorCmd.linuxCmd) {
+            $exe = (Get-Command $editorCmd.linuxCmd -ErrorAction SilentlyContinue)?.Source
+            if (-not $exe) { Write-Error "'$appName' not installed (no '$($editorCmd.linuxCmd)' on PATH)."; return }
+            Write-Host "  Opening in ${appName}: $dir" -ForegroundColor Green
+            Start-Process -FilePath $exe -ArgumentList $dir
         } else {
             $platform = if ($IsWindows) { 'Windows' } elseif ($IsLinux) { 'Linux' } else { 'this platform' }
             Write-Warning "'$appName' app launch is not supported on $platform."

@@ -40,6 +40,12 @@ Describe 'Convert-WtwArgsToSplat' {
         $result.Splat['Force'] | Should -BeTrue
     }
 
+    It 'parses stacked branch start point for create' {
+        $result = Convert-WtwArgsToSplat @('initiative-016-home', '--from', 'MS-phase-5-swim-polish')
+        $result.Positional | Should -Contain 'initiative-016-home'
+        $result.Splat['From'] | Should -Be 'MS-phase-5-swim-polish'
+    }
+
     It 'returns empty for no args' {
         $result = Convert-WtwArgsToSplat @()
         $result.Positional.Count | Should -Be 0
