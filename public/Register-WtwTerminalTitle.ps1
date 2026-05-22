@@ -13,7 +13,8 @@ function Register-WtwTerminalTitle {
         race on terminals that honor OSC 0.
 
         Safe to call from any repository's start-repository-session.ps1.
-        Idempotent — a second call within the same session is a no-op.
+        Repeated calls update the active repository/title state while keeping a
+        single prompt hook installed.
     .PARAMETER RepoRoot
         Absolute path to the repository root. Defaults to the current directory.
     .PARAMETER TabColor
@@ -36,9 +37,6 @@ function Register-WtwTerminalTitle {
         [string] $Label
     )
 
-    if ($global:_WtwTerminalTitleHookActive) { return $global:_WtwSessionPrNumber }
-    $global:_WtwTerminalTitleHookActive = $true
-
     $isAdmin = $false
     if ($IsWindows) {
         $isAdmin = (New-Object Security.Principal.WindowsPrincipal (
@@ -52,22 +50,30 @@ function Register-WtwTerminalTitle {
     $effectiveLabel = if ($Label) { $Label } elseif ($env:STS_LABEL) { $env:STS_LABEL } else { $null }
 
     $global:_WtwSessionPrNumber = Get-WtwCurrentPrNumber
+    $global:_WtwTerminalTitleState = [pscustomobject] @{
+        RepoRoot   = $RepoRoot
+        FolderName = $folderName
+        PrNumber   = $global:_WtwSessionPrNumber
+        IsAdmin    = $isAdmin
+        Label      = $effectiveLabel
+    }
 
     $title = Get-WtwWindowTitle `
-        -RepoRoot   $RepoRoot `
-        -FolderName $folderName `
-        -PrNumber   $global:_WtwSessionPrNumber `
-        -IsAdmin:   $isAdmin `
-        -Label      $effectiveLabel
+        -RepoRoot   $global:_WtwTerminalTitleState.RepoRoot `
+        -FolderName $global:_WtwTerminalTitleState.FolderName `
+        -PrNumber   $global:_WtwTerminalTitleState.PrNumber `
+        -IsAdmin:   $global:_WtwTerminalTitleState.IsAdmin `
+        -Label      $global:_WtwTerminalTitleState.Label
 
     Set-WtwTerminalColor -Color $TabColor -Title $title
     try { $Host.UI.RawUI.WindowTitle = $title } catch {}
 
-    # Capture values for the prompt-hook closure
-    $capturedRepoRoot   = $RepoRoot
-    $capturedFolderName = $folderName
-    $capturedIsAdmin    = $isAdmin
-    $capturedLabel      = $effectiveLabel
+    $hookVersion = 2
+    if ($global:_WtwTerminalTitleHookActive -and $global:_WtwTerminalTitleHookVersion -eq $hookVersion) {
+        return $global:_WtwSessionPrNumber
+    }
+    $global:_WtwTerminalTitleHookActive = $true
+    $global:_WtwTerminalTitleHookVersion = $hookVersion
 
     $prior      = Get-Item function:prompt -ErrorAction SilentlyContinue
     $priorBlock = if ($prior) { $prior.ScriptBlock } else { { '> ' } }
@@ -77,12 +83,17 @@ function Register-WtwTerminalTitle {
         $realSuccess  = $?
         $realExitCode = $global:LASTEXITCODE
 
-        $currentTitle = Get-WtwWindowTitle `
-            -RepoRoot   $capturedRepoRoot `
-            -FolderName $capturedFolderName `
-            -PrNumber   $global:_WtwSessionPrNumber `
-            -IsAdmin:   $capturedIsAdmin `
-            -Label      $capturedLabel
+        $state = $global:_WtwTerminalTitleState
+        $currentTitle = if ($state) {
+            Get-WtwWindowTitle `
+                -RepoRoot   $state.RepoRoot `
+                -FolderName $state.FolderName `
+                -PrNumber   $state.PrNumber `
+                -IsAdmin:   $state.IsAdmin `
+                -Label      $state.Label
+        } else {
+            $Host.UI.RawUI.WindowTitle
+        }
 
         # Re-apply tab color on iTerm2 (survives dark/light mode switches)
         if ($env:WTW_TAB_COLOR -and $env:TERM_PROGRAM -eq 'iTerm.app') {
