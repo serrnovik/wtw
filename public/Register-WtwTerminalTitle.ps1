@@ -49,6 +49,15 @@ function Register-WtwTerminalTitle {
     $folderName     = Split-Path $RepoRoot -Leaf
     $effectiveLabel = if ($Label) { $Label } elseif ($env:STS_LABEL) { $env:STS_LABEL } else { $null }
 
+    # Live title state lives in globals (not closure captures) so switching
+    # worktrees within the same pwsh session refreshes the title/PR. The
+    # prompt hook below reads these on every prompt; re-entry just rewrites
+    # them. (Closure-captured values would freeze the title to whichever
+    # worktree happened to install the hook first.)
+    $global:_WtwTitleRepoRoot   = $RepoRoot
+    $global:_WtwTitleFolderName = $folderName
+    $global:_WtwTitleIsAdmin    = $isAdmin
+    $global:_WtwTitleLabel      = $effectiveLabel
     $global:_WtwSessionPrNumber = Get-WtwCurrentPrNumber
     $global:_WtwTerminalTitleState = [pscustomobject] @{
         RepoRoot   = $RepoRoot
@@ -68,6 +77,10 @@ function Register-WtwTerminalTitle {
     Set-WtwTerminalColor -Color $TabColor -Title $title
     try { $Host.UI.RawUI.WindowTitle = $title } catch {}
 
+    # Install the per-prompt hook once per hook version. A second call (e.g.
+    # after `wtw go <other>`) refreshes the state globals above without stacking
+    # another hook; a tab carrying an older hook version is migrated by falling
+    # through to reinstall.
     $hookVersion = 2
     if ($global:_WtwTerminalTitleHookActive -and $global:_WtwTerminalTitleHookVersion -eq $hookVersion) {
         return $global:_WtwSessionPrNumber

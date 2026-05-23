@@ -80,7 +80,7 @@ function Copy-WtwWorkspace {
     if ($Open) {
         $editor = $config.editor ?? 'code'
         Write-Host "  Opening in ${editor}..." -ForegroundColor Green
-        & $editor $wsFile
+        Invoke-WtwEditorCli -Cmd $editor -Path $wsFile
     }
 
     Write-Host ''
