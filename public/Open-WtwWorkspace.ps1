@@ -114,7 +114,7 @@ function Open-WtwWorkspace {
     # Workspace file found — open it
     if ($wsFile -and (Test-Path $wsFile)) {
         Write-Host "  Opening in ${editorCmd}: $wsFile" -ForegroundColor Green
-        & $editorCmd $wsFile
+        Invoke-WtwEditorCli -Cmd $editorCmd -Path $wsFile
         return
     }
 
@@ -122,7 +122,7 @@ function Open-WtwWorkspace {
     $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
     if ($dir -and (Test-Path $dir)) {
         Write-Host "  Opening in ${editorCmd}: $dir" -ForegroundColor Green
-        & $editorCmd $dir
+        Invoke-WtwEditorCli -Cmd $editorCmd -Path $dir
     } else {
         Write-Error "No workspace or directory found for '$Name'."
     }
