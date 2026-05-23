@@ -36,9 +36,6 @@ function Register-WtwTerminalTitle {
         [string] $Label
     )
 
-    if ($global:_WtwTerminalTitleHookActive) { return $global:_WtwSessionPrNumber }
-    $global:_WtwTerminalTitleHookActive = $true
-
     $isAdmin = $false
     if ($IsWindows) {
         $isAdmin = (New-Object Security.Principal.WindowsPrincipal (
@@ -51,6 +48,15 @@ function Register-WtwTerminalTitle {
     $folderName     = Split-Path $RepoRoot -Leaf
     $effectiveLabel = if ($Label) { $Label } elseif ($env:STS_LABEL) { $env:STS_LABEL } else { $null }
 
+    # Live title state lives in globals (not closure captures) so switching
+    # worktrees within the same pwsh session refreshes the title/PR. The
+    # prompt hook below reads these on every prompt; re-entry just rewrites
+    # them. (Closure-captured values would freeze the title to whichever
+    # worktree happened to install the hook first.)
+    $global:_WtwTitleRepoRoot   = $RepoRoot
+    $global:_WtwTitleFolderName = $folderName
+    $global:_WtwTitleIsAdmin    = $isAdmin
+    $global:_WtwTitleLabel      = $effectiveLabel
     $global:_WtwSessionPrNumber = Get-WtwCurrentPrNumber
 
     $title = Get-WtwWindowTitle `
@@ -63,11 +69,11 @@ function Register-WtwTerminalTitle {
     Set-WtwTerminalColor -Color $TabColor -Title $title
     try { $Host.UI.RawUI.WindowTitle = $title } catch {}
 
-    # Capture values for the prompt-hook closure
-    $capturedRepoRoot   = $RepoRoot
-    $capturedFolderName = $folderName
-    $capturedIsAdmin    = $isAdmin
-    $capturedLabel      = $effectiveLabel
+    # Install the per-prompt hook exactly once per session. State refresh
+    # above already ran, so a second call (e.g. after `wtw go <other>`) updates
+    # the globals the existing hook reads without stacking another hook.
+    if ($global:_WtwTerminalTitleHookActive) { return $global:_WtwSessionPrNumber }
+    $global:_WtwTerminalTitleHookActive = $true
 
     $prior      = Get-Item function:prompt -ErrorAction SilentlyContinue
     $priorBlock = if ($prior) { $prior.ScriptBlock } else { { '> ' } }
@@ -78,11 +84,11 @@ function Register-WtwTerminalTitle {
         $realExitCode = $global:LASTEXITCODE
 
         $currentTitle = Get-WtwWindowTitle `
-            -RepoRoot   $capturedRepoRoot `
-            -FolderName $capturedFolderName `
+            -RepoRoot   $global:_WtwTitleRepoRoot `
+            -FolderName $global:_WtwTitleFolderName `
             -PrNumber   $global:_WtwSessionPrNumber `
-            -IsAdmin:   $capturedIsAdmin `
-            -Label      $capturedLabel
+            -IsAdmin:   $global:_WtwTitleIsAdmin `
+            -Label      $global:_WtwTitleLabel
 
         # Re-apply tab color on iTerm2 (survives dark/light mode switches)
         if ($env:WTW_TAB_COLOR -and $env:TERM_PROGRAM -eq 'iTerm.app') {
