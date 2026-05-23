@@ -13,7 +13,8 @@ function Register-WtwTerminalTitle {
         race on terminals that honor OSC 0.
 
         Safe to call from any repository's start-repository-session.ps1.
-        Idempotent — a second call within the same session is a no-op.
+        Repeated calls update the active repository/title state while keeping a
+        single prompt hook installed.
     .PARAMETER RepoRoot
         Absolute path to the repository root. Defaults to the current directory.
     .PARAMETER TabColor
@@ -58,22 +59,34 @@ function Register-WtwTerminalTitle {
     $global:_WtwTitleIsAdmin    = $isAdmin
     $global:_WtwTitleLabel      = $effectiveLabel
     $global:_WtwSessionPrNumber = Get-WtwCurrentPrNumber
+    $global:_WtwTerminalTitleState = [pscustomobject] @{
+        RepoRoot   = $RepoRoot
+        FolderName = $folderName
+        PrNumber   = $global:_WtwSessionPrNumber
+        IsAdmin    = $isAdmin
+        Label      = $effectiveLabel
+    }
 
     $title = Get-WtwWindowTitle `
-        -RepoRoot   $RepoRoot `
-        -FolderName $folderName `
-        -PrNumber   $global:_WtwSessionPrNumber `
-        -IsAdmin:   $isAdmin `
-        -Label      $effectiveLabel
+        -RepoRoot   $global:_WtwTerminalTitleState.RepoRoot `
+        -FolderName $global:_WtwTerminalTitleState.FolderName `
+        -PrNumber   $global:_WtwTerminalTitleState.PrNumber `
+        -IsAdmin:   $global:_WtwTerminalTitleState.IsAdmin `
+        -Label      $global:_WtwTerminalTitleState.Label
 
     Set-WtwTerminalColor -Color $TabColor -Title $title
     try { $Host.UI.RawUI.WindowTitle = $title } catch {}
 
-    # Install the per-prompt hook exactly once per session. State refresh
-    # above already ran, so a second call (e.g. after `wtw go <other>`) updates
-    # the globals the existing hook reads without stacking another hook.
-    if ($global:_WtwTerminalTitleHookActive) { return $global:_WtwSessionPrNumber }
+    # Install the per-prompt hook once per hook version. A second call (e.g.
+    # after `wtw go <other>`) refreshes the state globals above without stacking
+    # another hook; a tab carrying an older hook version is migrated by falling
+    # through to reinstall.
+    $hookVersion = 2
+    if ($global:_WtwTerminalTitleHookActive -and $global:_WtwTerminalTitleHookVersion -eq $hookVersion) {
+        return $global:_WtwSessionPrNumber
+    }
     $global:_WtwTerminalTitleHookActive = $true
+    $global:_WtwTerminalTitleHookVersion = $hookVersion
 
     $prior      = Get-Item function:prompt -ErrorAction SilentlyContinue
     $priorBlock = if ($prior) { $prior.ScriptBlock } else { { '> ' } }
@@ -83,12 +96,17 @@ function Register-WtwTerminalTitle {
         $realSuccess  = $?
         $realExitCode = $global:LASTEXITCODE
 
-        $currentTitle = Get-WtwWindowTitle `
-            -RepoRoot   $global:_WtwTitleRepoRoot `
-            -FolderName $global:_WtwTitleFolderName `
-            -PrNumber   $global:_WtwSessionPrNumber `
-            -IsAdmin:   $global:_WtwTitleIsAdmin `
-            -Label      $global:_WtwTitleLabel
+        $state = $global:_WtwTerminalTitleState
+        $currentTitle = if ($state) {
+            Get-WtwWindowTitle `
+                -RepoRoot   $state.RepoRoot `
+                -FolderName $state.FolderName `
+                -PrNumber   $state.PrNumber `
+                -IsAdmin:   $state.IsAdmin `
+                -Label      $state.Label
+        } else {
+            $Host.UI.RawUI.WindowTitle
+        }
 
         # Re-apply tab color on iTerm2 (survives dark/light mode switches)
         if ($env:WTW_TAB_COLOR -and $env:TERM_PROGRAM -eq 'iTerm.app') {
