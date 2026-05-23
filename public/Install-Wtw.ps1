@@ -212,38 +212,10 @@ if (Test-Path $_wtwModule) {
         @{ Name = 'VSCodium';     CmdCandidates = @('codium') }
     )
 
-    # Probe a CLI. We deliberately do NOT try to invoke `--version`: on a
-    # dangling symlink, pwsh's `& path` outside a pipeline silently
-    # succeeds with $LASTEXITCODE=0, and inside a pipeline it raises
-    # "Cannot run a document in the middle of a pipeline" — the exact
-    # crash this whole helper exists to avoid.
-    #
-    # Filesystem check instead: if Get-Command resolves to a symlink,
-    # follow the chain via FileInfo.ResolveLinkTarget(returnFinalTarget:
-    # $true) and verify the final target exists. Plain files just need
-    # Get-Item to return a FileInfo. Catches the
-    # `~/.antigravity/antigravity/bin/antigravity` stub v1 left behind
-    # when v2 ships at /Applications/Antigravity IDE.app/ instead.
-    function Test-EditorCli {
-        param([string]$Cmd)
-        $found = Get-Command $Cmd -ErrorAction SilentlyContinue
-        if (-not $found) { return $false }
-        $resolved = $found.Source
-        if (-not $resolved) { return $true }   # builtin / function — trust it
-        $item = Get-Item -LiteralPath $resolved -ErrorAction SilentlyContinue
-        if (-not $item) { return $false }
-        # Non-symlink: a FileInfo means it exists as a regular file.
-        if (-not $item.LinkType) { return ($item -is [System.IO.FileInfo]) }
-        # Symlink: walk the full chain (ResolveLinkTarget(true)) and
-        # verify the final target exists. Dangling links return a
-        # FileSystemInfo with Exists=$false.
-        try {
-            $target = [System.IO.FileInfo]::new($resolved).ResolveLinkTarget($true)
-            return ($null -ne $target -and $target.Exists)
-        } catch {
-            return $false
-        }
-    }
+    # CLI runnability is probed via the shared Test-WtwEditorCli helper
+    # (private/Test-WtwEditorCli.ps1), which is dangling-symlink-safe so a
+    # stale stub like `~/.antigravity/antigravity/bin/antigravity` is treated
+    # as "not runnable" instead of crashing.
 
     $peacockExtId = 'johnpapa.vscode-peacock'
     $installedEditors = @()
@@ -267,7 +239,7 @@ if (Test-Path $_wtwModule) {
     foreach ($ed in $editorDefs) {
         $workingCmd = $null
         foreach ($candidate in $ed.CmdCandidates) {
-            if (Test-EditorCli -Cmd $candidate) { $workingCmd = $candidate; break }
+            if (Test-WtwEditorCli -Cmd $candidate) { $workingCmd = $candidate; break }
         }
         if (-not $workingCmd) {
             # Case A: CLI is on PATH but broken (dangling symlink / stale stub).
