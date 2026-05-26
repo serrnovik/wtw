@@ -130,16 +130,20 @@ function Enter-WtwWorktree {
     # that's expected and fine; this guarantees something sensible if it doesn't.
     Set-WtwTerminalColor -Color $targetColor -Title $titleWithPr
 
-    # Use Set-GitRepo if available (from user profile), otherwise direct approach
-    if (Get-Command 'Set-GitRepo' -ErrorAction SilentlyContinue) {
-        $toolName = if ($sessionScript) { $sessionScript } else { 'start-repository-session.ps1' }
-        Set-GitRepo -gitRoot $targetPath -toolName $toolName
-    } else {
-        Set-Location $targetPath
-        if ($sessionScript) {
-            $scriptPath = Join-Path $targetPath $sessionScript
-            if (Test-Path $scriptPath) { & $scriptPath }
+    try {
+        # Use Set-GitRepo if available (from user profile), otherwise direct approach
+        if (Get-Command 'Set-GitRepo' -ErrorAction SilentlyContinue) {
+            $toolName = if ($sessionScript) { $sessionScript } else { 'start-repository-session.ps1' }
+            Set-GitRepo -gitRoot $targetPath -toolName $toolName
+        } else {
+            Set-Location $targetPath
+            if ($sessionScript) {
+                $scriptPath = Join-Path $targetPath $sessionScript
+                if (Test-Path $scriptPath) { & $scriptPath }
+            }
+            Write-Host "  Switched to: $targetPath" -ForegroundColor Green
         }
-        Write-Host "  Switched to: $targetPath" -ForegroundColor Green
+    } finally {
+        Restore-WtwInstalledModule
     }
 }

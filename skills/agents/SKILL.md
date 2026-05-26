@@ -25,7 +25,7 @@ Git worktree + VS Code/Cursor workspace manager. One command creates a worktree,
 Run all commands via `pwsh -Command`:
 
 ```bash
-# Create a worktree + workspace + branch
+# Create a worktree + workspace + branch + optional AI-tool project metadata
 pwsh -Command "wtw create <task> [--branch X] [--open]"
 
 # Switch to a worktree
@@ -52,6 +52,7 @@ pwsh -Command "wtw init [aliases] [--template X] [--startup-script X]"
 pwsh -Command "wtw open [name]"
 pwsh -Command "wtw cursor [name]"
 pwsh -Command "wtw code [name]"
+pwsh -Command "wtw codex [name] [--skip-restart]"
 
 # Clean stale AI worktrees
 pwsh -Command "wtw clean [--dry-run]"
@@ -92,6 +93,14 @@ Colors from a 20-color palette are auto-assigned on `wtw create`. They apply to:
 
 - VS Code/Cursor Peacock extension (title bar, activity bar, status bar)
 - Terminal tabs (iTerm2, Windows Terminal, Kitty, Konsole, tmux)
+
+When Codex Desktop is installed/present, `wtw create` also trusts the new
+worktree in `~/.codex/config.toml` and pre-seeds the saved sidebar label when
+Codex is not running. Use `wtw codex <name>` to open/register the workspace in
+Codex Desktop on demand; if Codex is running, it may prompt to close/relaunch so
+the label write is not overwritten. It skips the prompt when the saved label
+already matches; pass `--skip-restart` to open without repairing a missing/stale
+label. `wtw remove` cleans those Codex entries up.
 
 ## Config
 

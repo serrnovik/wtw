@@ -253,6 +253,7 @@ function New-WtwWorktree {
         created             = (Get-Date -Format 'o')
         prettyName          = $PrettyName
         supersetWorkspaceId = $null
+        codexProjectPath    = $null
     }
     $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
@@ -261,6 +262,13 @@ function New-WtwWorktree {
     $supersetWsId = New-WtwSupersetWorkspace -RepoName $repoName -Branch $Branch -PrettyName $PrettyName -MainRepoPath $registry.repos.$repoName.mainPath
     if ($supersetWsId) {
         $registry.repos.$repoName.worktrees.$Task.supersetWorkspaceId = $supersetWsId
+        Save-WtwRegistry $registry
+    }
+
+    # Register Codex Desktop project metadata (no-op when Codex is absent).
+    $codexProjectPath = Register-WtwCodexProject -ProjectPath $worktreePath -PrettyName $PrettyName
+    if ($codexProjectPath) {
+        $registry.repos.$repoName.worktrees.$Task.codexProjectPath = $codexProjectPath
         Save-WtwRegistry $registry
     }
 

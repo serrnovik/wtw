@@ -30,7 +30,7 @@ You have access to `wtw`, a PowerShell CLI for managing git worktrees + VS Code/
 
 ```powershell
 wtw init [alias] [--template X] [--startup-script X]  # Register current repo
-wtw create <task> [--branch X] [--open]                # Create worktree + workspace + branch
+wtw create <task> [--branch X] [--open]                # Create worktree + workspace + optional AI-tool project metadata
 wtw go <name>                                          # Switch to worktree (cd + session init)
 wtw <name>                                             # Same as go (implicit)
 wtw open <name>                                        # Open workspace in editor
@@ -54,6 +54,7 @@ wtw code <name>         # Open in VS Code (alias: co)
 wtw antigravity <name>  # Open in Antigravity (alias: anti, ag)
 wtw windsurf <name>     # Open in Windsurf (alias: wind, ws)
 wtw codium <name>       # Open in VSCodium (alias: vscodium)
+wtw codex <name> [--skip-restart] # Open in Codex Desktop
 ```
 
 ## Color management
@@ -69,6 +70,14 @@ Colors are auto-assigned from a 20-color palette. `random` picks the color with 
 
 - VS Code/Cursor Peacock (title bar, activity bar, status bar)
 - iTerm2 / Windows Terminal / Kitty / tmux tab colors
+
+When Codex Desktop is installed/present, `wtw create` also trusts the new
+worktree in `~/.codex/config.toml` and pre-seeds the saved sidebar label when
+Codex is not running. Use `wtw codex <name>` to open/register the workspace in
+Codex Desktop on demand; if Codex is running, it may prompt to close/relaunch so
+the label write is not overwritten. It skips the prompt when the saved label
+already matches; pass `--skip-restart` to open without repairing a missing/stale
+label. `wtw remove` cleans those Codex entries up.
 
 ## Name resolution
 

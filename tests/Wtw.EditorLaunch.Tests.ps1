@@ -67,3 +67,106 @@ Describe 'Invoke-WtwEditorCli' {
             Should -Throw -ExpectedMessage '*not runnable*'
     }
 }
+
+Describe 'Open-WtwWorkspace Codex launcher' {
+    It 'opens Codex with the worktree directory instead of the code-workspace file' {
+        $worktreeDir = Join-Path $script:tmp 'codex-worktree'
+        New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
+        $workspaceFile = Join-Path $script:tmp 'codex-worktree.code-workspace'
+        Set-Content -Path $workspaceFile -Value '{}'
+
+        Mock Resolve-WtwTarget {
+            [PSCustomObject]@{
+                WorktreeEntry = [PSCustomObject]@{
+                    path       = $worktreeDir
+                    workspace  = $workspaceFile
+                    prettyName = 'Blue Codex Worktree'
+                }
+                RepoEntry     = [PSCustomObject]@{
+                    mainPath = $script:tmp
+                }
+            }
+        } -ModuleName wtw
+        Mock Get-WtwCodexHome { $script:tmp } -ModuleName wtw
+        Mock Test-WtwCodexPresent { $true } -ModuleName wtw
+        Mock Test-WtwCodexProjectLabel { $false } -ModuleName wtw
+        Mock Resolve-WtwCodexStateConflict { @{ proceed = $true; relaunch = $false } } -ModuleName wtw
+        Mock Ensure-WtwCodexProjectConfig { $false } -ModuleName wtw
+        Mock Set-WtwCodexProjectTrust {} -ModuleName wtw
+        Mock Set-WtwCodexProjectLabel { $true } -ModuleName wtw
+        Mock Start-WtwCodexApp { $true } -ModuleName wtw
+        Mock Invoke-WtwEditorCli { throw 'generic editor path should not be used for Codex' } -ModuleName wtw
+
+        Open-WtwWorkspace -Name 'codex-worktree' -Editor @{ type = 'codex'; appName = 'Codex'; cmd = 'codex' }
+
+        Should -Invoke Start-WtwCodexApp -ModuleName wtw -Times 1 -Exactly -ParameterFilter { $ProjectPath -eq $worktreeDir }
+        Should -Invoke Set-WtwCodexProjectLabel -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+            $ProjectPath -eq $worktreeDir -and $PrettyName -eq 'Blue Codex Worktree'
+        }
+        Should -Invoke Resolve-WtwCodexStateConflict -ModuleName wtw -Times 1 -Exactly
+        Should -Invoke Invoke-WtwEditorCli -ModuleName wtw -Times 0
+    }
+
+    It 'does not prompt to restart Codex when the sidebar label already matches' {
+        $worktreeDir = Join-Path $script:tmp 'codex-labelled-worktree'
+        New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
+
+        Mock Resolve-WtwTarget {
+            [PSCustomObject]@{
+                WorktreeEntry = [PSCustomObject]@{
+                    path       = $worktreeDir
+                    prettyName = 'Existing Codex Label'
+                }
+                RepoEntry     = [PSCustomObject]@{
+                    mainPath = $script:tmp
+                }
+            }
+        } -ModuleName wtw
+        Mock Get-WtwCodexHome { $script:tmp } -ModuleName wtw
+        Mock Test-WtwCodexPresent { $true } -ModuleName wtw
+        Mock Test-WtwCodexProjectLabel { $true } -ModuleName wtw
+        Mock Resolve-WtwCodexStateConflict { throw 'already-labelled project should not prompt' } -ModuleName wtw
+        Mock Ensure-WtwCodexProjectConfig { $false } -ModuleName wtw
+        Mock Set-WtwCodexProjectTrust {} -ModuleName wtw
+        Mock Set-WtwCodexProjectLabel { throw 'already-labelled project should not rewrite label' } -ModuleName wtw
+        Mock Start-WtwCodexApp { $true } -ModuleName wtw
+
+        Open-WtwWorkspace -Name 'codex-labelled-worktree' -Editor @{ type = 'codex'; appName = 'Codex'; cmd = 'codex' }
+
+        Should -Invoke Resolve-WtwCodexStateConflict -ModuleName wtw -Times 0
+        Should -Invoke Set-WtwCodexProjectLabel -ModuleName wtw -Times 0
+        Should -Invoke Start-WtwCodexApp -ModuleName wtw -Times 1 -Exactly -ParameterFilter { $ProjectPath -eq $worktreeDir }
+    }
+
+    It 'skips the restart prompt when requested' {
+        $worktreeDir = Join-Path $script:tmp 'codex-skip-restart-worktree'
+        New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
+
+        Mock Resolve-WtwTarget {
+            [PSCustomObject]@{
+                WorktreeEntry = [PSCustomObject]@{
+                    path       = $worktreeDir
+                    prettyName = 'Needs Restart'
+                }
+                RepoEntry     = [PSCustomObject]@{
+                    mainPath = $script:tmp
+                }
+            }
+        } -ModuleName wtw
+        Mock Get-WtwCodexHome { $script:tmp } -ModuleName wtw
+        Mock Test-WtwCodexPresent { $true } -ModuleName wtw
+        Mock Test-WtwCodexProjectLabel { $false } -ModuleName wtw
+        Mock Test-WtwCodexAppRunning { $true } -ModuleName wtw
+        Mock Resolve-WtwCodexStateConflict { throw '--skip-restart should not prompt' } -ModuleName wtw
+        Mock Ensure-WtwCodexProjectConfig { $false } -ModuleName wtw
+        Mock Set-WtwCodexProjectTrust {} -ModuleName wtw
+        Mock Set-WtwCodexProjectLabel { throw '--skip-restart should not rewrite label while Codex is running' } -ModuleName wtw
+        Mock Start-WtwCodexApp { $true } -ModuleName wtw
+
+        Open-WtwWorkspace -Name 'codex-skip-restart-worktree' -Editor @{ type = 'codex'; appName = 'Codex'; cmd = 'codex' } -SkipRestart
+
+        Should -Invoke Resolve-WtwCodexStateConflict -ModuleName wtw -Times 0
+        Should -Invoke Set-WtwCodexProjectLabel -ModuleName wtw -Times 0
+        Should -Invoke Start-WtwCodexApp -ModuleName wtw -Times 1 -Exactly -ParameterFilter { $ProjectPath -eq $worktreeDir }
+    }
+}

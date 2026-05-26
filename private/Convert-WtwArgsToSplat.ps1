@@ -23,7 +23,7 @@ function Convert-WtwArgsToSplat {
         $arg = "$($ArgList[$i])"
 
         # Translate --kebab-case to PascalCase
-        if ($arg -match '^--([a-z][a-z0-9-]*)$') {
+        if ($arg -match '^--([A-Za-z][A-Za-z0-9-]*)$') {
             $parts = $Matches[1] -split '-'
             $arg = '-' + (($parts | ForEach-Object { $_.Substring(0,1).ToUpper() + $_.Substring(1) }) -join '')
         }

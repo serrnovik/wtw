@@ -17,7 +17,7 @@ function Resolve-WtwEditorCommand {
            winCmd = 'SourceGit'; linuxCmd = 'sourcegit' }
         # macOS open-app style — always opens directory, uses: open -a "AppName" <dir>
         # appNameCandidates: ordered list tried at runtime so name changes (Alpha→Beta→stable) work automatically
-        @{ prefixes = @('codex');               type = 'macapp'; appName = 'Codex';       appNameCandidates = @('Codex') }
+        @{ prefixes = @('codex');               type = 'codex';  appName = 'Codex';       cmd = 'codex'; appNameCandidates = @('Codex') }
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }
         @{ prefixes = @('claudecode', 'ccode'); type = 'macapp'; appName = 'Claude Code'; appNameCandidates = @('Claude Code') }
         @{ prefixes = @('t3', 't3code');        type = 'macapp'; appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
@@ -31,6 +31,7 @@ function Resolve-WtwEditorCommand {
             if ($prefix -eq $Name -or $prefix.StartsWith($Name, [System.StringComparison]::OrdinalIgnoreCase)) {
                 if ($editor.ContainsKey('type')) {
                     $result = @{ type = $editor.type; appName = $editor.appName }
+                    if ($editor.ContainsKey('cmd'))               { $result.cmd               = $editor.cmd }
                     if ($editor.ContainsKey('appNameCandidates')) { $result.appNameCandidates = $editor.appNameCandidates }
                     if ($editor.ContainsKey('winCmd'))        { $result.winCmd        = $editor.winCmd }
                     if ($editor.ContainsKey('linuxCmd'))      { $result.linuxCmd      = $editor.linuxCmd }

@@ -58,6 +58,18 @@ function Remove-WtwWorktree {
         Remove-WtwSupersetWorkspace -WorkspaceId $wt.supersetWorkspaceId
     }
 
+    # Remove Codex Desktop project metadata if wtw registered it. Older
+    # registry entries will not have codexProjectPath, so fall back to the
+    # worktree path being removed.
+    $codexProjectPath = if ($wt.PSObject.Properties.Name -contains 'codexProjectPath' -and $wt.codexProjectPath) {
+        $wt.codexProjectPath
+    } else {
+        $wt.path
+    }
+    if ($codexProjectPath) {
+        Unregister-WtwCodexProject -ProjectPath $codexProjectPath
+    }
+
     # Drop from SourceGit's managed repository list (macOS only, no-op when app absent)
     Remove-WtwSourceGitRepository -Path $wt.path
 

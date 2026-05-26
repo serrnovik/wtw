@@ -14,7 +14,7 @@ Then there's the visual problem. With five workspaces open, they all look identi
 
 That's what wtw does: **one command, everything wired.**
 
-- `wtw create auth` — git worktree, workspace file, unique color, shell aliases. Ready.
+- `wtw create auth` — git worktree, workspace file, unique color, shell aliases, and optional AI-tool project registration. Ready.
 - `wtw auth` — switch to it.
 - `wtw remove auth` — clean up worktree, workspace, branch, color. Gone.
 
@@ -100,6 +100,7 @@ This creates:
 - Branch `auth`
 - Workspace file `my-app_auth.code-workspace` from your template
 - Unique Peacock color
+- Codex Desktop project metadata, if Codex is installed/present
 
 ### 3. Work in it
 
@@ -107,6 +108,8 @@ This creates:
 wtw auth                  # cd to worktree + run session script
 wtw cursor auth           # open in Cursor (or: wtw cur auth)
 wtw code auth             # open in VS Code (or: wtw co auth)
+wtw codex auth            # open the worktree in Codex Desktop
+wtw codex auth --skip-restart  # open without closing Codex if the label needs repair
 ```
 
 ### 4. Done with it
@@ -138,6 +141,7 @@ wtw clean                 # interactive selection + removal
 | `wtw antigravity [name]` | Open in Antigravity (aliases: `anti`, `ag`) |
 | `wtw windsurf [name]` | Open in Windsurf (aliases: `wind`, `ws`) |
 | `wtw codium [name]` | Open in VSCodium (aliases: `vscodium`) |
+| `wtw codex [name] [--skip-restart]` | Open in Codex Desktop |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
 | `wtw workspace <name> [--main] [--worktree-path X]` | Generate workspace file only (no git worktree) |
@@ -336,6 +340,25 @@ Each generated workspace:
 - Gets a unique Peacock color from the 20-color palette
 - Has terminal profiles pointing to the correct `${workspaceFolder:X}`
 - Stores `wtw.*` metadata in settings for sync support
+
+## AI Tool Integrations
+
+When optional tools are installed, `wtw create` registers the new worktree with
+them and `wtw remove` cleans that registration up:
+
+- **Codex Desktop** — trusts the worktree path in `~/.codex/config.toml`, keeps
+  a minimal `.codex/config.toml` in the worktree when one is missing, and
+  pre-seeds the saved sidebar label in
+  `~/.codex/.codex-global-state.json` from the same `--name`/pretty name and
+  color-circle prefix used by Superset/SourceGit when Codex is not running.
+  When Codex is already running, `wtw codex <name>` prompts to close/relaunch it
+  around the label write so the app does not overwrite the external state edit.
+  It skips that prompt when the saved label already matches; pass
+  `--skip-restart` to open without repairing a missing/stale label.
+- **Superset** — creates/removes a local workspace named from the same pretty
+  name when the Superset CLI is installed and the repo project can be matched.
+- **SourceGit** — adds/removes the worktree from managed repositories when
+  SourceGit is installed.
 
 ## Colors
 

@@ -96,7 +96,7 @@ function Install-Wtw {
 # wtw — worktree + workspace manager (global install)
 $_wtwModule = Join-Path $HOME '.wtw' 'module' 'wtw.psm1'
 if (Test-Path $_wtwModule) {
-    Import-Module $_wtwModule -Force -DisableNameChecking -Verbose:$false -Debug:$false 1>$null 4>$null 5>$null 6>$null
+    Import-Module $_wtwModule -Global -Force -DisableNameChecking -Verbose:$false -Debug:$false 1>$null 4>$null 5>$null 6>$null
     Register-WtwProfile
 }
 '@

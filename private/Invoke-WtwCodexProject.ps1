@@ -1,0 +1,459 @@
+function Get-WtwCodexHome {
+    [CmdletBinding()]
+    param()
+
+    if ($env:CODEX_HOME) {
+        return [System.IO.Path]::GetFullPath($env:CODEX_HOME)
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $HOME '.codex'))
+}
+
+function Test-WtwCodexPresent {
+    [CmdletBinding()]
+    param(
+        [string] $CodexHome = (Get-WtwCodexHome)
+    )
+
+    if ($CodexHome -and (Test-Path $CodexHome)) { return $true }
+    if (Get-Command codex -ErrorAction SilentlyContinue) { return $true }
+    if ($IsMacOS -and (Test-Path '/Applications/Codex.app')) { return $true }
+
+    return $false
+}
+
+function Test-WtwCodexAppRunning {
+    [CmdletBinding()]
+    param()
+
+    return [bool](Get-Process -Name 'Codex' -ErrorAction SilentlyContinue)
+}
+
+function Start-WtwCodexApp {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath
+    )
+
+    $codexExe = (Get-Command codex -ErrorAction SilentlyContinue)?.Source
+    if ($codexExe) {
+        Start-Process -FilePath $codexExe -ArgumentList @('app', $ProjectPath)
+        return $true
+    }
+
+    if ($IsMacOS -and (Test-Path '/Applications/Codex.app')) {
+        & open -a Codex $ProjectPath
+        return $true
+    }
+
+    return $false
+}
+
+function Stop-WtwCodexProcess {
+    [CmdletBinding()]
+    param([int] $TimeoutSeconds = 10)
+
+    $procs = @(Get-Process -Name 'Codex' -ErrorAction SilentlyContinue)
+    if ($procs.Count -eq 0) { return $true }
+
+    foreach ($process in $procs) {
+        try { $process.CloseMainWindow() | Out-Null } catch { }
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Test-WtwCodexAppRunning)) { return $true }
+        Start-Sleep -Milliseconds 250
+    }
+
+    foreach ($process in @(Get-Process -Name 'Codex' -ErrorAction SilentlyContinue)) {
+        try { $process.Kill($true) } catch { try { $process.Kill() } catch { } }
+    }
+
+    $deadline = (Get-Date).AddSeconds(5)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Test-WtwCodexAppRunning)) { return $true }
+        Start-Sleep -Milliseconds 250
+    }
+
+    return -not (Test-WtwCodexAppRunning)
+}
+
+function Resolve-WtwCodexStateConflict {
+    [CmdletBinding()]
+    param([string] $OperationLabel = 'update Codex project metadata')
+
+    if (-not (Test-WtwCodexAppRunning)) { return @{ proceed = $true; relaunch = $false } }
+
+    Write-Host ''
+    Write-Host '  Codex is running — it overwrites project labels on exit.' -ForegroundColor Yellow
+    Write-Host "  How should I $OperationLabel"'?' -ForegroundColor Yellow
+    Write-Host '    [c] Close Codex yourself, then write (I will wait, then relaunch)'
+    Write-Host '    [k] Force-kill Codex, write, relaunch'
+    Write-Host '    [i] Ignore — write anyway (Codex may overwrite it)'
+    Write-Host '    [s] Skip — open without changing the sidebar label'
+
+    $answer = (Read-Host '  Choice [c/k/i/s]').Trim().ToLowerInvariant()
+    if (-not $answer) { $answer = 'c' }
+
+    switch ($answer) {
+        'c' {
+            Write-Host '  Waiting for Codex to close (Ctrl+C to abort)...' -ForegroundColor Cyan
+            while (Test-WtwCodexAppRunning) { Start-Sleep -Milliseconds 500 }
+            Write-Host '  Codex closed.' -ForegroundColor Green
+            return @{ proceed = $true; relaunch = $true }
+        }
+        'k' {
+            Write-Host '  Force-closing Codex...' -ForegroundColor Cyan
+            if (-not (Stop-WtwCodexProcess)) {
+                Write-Host '  Could not stop Codex — skipping label update.' -ForegroundColor Red
+                return @{ proceed = $false; relaunch = $false }
+            }
+            Write-Host '  Codex stopped.' -ForegroundColor Green
+            return @{ proceed = $true; relaunch = $true }
+        }
+        's' {
+            Write-Host '  Skipped Codex label update.' -ForegroundColor DarkGray
+            return @{ proceed = $false; relaunch = $false }
+        }
+        default {
+            Write-Host '  Writing anyway — quit Codex before restarting if it does not stick.' -ForegroundColor Yellow
+            return @{ proceed = $true; relaunch = $false }
+        }
+    }
+}
+
+function ConvertTo-WtwTomlQuotedKey {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, Position = 0)]
+        [string] $Value
+    )
+
+    $escaped = $Value.Replace('\', '\\').Replace('"', '\"')
+    return '"' + $escaped + '"'
+}
+
+function Get-WtwCodexProjectHeader {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, Position = 0)]
+        [string] $ProjectPath
+    )
+
+    return '[projects.{0}]' -f (ConvertTo-WtwTomlQuotedKey $ProjectPath)
+}
+
+function Set-WtwCodexProjectTrust {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [string] $ConfigPath = (Join-Path (Get-WtwCodexHome) 'config.toml')
+    )
+
+    $configDir = Split-Path $ConfigPath -Parent
+    if (-not (Test-Path $configDir)) {
+        New-Item -Path $configDir -ItemType Directory -Force | Out-Null
+    }
+
+    $raw = if (Test-Path $ConfigPath) { Get-Content -Path $ConfigPath -Raw } else { '' }
+    $header = Get-WtwCodexProjectHeader $ProjectPath
+    $sectionPattern = "(?ms)^$([regex]::Escape($header))\s*(\r?\n)(.*?)(?=^\[|\z)"
+    $trustLine = 'trust_level = "trusted"'
+
+    $match = [regex]::Match($raw, $sectionPattern)
+    if ($match.Success) {
+        $section = $match.Groups[0].Value
+        $lineBreak = $match.Groups[1].Value
+        $body = $match.Groups[3].Value
+        if ($body -match '(?m)^trust_level\s*=') {
+            $newBody = [regex]::Replace($body, '(?m)^trust_level\s*=.*$', $trustLine, 1)
+        } else {
+            $newBody = $body.TrimEnd() + $lineBreak + $trustLine + $lineBreak
+        }
+        $newSection = $header + $lineBreak + $newBody
+        $raw = $raw.Substring(0, $match.Index) + $newSection + $raw.Substring($match.Index + $section.Length)
+    } else {
+        $prefix = if ([string]::IsNullOrWhiteSpace($raw)) { '' } else { $raw.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine }
+        $raw = $prefix + $header + [Environment]::NewLine + $trustLine + [Environment]::NewLine
+    }
+
+    Set-Content -Path $ConfigPath -Value $raw -Encoding utf8
+}
+
+function Remove-WtwCodexProjectTrust {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [string] $ConfigPath = (Join-Path (Get-WtwCodexHome) 'config.toml')
+    )
+
+    if (-not (Test-Path $ConfigPath)) { return }
+
+    $raw = Get-Content -Path $ConfigPath -Raw
+    $header = Get-WtwCodexProjectHeader $ProjectPath
+    $sectionPattern = "(?ms)^$([regex]::Escape($header))\s*(\r?\n)(.*?)(?=^\[|\z)"
+    $match = [regex]::Match($raw, $sectionPattern)
+    if (-not $match.Success) { return }
+
+    $section = $match.Groups[0].Value
+    $lineBreak = $match.Groups[1].Value
+    $body = $match.Groups[3].Value
+    $body = [regex]::Replace($body, '(?m)^trust_level\s*=.*(?:\r?\n)?', '')
+
+    if ([string]::IsNullOrWhiteSpace($body)) {
+        $raw = $raw.Substring(0, $match.Index) + $raw.Substring($match.Index + $section.Length)
+    } else {
+        $newSection = $header + $lineBreak + $body.TrimEnd() + $lineBreak
+        $raw = $raw.Substring(0, $match.Index) + $newSection + $raw.Substring($match.Index + $section.Length)
+    }
+
+    Set-Content -Path $ConfigPath -Value $raw.TrimEnd() -Encoding utf8
+}
+
+function Add-WtwCodexArrayValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][PSObject] $State,
+        [Parameter(Mandatory)][string] $PropertyName,
+        [Parameter(Mandatory)][string] $Value,
+        [switch] $Prepend
+    )
+
+    $items = @()
+    $existing = $State.PSObject.Properties[$PropertyName]
+    if ($existing -and $null -ne $existing.Value) {
+        $items = @($existing.Value) | Where-Object { $_ -and $_ -ne $Value }
+    }
+
+    $items = if ($Prepend) { @($Value) + $items } else { $items + @($Value) }
+    $State | Add-Member -NotePropertyName $PropertyName -NotePropertyValue @($items) -Force
+}
+
+function Remove-WtwCodexArrayValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][PSObject] $State,
+        [Parameter(Mandatory)][string] $PropertyName,
+        [Parameter(Mandatory)][string] $Value
+    )
+
+    $existing = $State.PSObject.Properties[$PropertyName]
+    if (-not $existing) { return }
+
+    $items = @($existing.Value) | Where-Object { $_ -and $_ -ne $Value }
+    $State | Add-Member -NotePropertyName $PropertyName -NotePropertyValue @($items) -Force
+}
+
+function Set-WtwCodexProjectLabel {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [Parameter(Mandatory)][string] $PrettyName,
+        [string] $GlobalStatePath = (Join-Path (Get-WtwCodexHome) '.codex-global-state.json')
+    )
+
+    $stateDir = Split-Path $GlobalStatePath -Parent
+    if (-not (Test-Path $stateDir)) {
+        New-Item -Path $stateDir -ItemType Directory -Force | Out-Null
+    }
+
+    if (Test-Path $GlobalStatePath) {
+        try {
+            $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
+        } catch {
+            Write-Host "  Codex: could not parse desktop state — skipping sidebar label update." -ForegroundColor Yellow
+            return $false
+        }
+    } else {
+        $state = [PSCustomObject]@{}
+    }
+
+    Add-WtwCodexArrayValue -State $state -PropertyName 'electron-saved-workspace-roots' -Value $ProjectPath -Prepend
+    Add-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $ProjectPath -Prepend
+
+    $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
+    $labels = if ($labelsProp -and $labelsProp.Value) { $labelsProp.Value } else { [PSCustomObject]@{} }
+    $labels | Add-Member -NotePropertyName $ProjectPath -NotePropertyValue $PrettyName -Force
+    $state | Add-Member -NotePropertyName 'electron-workspace-root-labels' -NotePropertyValue $labels -Force
+
+    try {
+        $state | ConvertTo-Json -Depth 80 -Compress | Set-Content -Path $GlobalStatePath -Encoding utf8
+        return $true
+    } catch {
+        Write-Host "  Codex: could not save desktop state — skipping sidebar label update." -ForegroundColor Yellow
+        return $false
+    }
+}
+
+function Get-WtwCodexProjectLabel {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [string] $GlobalStatePath = (Join-Path (Get-WtwCodexHome) '.codex-global-state.json')
+    )
+
+    if (-not (Test-Path $GlobalStatePath)) { return $null }
+
+    try {
+        $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+
+    $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
+    if (-not ($labelsProp -and $labelsProp.Value)) { return $null }
+
+    $labelProp = $labelsProp.Value.PSObject.Properties[$ProjectPath]
+    if ($labelProp) { return [string]$labelProp.Value }
+
+    $trimmedPath = $ProjectPath.TrimEnd([char]'/', [char]'\')
+    if ($trimmedPath -ne $ProjectPath) {
+        $labelProp = $labelsProp.Value.PSObject.Properties[$trimmedPath]
+        if ($labelProp) { return [string]$labelProp.Value }
+    }
+
+    return $null
+}
+
+function Test-WtwCodexProjectLabel {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [Parameter(Mandatory)][string] $PrettyName,
+        [string] $GlobalStatePath = (Join-Path (Get-WtwCodexHome) '.codex-global-state.json')
+    )
+
+    $label = Get-WtwCodexProjectLabel -ProjectPath $ProjectPath -GlobalStatePath $GlobalStatePath
+    return $label -eq $PrettyName
+}
+
+function Remove-WtwCodexProjectLabel {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [string] $GlobalStatePath = (Join-Path (Get-WtwCodexHome) '.codex-global-state.json')
+    )
+
+    if (-not (Test-Path $GlobalStatePath)) { return $false }
+
+    try {
+        $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
+    } catch {
+        Write-Host "  Codex: could not parse desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
+        return $false
+    }
+
+    Remove-WtwCodexArrayValue -State $state -PropertyName 'electron-saved-workspace-roots' -Value $ProjectPath
+    Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $ProjectPath
+    Remove-WtwCodexArrayValue -State $state -PropertyName 'active-workspace-roots' -Value $ProjectPath
+
+    $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
+    if ($labelsProp -and $labelsProp.Value) {
+        $labelsProp.Value.PSObject.Properties.Remove($ProjectPath)
+    }
+
+    try {
+        $state | ConvertTo-Json -Depth 80 -Compress | Set-Content -Path $GlobalStatePath -Encoding utf8
+        return $true
+    } catch {
+        Write-Host "  Codex: could not save desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
+        return $false
+    }
+}
+
+function Ensure-WtwCodexProjectConfig {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath
+    )
+
+    $codexDir = Join-Path $ProjectPath '.codex'
+    $configPath = Join-Path $codexDir 'config.toml'
+    if (Test-Path $configPath) { return $false }
+
+    if (-not (Test-Path $codexDir)) {
+        New-Item -Path $codexDir -ItemType Directory -Force | Out-Null
+    }
+
+    $content = @(
+        '[features]',
+        'hooks = true',
+        ''
+    ) -join [Environment]::NewLine
+    Set-Content -Path $configPath -Value $content -Encoding utf8
+    return $true
+}
+
+function Register-WtwCodexProject {
+    <#
+    .SYNOPSIS
+        Register a worktree as a Codex Desktop workspace when Codex is present.
+    .DESCRIPTION
+        Best-effort integration: creates a minimal project config only when
+        missing, trusts the worktree path in ~/.codex/config.toml, and updates
+        Codex Desktop's known workspace roots/sidebar label if the desktop
+        state file exists.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [Parameter(Mandatory)][string] $PrettyName
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
+    $codexHome = Get-WtwCodexHome
+    if (-not (Test-WtwCodexPresent -CodexHome $codexHome)) {
+        Write-Host '  Codex: not installed/present — skipping project registration.' -ForegroundColor DarkGray
+        return $null
+    }
+
+    $isAppRunning = Test-WtwCodexAppRunning
+    $createdProjectConfig = Ensure-WtwCodexProjectConfig -ProjectPath $fullPath
+    Set-WtwCodexProjectTrust -ProjectPath $fullPath -ConfigPath (Join-Path $codexHome 'config.toml')
+    $labelUpdated = if ($isAppRunning) {
+        $false
+    } else {
+        Set-WtwCodexProjectLabel -ProjectPath $fullPath -PrettyName $PrettyName -GlobalStatePath (Join-Path $codexHome '.codex-global-state.json')
+    }
+
+    Write-Host "  Codex: trusted project $fullPath" -ForegroundColor Green
+    if ($createdProjectConfig) {
+        Write-Host '  Codex: created .codex/config.toml' -ForegroundColor Green
+    }
+    if ($labelUpdated) {
+        Write-Host "  Codex: sidebar label '$PrettyName'" -ForegroundColor Green
+    } elseif ($isAppRunning) {
+        Write-Host "  Codex: app is running; run 'wtw codex' to close/relaunch and finalize sidebar label '$PrettyName'." -ForegroundColor DarkGray
+    } else {
+        Write-Host "  Codex: run 'wtw codex' from the worktree to open it in Codex Desktop." -ForegroundColor DarkGray
+    }
+
+    return $fullPath
+}
+
+function Unregister-WtwCodexProject {
+    <#
+    .SYNOPSIS
+        Remove a worktree from Codex Desktop's local project metadata.
+    .DESCRIPTION
+        Best-effort cleanup for the trust entry and sidebar/root state. Safe to
+        call when Codex is absent or the project was never registered.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
+    $codexHome = Get-WtwCodexHome
+    if (-not (Test-WtwCodexPresent -CodexHome $codexHome)) { return }
+
+    Remove-WtwCodexProjectTrust -ProjectPath $fullPath -ConfigPath (Join-Path $codexHome 'config.toml')
+    $labelRemoved = Remove-WtwCodexProjectLabel -ProjectPath $fullPath -GlobalStatePath (Join-Path $codexHome '.codex-global-state.json')
+
+    Write-Host "  Codex: removed project metadata for $fullPath" -ForegroundColor Green
+    if ($labelRemoved) {
+        Write-Host '  Codex: removed sidebar label/root entries.' -ForegroundColor Green
+    }
+}

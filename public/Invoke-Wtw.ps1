@@ -43,7 +43,7 @@ function Invoke-Wtw {
         Write-Host '    antigravity [name] Open in Antigravity (alias: anti)'
         Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
         Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
-        Write-Host '    codex [name]      Open in Codex'
+        Write-Host '    codex [name] [--skip-restart]  Open in Codex'
         Write-Host '    claude [name]     Open Claude.ai app  (alias: cowork)'
         Write-Host '    claudecode [name] Open Claude Code    (alias: ccode)'
         Write-Host '    t3 [name]         Open T3 Code Alpha  (alias: t3code)'
@@ -207,4 +207,3 @@ function Invoke-Wtw {
         }
     }
 }
-

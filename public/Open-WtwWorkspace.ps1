@@ -22,7 +22,8 @@ function Open-WtwWorkspace {
         [string] $Name,
 
         [string] $Repo,
-        [object] $Editor  # string for CLI editors; hashtable @{type='macapp'; appName=...} for open-app style
+        [object] $Editor,  # string for CLI editors; hashtable @{type='macapp'; appName=...} for open-app style
+        [switch] $SkipRestart
     )
 
     # If no name given, detect from cwd
@@ -41,14 +42,65 @@ function Open-WtwWorkspace {
     $target = Resolve-WtwTarget $Name
     if (-not $target) { return }
 
+    $editorType = if ($editorCmd -is [System.Collections.IDictionary]) {
+        $editorCmd['type']
+    } elseif ($editorCmd.PSObject.Properties.Name -contains 'type') {
+        $editorCmd.type
+    } else {
+        $null
+    }
+
     # Superset — look up matching workspace by branch/task and open the Superset app
-    if ($editorCmd -is [hashtable] -and $editorCmd.type -eq 'superset') {
+    if ($editorType -eq 'superset') {
         Open-WtwSupersetWorkspace -Target $target
         return
     }
 
-    # macOS/cross-platform open-app style (Codex, Claude, T3 Code, etc.) — always opens directory
-    if ($editorCmd -is [hashtable] -and $editorCmd.type -eq 'macapp') {
+    # Codex Desktop — prefer the supported CLI app launcher (`codex app <dir>`),
+    # falling back to macOS open-app behavior when only the app bundle exists.
+    if ($editorType -eq 'codex') {
+        $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+        if (-not ($dir -and (Test-Path $dir))) {
+            Write-Error "No directory found for '$Name'."
+            return
+        }
+        $prettyName = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
+            $target.WorktreeEntry.prettyName
+        } elseif ($target.TaskName) {
+            $target.TaskName
+        } else {
+            Split-Path $dir -Leaf
+        }
+        $fullDir = [System.IO.Path]::GetFullPath($dir)
+        $codexHome = Get-WtwCodexHome
+        if (Test-WtwCodexPresent -CodexHome $codexHome) {
+            $globalStatePath = Join-Path $codexHome '.codex-global-state.json'
+            $labelAlreadySet = Test-WtwCodexProjectLabel -ProjectPath $fullDir -PrettyName $prettyName -GlobalStatePath $globalStatePath
+            Ensure-WtwCodexProjectConfig -ProjectPath $fullDir | Out-Null
+            Set-WtwCodexProjectTrust -ProjectPath $fullDir -ConfigPath (Join-Path $codexHome 'config.toml')
+            if ($labelAlreadySet) {
+                Write-Host "  Codex: sidebar label already '$prettyName'" -ForegroundColor DarkGray
+            } elseif ($SkipRestart -and (Test-WtwCodexAppRunning)) {
+                Write-Host "  Codex: sidebar label needs restart; skipped because --skip-restart was set." -ForegroundColor DarkGray
+            } else {
+                $decision = Resolve-WtwCodexStateConflict -OperationLabel "set sidebar label '$prettyName'"
+                if ($decision.proceed -and (Set-WtwCodexProjectLabel -ProjectPath $fullDir -PrettyName $prettyName -GlobalStatePath $globalStatePath)) {
+                    Write-Host "  Codex: sidebar label '$prettyName'" -ForegroundColor Green
+                }
+            }
+        }
+
+        if (Start-WtwCodexApp -ProjectPath $fullDir) {
+            Write-Host "  Opening in Codex: $fullDir" -ForegroundColor Green
+            return
+        }
+
+        Write-Error "Codex is not installed or not on PATH. Install the 'codex' CLI or Codex.app first."
+        return
+    }
+
+    # macOS/cross-platform open-app style (Claude, T3 Code, etc.) — always opens directory
+    if ($editorType -eq 'macapp') {
         $appName = $editorCmd.appName
         $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
         if (-not ($dir -and (Test-Path $dir))) {

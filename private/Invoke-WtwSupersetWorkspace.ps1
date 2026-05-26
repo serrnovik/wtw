@@ -62,6 +62,27 @@ function New-WtwSupersetWorkspace {
         if ($m.Success) { $wsId = $m.Value }
     }
 
+    if (-not $wsId) {
+        $workspacesJson = & superset workspaces list --local --json 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            try {
+                $workspaces = $workspacesJson | ConvertFrom-Json
+                $matchedWorkspace = $workspaces | Where-Object {
+                    $_.projectId -eq $project.id -and
+                    (
+                        [string]::Equals($_.branch, $Branch, [System.StringComparison]::OrdinalIgnoreCase) -or
+                        [string]::Equals($_.name, $wsName, [System.StringComparison]::OrdinalIgnoreCase)
+                    )
+                } | Select-Object -First 1
+                if ($matchedWorkspace) {
+                    $wsId = $matchedWorkspace.id
+                }
+            } catch {
+                Write-Host '  Superset: could not parse workspace list for id lookup.' -ForegroundColor Yellow
+            }
+        }
+    }
+
     if ($wsId) {
         Write-Host "  Superset: workspace created (id: $wsId)" -ForegroundColor Green
     } else {

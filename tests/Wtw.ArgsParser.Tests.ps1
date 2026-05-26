@@ -28,6 +28,11 @@ Describe 'Convert-WtwArgsToSplat' {
         $result.Splat['DryRun'] | Should -BeTrue
     }
 
+    It 'translates --camelCase to PascalCase' {
+        $result = Convert-WtwArgsToSplat @('--skipRestart')
+        $result.Splat['SkipRestart'] | Should -BeTrue
+    }
+
     It 'translates --kebab-case with value' {
         $result = Convert-WtwArgsToSplat @('--code-folder', '/some/path')
         $result.Splat['CodeFolder'] | Should -Be '/some/path'

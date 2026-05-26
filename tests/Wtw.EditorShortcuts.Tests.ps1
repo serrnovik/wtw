@@ -45,6 +45,14 @@ Describe 'Resolve-WtwEditorCommand' {
         $command.appName | Should -Be 'SourceGit'
     }
 
+    It 'resolves "codex" to Codex Desktop launcher metadata' {
+        $command = Resolve-WtwEditorCommand 'codex'
+
+        $command.type | Should -Be 'codex'
+        $command.appName | Should -Be 'Codex'
+        $command.cmd | Should -Be 'codex'
+    }
+
     It 'returns null for unknown editor' {
         Resolve-WtwEditorCommand 'vim' | Should -BeNullOrEmpty
     }
