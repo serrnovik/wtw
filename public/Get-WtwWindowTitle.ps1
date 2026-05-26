@@ -31,7 +31,10 @@ function Get-WtwWindowTitle {
 
     if (-not $FolderName) { $FolderName = Split-Path $RepoRoot -Leaf }
 
-    $icons      = $script:_WtwIcons
+    $icons = @($script:_WtwIcons)
+    if ($icons.Count -eq 0) {
+        $icons = @('💠', '🔶', '🔷', '🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓')
+    }
     $folderIcon = $icons[(Get-WtwNumberFromRange $icons.Length (Get-WtwFNVHash $RepoRoot))]
 
     try {

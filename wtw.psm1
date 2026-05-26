@@ -14,7 +14,7 @@ if (Test-Path $privatePath) {
     $private = @(Get-ChildItem -Path $privatePath @dotSourceParams)
 }
 
-foreach ($import in @($public + $private)) {
+foreach ($import in @($private + $public)) {
     try {
         . $import.FullName
     } catch {

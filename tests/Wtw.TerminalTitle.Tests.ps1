@@ -94,4 +94,18 @@ Describe 'Register-WtwTerminalTitle' {
 
         $second | Should -Be $first
     }
+
+    It 'builds a title even when the module icon pool is missing' {
+        InModuleScope wtw {
+            $oldIcons = $script:_WtwIcons
+            try {
+                $script:_WtwIcons = $null
+
+                { Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' } | Should -Not -Throw
+                Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' | Should -Match 'snowmain1_stripe'
+            } finally {
+                $script:_WtwIcons = $oldIcons
+            }
+        }
+    }
 }
