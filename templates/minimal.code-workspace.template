@@ -1,0 +1,9 @@
+{
+  "folders": [
+    {
+      "name": "{{WTW_WORKSPACE_NAME}}",
+      "path": "{{WTW_CODE_FOLDER}}"
+    }
+  ],
+  "settings": {}
+}

@@ -66,7 +66,7 @@ function Install-Wtw {
     # Copy module files
     New-Item -Path $installDir -ItemType Directory -Force | Out-Null
 
-    $dirs = @('public', 'private', 'completions', 'shell', 'skills', 'assets')
+    $dirs = @('public', 'private', 'completions', 'shell', 'skills', 'assets', 'templates')
     foreach ($dir in $dirs) {
         $src = Join-Path $sourceDir $dir
         if (Test-Path $src) {

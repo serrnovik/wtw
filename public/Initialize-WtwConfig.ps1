@@ -148,6 +148,22 @@ function Initialize-WtwConfig {
         }
     }
 
+    # Fallback: use a repo-shipped workspace template when present.
+    if (-not $templateSource) {
+        $repoTemplate = Resolve-WtwRepoTemplatePath -RepoRoot $repoRoot
+        if ($repoTemplate) {
+            $templateSource = $repoTemplate
+        }
+    }
+
+    # Final fallback: a minimal template shipped with wtw so colors still work.
+    if (-not $templateSource) {
+        $defaultTemplate = Resolve-WtwDefaultTemplatePath
+        if ($defaultTemplate) {
+            $templateSource = $defaultTemplate
+        }
+    }
+
     if ($templateSource) {
         Write-Host "  Template source: $templateSource" -ForegroundColor Cyan
     } else {

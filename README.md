@@ -213,6 +213,22 @@ Templates define the shared workspace structure and use `{{WTW_*}}` placeholders
 
 Colors (`workbench.colorCustomizations`, `peacock.color`) are **not** in the template — wtw injects them automatically from the color palette.
 
+### Template resolution
+
+`wtw init` chooses the workspace template in this order:
+
+1. `--template <alias|path>` when provided.
+2. An existing `<repo>.code-workspace` in the configured workspaces directory.
+3. A repo-shipped template under `configs/workspace-templates/` when one can be
+   resolved by repo name, repo name without trailing digits, or as the only
+   template in that directory.
+4. The bundled minimal template from
+   `devops/worktree-workspace/templates/minimal.code-workspace.template`.
+
+The minimal fallback contains only the active code folder and empty settings;
+wtw still injects Peacock colors and `wtw.*` metadata, so fresh installs get
+usable colored workspaces even when a repo has no custom template.
+
 ### Sharing templates across repos
 
 Multiple repos can share a template for consistent terminal profiles, extra folders, and editor settings:
