@@ -61,4 +61,53 @@ Describe 'agentctl integration' {
 
         $profile | Should -Be 'review'
     }
+
+    It 'sets a repo profile through the wtw agent command' {
+        $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "wtw-agentctl-$([guid]::NewGuid())"
+        New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
+
+        try {
+            $saved = InModuleScope wtw -Parameters @{ TempDir = $tempDir } {
+                $script:WtwConfigDir = $TempDir
+                $script:WtwConfigPath = Join-Path $TempDir 'config.json'
+
+                Invoke-Wtw agent profile set demo-repo solo
+                Get-Content -Path $script:WtwConfigPath -Raw | ConvertFrom-Json
+            }
+
+            $saved.agentctl.defaultProfile | Should -Be 'team'
+            $saved.agentctl.repoProfiles.'demo-repo' | Should -Be 'solo'
+        } finally {
+            Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'resolves repo aliases when setting a profile' {
+        $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "wtw-agentctl-$([guid]::NewGuid())"
+        New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
+
+        try {
+            $saved = InModuleScope wtw -Parameters @{ TempDir = $tempDir } {
+                $script:WtwConfigDir = $TempDir
+                $script:WtwConfigPath = Join-Path $TempDir 'config.json'
+                $script:WtwRegistryPath = Join-Path $TempDir 'registry.json'
+
+                [PSCustomObject]@{
+                    repos = [PSCustomObject]@{
+                        everix1 = [PSCustomObject]@{
+                            aliases = @('e1', 'evx1')
+                        }
+                    }
+                } | ConvertTo-Json -Depth 10 | Set-Content -Path $script:WtwRegistryPath -Encoding utf8
+
+                Invoke-Wtw agent profile set e1 team
+                Get-Content -Path $script:WtwConfigPath -Raw | ConvertFrom-Json
+            }
+
+            $saved.agentctl.repoProfiles.everix1 | Should -Be 'team'
+            $saved.agentctl.repoProfiles.PSObject.Properties.Name | Should -Not -Contain 'e1'
+        } finally {
+            Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }

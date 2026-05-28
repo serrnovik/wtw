@@ -328,8 +328,8 @@ All config lives in `~/.wtw/`:
 
 ### agentctl profile overlays
 
-When the optional `agentctl` helper is installed on `PATH`, `wtw create`
-attaches a local AI-agent overlay inside the new worktree:
+When an optional `agentctl`-compatible helper is installed on `PATH`,
+`wtw create` attaches a local AI-agent overlay inside the new worktree:
 
 ```text
 .agent.local/personal.md
@@ -338,7 +338,14 @@ CLAUDE.local.md
 ```
 
 This integration is best-effort and skipped when `agentctl` is not installed.
-It never vendors `agentctl` or profile content into `wtw`.
+WTW does not vendor `agentctl` or profile content. For open-source use,
+`agentctl` is just a local executable hook with this tiny contract:
+
+```powershell
+agentctl repo attach --profile <profile>
+```
+
+The helper decides what profiles mean and what ignored local files to create.
 
 Profile resolution is intentionally conservative:
 
@@ -361,6 +368,17 @@ Example `~/.wtw/config.json` fragment:
   }
 }
 ```
+
+Set these values through WTW:
+
+```powershell
+wtw agent profile set snowmain1 solo
+wtw agent profile set e1 team
+wtw agent profile default team
+wtw agent profile list
+```
+
+Repo aliases are accepted and stored under the canonical WTW repo name.
 
 Set `"enabled": false` to disable the integration globally.
 

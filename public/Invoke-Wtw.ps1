@@ -55,6 +55,7 @@ function Invoke-Wtw {
         Write-Host '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
         Write-Host '    sync [file|--all] Re-apply template to managed workspaces'
         Write-Host '    clean             Clean stale AI worktrees'
+        Write-Host '    agent profile ... Configure agentctl profile overlays'
         Write-Host '    install           Install/update wtw globally (~/.wtw/module/)'
         Write-Host '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
         Write-Host '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
@@ -118,6 +119,7 @@ function Invoke-Wtw {
             Set-WtwColor @splat 
         }
         'clean'     { Invoke-WtwClean @splat }
+        'agent'     { Invoke-WtwAgent @rawArgs }
         'install'   { Install-Wtw @splat }
         'update'    { Install-Wtw @splat }
         'skill'     { Install-WtwSkill @splat }

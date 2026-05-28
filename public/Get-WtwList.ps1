@@ -34,6 +34,7 @@ function Get-WtwList {
     )
 
     $registry = Get-WtwRegistry
+    $config = Get-WtwConfig
     $repoNames = $registry.repos.PSObject.Properties.Name
 
     if (-not $repoNames -or $repoNames.Count -eq 0) {
@@ -50,6 +51,7 @@ function Get-WtwList {
 
         $wsFile = $repoEntry.templateWorkspace
         $wsDisplay = if ($wsFile -and (Test-Path $wsFile)) { Split-Path $wsFile -Leaf } else { '-' }
+        $agentProfile = Get-WtwAgentCtlProfile -RepoName $name -RepoEntry $repoEntry -Config $config
 
         # Main entry
         $items += [PSCustomObject]@{
@@ -62,6 +64,7 @@ function Get-WtwList {
             Path      = $repoEntry.mainPath
             Workspace = $wsDisplay
             Created   = '-'
+            AgentProfile = $agentProfile
         }
 
         # Worktrees
@@ -99,6 +102,7 @@ function Get-WtwList {
                     Path      = $pathDisplay
                     Workspace = $wtWsDisplay
                     Created   = $createdStr
+                    AgentProfile = $agentProfile
                     PrettyName = $wt.prettyName
                     SupersetId = $wt.supersetWorkspaceId
                 }
@@ -206,6 +210,7 @@ function Format-WtwDetailedList {
             Write-WtwDetailedAliasesBlock -Indent '    ' -Aliases $item.Aliases -ForegroundColor Gray
             Write-Host "    Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor Gray
             Write-Host "    Workspace : $($item.Workspace)" -ForegroundColor Gray
+            Write-Host "    Agent     : $($item.AgentProfile)" -ForegroundColor Gray
             Write-Host ''
         } else {
             # Worktree entry (indented)
@@ -256,4 +261,3 @@ function Format-WtwDetailedList {
     }
     Write-Host ''
 }
-
