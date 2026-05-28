@@ -326,6 +326,44 @@ All config lives in `~/.wtw/`:
 | `colors.json` | 20-color palette + per-worktree color assignments |
 | `module/` | Globally installed module copy |
 
+### agentctl profile overlays
+
+When the optional `agentctl` helper is installed on `PATH`, `wtw create`
+attaches a local AI-agent overlay inside the new worktree:
+
+```text
+.agent.local/personal.md
+.agent.local/PLAN.md
+CLAUDE.local.md
+```
+
+This integration is best-effort and skipped when `agentctl` is not installed.
+It never vendors `agentctl` or profile content into `wtw`.
+
+Profile resolution is intentionally conservative:
+
+1. `registry.json` repo entry `agentctlProfile`
+2. `config.json` `agentctl.repoProfiles.<repoName>`
+3. `config.json` `agentctl.defaultProfile`
+4. fallback: `team`
+
+Example `~/.wtw/config.json` fragment:
+
+```json
+{
+  "agentctl": {
+    "enabled": true,
+    "defaultProfile": "team",
+    "repoProfiles": {
+      "snowmain1": "solo",
+      "everix1": "team"
+    }
+  }
+}
+```
+
+Set `"enabled": false` to disable the integration globally.
+
 ## Worktree Layout
 
 Worktrees are created as siblings to the main repo, named `{registryKey}_{task}`:
@@ -375,6 +413,9 @@ them and `wtw remove` cleans that registration up:
   name when the Superset CLI is installed and the repo project can be matched.
 - **SourceGit** — adds/removes the worktree from managed repositories when
   SourceGit is installed.
+- **agentctl** — when installed, attaches ignored local AI-agent overlay files
+  to the new worktree using the configured profile. Defaults to `team` for
+  safety unless a repo/global override selects another profile.
 
 ## Colors
 

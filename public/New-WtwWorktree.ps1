@@ -276,6 +276,11 @@ function New-WtwWorktree {
     # Pass the assigned hex so SourceGit's Bookmark gets the nearest of its 7 palette slots.
     Add-WtwSourceGitRepository -Path $worktreePath -Name $PrettyName -Hex $color
 
+    # Attach the user's local AI-agent overlay when the optional personal
+    # `agentctl` helper is installed. This is intentionally best-effort:
+    # worktree creation must not depend on personal dotfiles.
+    Invoke-WtwAgentCtlAttach -WorktreePath $worktreePath -RepoName $repoName -RepoEntry $repoEntry -Config $config | Out-Null
+
     # Optionally register the new branch with Graphite. Done inside the
     # new worktree (gt operates on the cwd's branch) and passes --parent
     # when -From is set so the stack edge is recorded immediately.

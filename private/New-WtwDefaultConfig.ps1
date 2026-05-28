@@ -30,5 +30,10 @@ function New-WtwDefaultConfig {
             (Join-Path -Path $HOME -ChildPath '.cursor' -AdditionalChildPath 'worktrees'),
             (Join-Path -Path $HOME -ChildPath 'conductor' -AdditionalChildPath 'workspaces')
         )
+        agentctl           = [PSCustomObject]@{
+            enabled        = $true
+            defaultProfile = 'team'
+            repoProfiles   = [PSCustomObject]@{}
+        }
     }
 }
