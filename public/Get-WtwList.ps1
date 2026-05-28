@@ -35,6 +35,7 @@ function Get-WtwList {
 
     $registry = Get-WtwRegistry
     $config = Get-WtwConfig
+    $gitCommand = Get-WtwGitCommand
     $repoNames = $registry.repos.PSObject.Properties.Name
 
     if (-not $repoNames -or $repoNames.Count -eq 0) {
@@ -52,6 +53,10 @@ function Get-WtwList {
         $wsFile = $repoEntry.templateWorkspace
         $wsDisplay = if ($wsFile -and (Test-Path $wsFile)) { Split-Path $wsFile -Leaf } else { '-' }
         $agentProfile = Get-WtwAgentCtlProfile -RepoName $name -RepoEntry $repoEntry -Config $config
+        $branch = '?'
+        if ($gitCommand) {
+            $branch = (& $gitCommand -C $repoEntry.mainPath branch --show-current 2>$null) ?? '?'
+        }
 
         # Main entry
         $items += [PSCustomObject]@{
@@ -59,7 +64,7 @@ function Get-WtwList {
             Repo      = $name
             Task      = '-'
             Aliases   = ($aliases -join "`n")
-            Branch    = (git -C $repoEntry.mainPath branch --show-current 2>$null) ?? '?'
+            Branch    = $branch
             Color     = (Get-WtwColors).assignments."$name/main" ?? '-'
             Path      = $repoEntry.mainPath
             Workspace = $wsDisplay
@@ -83,11 +88,11 @@ function Get-WtwList {
                     try { $createdStr = ([datetime]$wt.created).ToString('yyyy-MM-dd') } catch {}
                 }
                 if ($createdStr -eq '-') {
-                    if ($exists) {
-                        $gitDate = git -C $wt.path log --reverse --format='%cs' 2>$null | Select-Object -First 1
+                    if ($gitCommand -and $exists) {
+                        $gitDate = & $gitCommand -C $wt.path log --reverse --format='%cs' 2>$null | Select-Object -First 1
                         if ($gitDate) { $createdStr = $gitDate }
-                    } elseif ($repoEntry.mainPath -and $wt.branch) {
-                        $gitDate = git -C $repoEntry.mainPath log --reverse --format='%cs' $wt.branch 2>$null | Select-Object -First 1
+                    } elseif ($gitCommand -and $repoEntry.mainPath -and $wt.branch) {
+                        $gitDate = & $gitCommand -C $repoEntry.mainPath log --reverse --format='%cs' $wt.branch 2>$null | Select-Object -First 1
                         if ($gitDate) { $createdStr = $gitDate }
                     }
                 }
