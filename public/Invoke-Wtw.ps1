@@ -196,26 +196,13 @@ function Invoke-Wtw {
             # Called silently by shell integration when a terminal starts inside
             # cmux. Socket commands are allowed from inside cmux, unlike the
             # external app-open fallback path.
-            if (-not $env:CMUX_WORKSPACE_ID) { return }
-            $currentName = Resolve-WtwCurrentTarget
-            if (-not $currentName) { return }
-            $target = & { Resolve-WtwTarget $currentName } 6>$null
-            if (-not $target) { return }
-
-            $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
-            if (-not ($dir -and (Test-Path $dir))) { return }
-
-            $prettyName = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
-                $target.WorktreeEntry.prettyName
-            } elseif ($target.TaskName) {
-                $target.TaskName
-            } else {
-                Split-Path ([System.IO.Path]::GetFullPath($dir)) -Leaf
-            }
-            $color = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'color') { $target.WorktreeEntry.color } else { $null }
-            $statusValue = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
-
-            Set-WtwCmuxWorkspaceMetadata -WorkspaceRef $env:CMUX_WORKSPACE_ID -PrettyName $prettyName -Color $color -StatusValue $statusValue | Out-Null
+            Initialize-WtwCmuxCurrentSession
+        }
+        '__cmux_init_current' {
+            # PowerShell cmux startup path. Applies the normal wtw terminal title,
+            # env vars, and session script for the cwd target, then refreshes cmux
+            # workspace metadata.
+            Initialize-WtwCmuxCurrentSession -ApplyTerminalSession
         }
         default   {
             # Check if command is an editor shortcut (cursor, cur, code, co, anti, etc.)

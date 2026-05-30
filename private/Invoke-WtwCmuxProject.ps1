@@ -81,7 +81,7 @@ function ConvertFrom-WtwCmuxWorkspaceListOutput {
         $trimmed = $line.Trim()
         if (-not $trimmed -or $trimmed.StartsWith('Error:', [System.StringComparison]::OrdinalIgnoreCase)) { continue }
 
-        $match = [regex]::Match($trimmed, '^(?<ref>(workspace|[0-9a-f]{8})[:0-9a-f-]*)\s*(?<name>.*)$', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        $match = [regex]::Match($trimmed, '^(?:\*\s*)?(?<ref>(workspace|[0-9a-f]{8})[:0-9a-f-]*)\s*(?<name>.*?)(?:\s+\[selected\])?$', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
         if (-not $match.Success) { continue }
 
         $items += [PSCustomObject]@{
@@ -166,9 +166,10 @@ function New-WtwCmuxWorkspaceCommand {
             pane = [PSCustomObject]@{
                 surfaces = @(
                     [PSCustomObject]@{
-                        type  = 'terminal'
-                        name  = 'Shell'
-                        focus = $true
+                        type    = 'terminal'
+                        name    = $PrettyName
+                        command = 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw __cmux_init_current"'
+                        focus   = $true
                     }
                 )
             }

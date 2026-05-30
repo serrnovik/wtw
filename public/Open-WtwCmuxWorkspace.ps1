@@ -51,6 +51,7 @@ function Get-WtwCmuxWorkspaceCwd {
     return Get-WtwCmuxObjectValue -Object $Workspace -Names @(
         'cwd',
         'path',
+        'current_directory',
         'workingDirectory',
         'currentWorkingDirectory',
         'sidebar.cwd',
@@ -62,7 +63,7 @@ function Get-WtwCmuxLiveWorkspaces {
     [CmdletBinding()]
     param()
 
-    $result = Invoke-WtwCmuxCommand -ArgumentList @('list-workspaces')
+    $result = Invoke-WtwCmuxCommand -ArgumentList @('list-workspaces', '--json')
     if ($result.ExitCode -ne 0) { return @() }
 
     $parsed = ConvertFrom-WtwCmuxJsonOutput -Output $result.Output
@@ -72,7 +73,9 @@ function Get-WtwCmuxLiveWorkspaces {
         return @($parsed)
     }
 
-    return ConvertFrom-WtwCmuxWorkspaceListOutput -Output $result.Output
+    $fallbackResult = Invoke-WtwCmuxCommand -ArgumentList @('list-workspaces')
+    if ($fallbackResult.ExitCode -ne 0) { return @() }
+    return ConvertFrom-WtwCmuxWorkspaceListOutput -Output $fallbackResult.Output
 }
 
 function Find-WtwCmuxWorkspace {
@@ -119,6 +122,89 @@ function Set-WtwCmuxWorkspaceMetadata {
     if ($StatusValue) {
         Invoke-WtwCmuxCommand -ArgumentList @('set-status', 'wtw', $StatusValue, '--workspace', $WorkspaceRef, '--icon', 'git-branch', '--color', ($Color ?? '#7A4FD8'), '--priority', '90') | Out-Null
     }
+}
+
+function Test-WtwCmuxSocketPermissionDenied {
+    [CmdletBinding()]
+    param([string] $Output)
+
+    if ([string]::IsNullOrWhiteSpace($Output)) { return $false }
+
+    return (
+        $Output -match 'Access denied' -or
+        $Output -match 'Operation not permitted' -or
+        $Output -match 'only processes started inside cmux can connect'
+    )
+}
+
+function ConvertTo-WtwPowerShellSingleQuotedLiteral {
+    [CmdletBinding()]
+    param([AllowNull()][string] $Value)
+
+    return "'$($Value.Replace("'", "''"))'"
+}
+
+function Open-WtwCmuxAppleScriptWorkspace {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [Parameter(Mandatory)][string] $PrettyName
+    )
+
+    if (-not $IsMacOS) { return $false }
+    if (-not (Get-Command osascript -ErrorAction SilentlyContinue)) { return $false }
+
+    $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
+    $initCommand = "Clear-Host; Set-Location -LiteralPath $(ConvertTo-WtwPowerShellSingleQuotedLiteral -Value $fullPath); wtw __cmux_init_current"
+    $script = @'
+on run argv
+    set targetPath to item 1 of argv
+    set targetName to item 2 of argv
+    set initCommand to item 3 of argv
+
+    tell application "cmux"
+        activate
+        if (count of windows) is 0 then
+            set targetWindow to new window
+        else
+            set targetWindow to front window
+        end if
+
+        repeat with workspaceTab in tabs of targetWindow
+            try
+                if (name of workspaceTab as text) is targetName then
+                    select tab workspaceTab
+                    return "selected"
+                end if
+
+                repeat with workspaceTerminal in terminals of workspaceTab
+                    try
+                        if (working directory of workspaceTerminal as text) is targetPath then
+                            select tab workspaceTab
+                            return "selected"
+                        end if
+                    end try
+                end repeat
+            end try
+        end repeat
+
+        set createdTab to new tab in targetWindow
+        select tab createdTab
+        delay 0.4
+        set createdTerminal to focused terminal of createdTab
+        input text (initCommand & return) to createdTerminal
+        return "created"
+    end tell
+end run
+'@
+
+    $result = & osascript @('-e', $script, '--', $fullPath, $PrettyName, $initCommand) 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Verbose "cmux AppleScript fallback failed: $($result -join [Environment]::NewLine)"
+        return $false
+    }
+
+    return $true
 }
 
 function Open-WtwCmuxWorkspace {
@@ -187,12 +273,27 @@ function Open-WtwCmuxWorkspace {
         }
     }
 
-    $cmuxArgs = @('new-workspace', '--name', $prettyName, '--cwd', $fullDir, '--focus', 'true')
+    $cmuxArgs = @(
+        'new-workspace',
+        '--name', $prettyName,
+        '--cwd', $fullDir,
+        '--command', 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw __cmux_init_current"',
+        '--focus', 'true'
+    )
     if ($statusValue) {
         $cmuxArgs += @('--description', "wtw: $statusValue")
     }
     $createResult = Invoke-WtwCmuxCommand -ArgumentList $cmuxArgs
     if ($createResult.ExitCode -ne 0) {
+        if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $fullDir -PrettyName $prettyName) {
+            if (Test-WtwCmuxSocketPermissionDenied -Output $createResult.Output) {
+                Write-Host "  cmux: opened via AppleScript fallback (socket access denied)." -ForegroundColor Green
+            } else {
+                Write-Host "  cmux: opened via AppleScript fallback." -ForegroundColor Green
+            }
+            return
+        }
+
         if (Open-WtwCmuxAppPath -ProjectPath $fullDir) {
             Write-Host "  Opening in cmux: $fullDir" -ForegroundColor Green
             return
