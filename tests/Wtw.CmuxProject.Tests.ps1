@@ -43,10 +43,9 @@ Describe 'cmux project registration' {
         $config.commands[0].workspace.cwd | Should -Be $script:projectPath
         $config.commands[0].workspace.color | Should -Be '#336699'
         $config.commands[0].workspace.restart | Should -Be 'ignore'
+        $config.workspaceGroups.byCwd.PSObject.Properties[$script:projectPath].Value.color | Should -Be '#336699'
 
-        Should -Invoke Invoke-WtwCmuxCommand -Times 1 -Exactly -ParameterFilter {
-            ($ArgumentList -join ' ') -eq 'reload-config'
-        }
+        Should -Invoke Invoke-WtwCmuxCommand -Times 0 -Exactly
     }
 
     It 'preserves unrelated commands and removes the wtw entry' {
@@ -75,6 +74,29 @@ Describe 'cmux project registration' {
     }
 }
 
+Describe 'cmux workspace output parsing' {
+    It 'parses ref-first list-workspaces output' {
+        $parsed = ConvertFrom-WtwCmuxWorkspaceListOutput @'
+workspace:1 Main
+workspace:2 Blue Feature
+workspace:3
+'@
+
+        @($parsed).Count | Should -Be 3
+        $parsed[0].ref | Should -Be 'workspace:1'
+        $parsed[0].name | Should -Be 'Main'
+        $parsed[1].ref | Should -Be 'workspace:2'
+        $parsed[1].name | Should -Be 'Blue Feature'
+        $parsed[2].ref | Should -Be 'workspace:3'
+    }
+
+    It 'parses current-workspace text output' {
+        $parsed = ConvertFrom-WtwCmuxCurrentWorkspaceOutput 'workspace:4'
+
+        $parsed.ref | Should -Be 'workspace:4'
+    }
+}
+
 Describe 'Open-WtwCmuxWorkspace' {
     BeforeEach {
         $script:tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-cmux-open-" + [guid]::NewGuid())
@@ -83,6 +105,8 @@ Describe 'Open-WtwCmuxWorkspace' {
         $script:cmuxCalls = [System.Collections.Generic.List[string]]::new()
 
         Mock Test-WtwCmuxPresent { $true } -ModuleName wtw
+        Mock Open-WtwCmuxAppPath { $true } -ModuleName wtw
+        Mock Register-WtwCmuxProject { 'wtw.test' } -ModuleName wtw
     }
 
     AfterEach {
@@ -93,18 +117,10 @@ Describe 'Open-WtwCmuxWorkspace' {
         Mock Invoke-WtwCmuxCommand {
             $script:cmuxCalls.Add(($ArgumentList -join ' '))
             $command = $ArgumentList -join ' '
-            if ($command -eq '--json list-workspaces') {
+            if ($command -eq 'list-workspaces') {
                 return [PSCustomObject]@{
                     ExitCode = 0
-                    Output   = (@{
-                        workspaces = @(
-                            @{
-                                ref  = 'workspace:2'
-                                name = 'Blue Feature'
-                                cwd  = $script:projectPath
-                            }
-                        )
-                    } | ConvertTo-Json -Depth 10 -Compress)
+                    Output   = "workspace:2 Blue Feature"
                 }
             }
             return [PSCustomObject]@{ ExitCode = 0; Output = '' }
@@ -125,6 +141,7 @@ Describe 'Open-WtwCmuxWorkspace' {
 
         $script:cmuxCalls | Should -Contain 'select-workspace --workspace workspace:2'
         ($script:cmuxCalls | Where-Object { $_ -like 'new-workspace*' }).Count | Should -Be 0
+        ($script:cmuxCalls | Where-Object { $_ -eq 'workspace-action --workspace workspace:2 --action rename --title Blue Feature' }).Count | Should -Be 0
         $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:2 --action set-color --color #336699'
         $script:cmuxCalls | Should -Contain 'set-status wtw repo/feature --workspace workspace:2 --icon git-branch --color #336699 --priority 90'
     }
@@ -133,11 +150,11 @@ Describe 'Open-WtwCmuxWorkspace' {
         Mock Invoke-WtwCmuxCommand {
             $script:cmuxCalls.Add(($ArgumentList -join ' '))
             $command = $ArgumentList -join ' '
-            if ($command -eq '--json list-workspaces') {
-                return [PSCustomObject]@{ ExitCode = 0; Output = '{"workspaces":[]}' }
+            if ($command -eq 'list-workspaces') {
+                return [PSCustomObject]@{ ExitCode = 0; Output = '' }
             }
-            if ($command -eq '--json current-workspace') {
-                return [PSCustomObject]@{ ExitCode = 0; Output = '{"ref":"workspace:4","name":"Green Feature"}' }
+            if ($command -eq 'current-workspace') {
+                return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:4' }
             }
             return [PSCustomObject]@{ ExitCode = 0; Output = '' }
         } -ModuleName wtw
@@ -156,7 +173,40 @@ Describe 'Open-WtwCmuxWorkspace' {
         Open-WtwCmuxWorkspace -Target $target
 
         $script:cmuxCalls | Should -Contain "new-workspace --name Green Feature --cwd $script:projectPath --focus true --description wtw: repo/green"
-        $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:4 --action rename --title Green Feature'
+        ($script:cmuxCalls | Where-Object { $_ -eq 'workspace-action --workspace workspace:4 --action rename --title Green Feature' }).Count | Should -Be 0
         $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:4 --action set-color --color #228833'
+    }
+
+    It 'falls back to macOS app open when socket workspace creation is denied' {
+        Mock Invoke-WtwCmuxCommand {
+            $script:cmuxCalls.Add(($ArgumentList -join ' '))
+            $command = $ArgumentList -join ' '
+            if ($command -eq 'list-workspaces') {
+                return [PSCustomObject]@{ ExitCode = 1; Output = 'Error: ERROR: Access denied - only processes started inside cmux can connect' }
+            }
+            if ($command -like 'new-workspace*') {
+                return [PSCustomObject]@{ ExitCode = 1; Output = 'Error: ERROR: Access denied - only processes started inside cmux can connect' }
+            }
+            return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+        } -ModuleName wtw
+
+        $target = [PSCustomObject]@{
+            RepoName       = 'repo'
+            TaskName       = 'denied'
+            WorktreeEntry  = [PSCustomObject]@{
+                path       = $script:projectPath
+                prettyName = 'Denied Feature'
+                color      = '#8844aa'
+            }
+            RepoEntry      = [PSCustomObject]@{ mainPath = $script:tempDir }
+        }
+
+        Open-WtwCmuxWorkspace -Target $target
+
+        Should -Invoke Open-WtwCmuxAppPath -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+            $ProjectPath -eq $script:projectPath
+        }
+        $script:cmuxCalls | Should -Contain "new-workspace --name Denied Feature --cwd $script:projectPath --focus true --description wtw: repo/denied"
+        ($script:cmuxCalls | Where-Object { $_ -eq $script:projectPath }).Count | Should -Be 0
     }
 }

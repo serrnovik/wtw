@@ -20,19 +20,6 @@ function Get-WtwCmuxObjectValue {
     return $null
 }
 
-function ConvertFrom-WtwCmuxJsonOutput {
-    [CmdletBinding()]
-    param([string] $Output)
-
-    if ([string]::IsNullOrWhiteSpace($Output)) { return $null }
-
-    try {
-        return $Output | ConvertFrom-Json
-    } catch {
-        return $null
-    }
-}
-
 function Get-WtwCmuxWorkspaceRef {
     [CmdletBinding()]
     param([Parameter(Mandatory)] $Workspace)
@@ -75,16 +62,17 @@ function Get-WtwCmuxLiveWorkspaces {
     [CmdletBinding()]
     param()
 
-    $result = Invoke-WtwCmuxCommand -ArgumentList @('--json', 'list-workspaces')
+    $result = Invoke-WtwCmuxCommand -ArgumentList @('list-workspaces')
     if ($result.ExitCode -ne 0) { return @() }
 
     $parsed = ConvertFrom-WtwCmuxJsonOutput -Output $result.Output
-    if (-not $parsed) { return @() }
+    if ($parsed) {
+        if ($parsed -is [array]) { return @($parsed) }
+        if ($parsed.PSObject.Properties.Name -contains 'workspaces') { return @($parsed.workspaces) }
+        return @($parsed)
+    }
 
-    if ($parsed -is [array]) { return @($parsed) }
-    if ($parsed.PSObject.Properties.Name -contains 'workspaces') { return @($parsed.workspaces) }
-
-    return @($parsed)
+    return ConvertFrom-WtwCmuxWorkspaceListOutput -Output $result.Output
 }
 
 function Find-WtwCmuxWorkspace {
@@ -100,7 +88,7 @@ function Find-WtwCmuxWorkspace {
 
     $byCwd = $workspaces | Where-Object {
         $cwd = Get-WtwCmuxWorkspaceCwd -Workspace $_
-        $cwd -and [System.IO.Path]::GetFullPath("$cwd") -eq $fullPath
+        $cwd -and [string]::Equals([System.IO.Path]::GetFullPath("$cwd"), $fullPath, [System.StringComparison]::OrdinalIgnoreCase)
     } | Select-Object -First 1
     if ($byCwd) { return $byCwd }
 
@@ -115,15 +103,17 @@ function Set-WtwCmuxWorkspaceMetadata {
         [string] $WorkspaceRef,
         [string] $PrettyName,
         [string] $Color,
-        [string] $StatusValue
+        [string] $StatusValue,
+        [string] $CurrentName,
+        [string] $CurrentColor
     )
 
     if (-not $WorkspaceRef) { return }
 
-    if ($PrettyName) {
+    if ($PrettyName -and -not [string]::Equals($CurrentName, $PrettyName, [System.StringComparison]::Ordinal)) {
         Invoke-WtwCmuxCommand -ArgumentList @('workspace-action', '--workspace', $WorkspaceRef, '--action', 'rename', '--title', $PrettyName) | Out-Null
     }
-    if ($Color) {
+    if ($Color -and -not [string]::Equals($CurrentColor, $Color, [System.StringComparison]::OrdinalIgnoreCase)) {
         Invoke-WtwCmuxCommand -ArgumentList @('workspace-action', '--workspace', $WorkspaceRef, '--action', 'set-color', '--color', $Color) | Out-Null
     }
     if ($StatusValue) {
@@ -171,39 +161,51 @@ function Open-WtwCmuxWorkspace {
     $color = if ($Target.WorktreeEntry -and $Target.WorktreeEntry.PSObject.Properties.Name -contains 'color') { $Target.WorktreeEntry.color } else { $null }
     $statusValue = if ($Target.TaskName) { "$($Target.RepoName)/$($Target.TaskName)" } else { $Target.RepoName }
 
+    Register-WtwCmuxProject `
+        -ProjectPath $fullDir `
+        -PrettyName $prettyName `
+        -Color $color `
+        -RepoName $Target.RepoName `
+        -TaskName $Target.TaskName | Out-Null
+
     $existing = Find-WtwCmuxWorkspace -ProjectPath $fullDir -PrettyName $prettyName
     if ($existing) {
         $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $existing
         if ($workspaceRef) {
             $selectResult = Invoke-WtwCmuxCommand -ArgumentList @('select-workspace', '--workspace', "$workspaceRef")
             if ($selectResult.ExitCode -eq 0) {
-                Set-WtwCmuxWorkspaceMetadata -WorkspaceRef "$workspaceRef" -PrettyName $prettyName -Color $color -StatusValue $statusValue
+                Set-WtwCmuxWorkspaceMetadata `
+                    -WorkspaceRef "$workspaceRef" `
+                    -PrettyName $prettyName `
+                    -Color $color `
+                    -StatusValue $statusValue `
+                    -CurrentName (Get-WtwCmuxWorkspaceName -Workspace $existing) `
+                    -CurrentColor (Get-WtwCmuxObjectValue -Object $existing -Names @('color', 'workspace.color', 'sidebar.color', 'sidebarState.color'))
                 Write-Host "  cmux: selected workspace '$prettyName'" -ForegroundColor Green
                 return
             }
         }
     }
 
-    $args = @('new-workspace', '--name', $prettyName, '--cwd', $fullDir, '--focus', 'true')
+    $cmuxArgs = @('new-workspace', '--name', $prettyName, '--cwd', $fullDir, '--focus', 'true')
     if ($statusValue) {
-        $args += @('--description', "wtw: $statusValue")
+        $cmuxArgs += @('--description', "wtw: $statusValue")
     }
-    $createResult = Invoke-WtwCmuxCommand -ArgumentList $args
+    $createResult = Invoke-WtwCmuxCommand -ArgumentList $cmuxArgs
     if ($createResult.ExitCode -ne 0) {
-        Write-Host "  cmux: workspace create failed; falling back to 'cmux <path>'." -ForegroundColor Yellow
-        $fallback = Invoke-WtwCmuxCommand -ArgumentList @($fullDir)
-        if ($fallback.ExitCode -ne 0) {
-            Write-Error "cmux open failed: $($fallback.Output)"
+        if (Open-WtwCmuxAppPath -ProjectPath $fullDir) {
+            Write-Host "  Opening in cmux: $fullDir" -ForegroundColor Green
             return
         }
-        Write-Host "  Opening in cmux: $fullDir" -ForegroundColor Green
+
+        Write-Error "cmux workspace create failed: $($createResult.Output)"
         return
     }
 
-    $currentResult = Invoke-WtwCmuxCommand -ArgumentList @('--json', 'current-workspace')
+    $currentResult = Invoke-WtwCmuxCommand -ArgumentList @('current-workspace')
     $workspaceRef = $null
     if ($currentResult.ExitCode -eq 0) {
-        $currentWorkspace = ConvertFrom-WtwCmuxJsonOutput -Output $currentResult.Output
+        $currentWorkspace = ConvertFrom-WtwCmuxCurrentWorkspaceOutput -Output $currentResult.Output
         if ($currentWorkspace) {
             $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $currentWorkspace
         }
@@ -215,6 +217,6 @@ function Open-WtwCmuxWorkspace {
         }
     }
 
-    Set-WtwCmuxWorkspaceMetadata -WorkspaceRef "$workspaceRef" -PrettyName $prettyName -Color $color -StatusValue $statusValue
+    Set-WtwCmuxWorkspaceMetadata -WorkspaceRef "$workspaceRef" -PrettyName $prettyName -Color $color -StatusValue $statusValue -CurrentName $prettyName -CurrentColor $null
     Write-Host "  Opening in cmux: $fullDir" -ForegroundColor Green
 }
