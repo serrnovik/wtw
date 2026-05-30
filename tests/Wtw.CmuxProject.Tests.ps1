@@ -210,3 +210,37 @@ Describe 'Open-WtwCmuxWorkspace' {
         ($script:cmuxCalls | Where-Object { $_ -eq $script:projectPath }).Count | Should -Be 0
     }
 }
+
+Describe 'cmux shell startup metadata hook' {
+    It 'applies pretty name and color to the current cmux workspace' {
+        $oldWorkspaceId = $env:CMUX_WORKSPACE_ID
+        try {
+            $env:CMUX_WORKSPACE_ID = 'workspace:9'
+            Mock Resolve-WtwCurrentTarget { 'feature' } -ModuleName wtw
+            Mock Resolve-WtwTarget {
+                [PSCustomObject]@{
+                    RepoName      = 'repo'
+                    TaskName      = 'feature'
+                    WorktreeEntry = [PSCustomObject]@{
+                        path       = $TestDrive
+                        prettyName = '🟢 Feature'
+                        color      = '#96dd2c'
+                    }
+                    RepoEntry     = [PSCustomObject]@{ mainPath = $TestDrive }
+                }
+            } -ModuleName wtw
+            Mock Set-WtwCmuxWorkspaceMetadata {} -ModuleName wtw
+
+            Invoke-Wtw __cmux_apply_current
+
+            Should -Invoke Set-WtwCmuxWorkspaceMetadata -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+                $WorkspaceRef -eq 'workspace:9' -and
+                $PrettyName -eq '🟢 Feature' -and
+                $Color -eq '#96dd2c' -and
+                $StatusValue -eq 'repo/feature'
+            }
+        } finally {
+            $env:CMUX_WORKSPACE_ID = $oldWorkspaceId
+        }
+    }
+}
