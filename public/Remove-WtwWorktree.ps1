@@ -70,6 +70,15 @@ function Remove-WtwWorktree {
         Unregister-WtwCodexProject -ProjectPath $codexProjectPath
     }
 
+    # Remove cmux Command Palette metadata if wtw registered it. Older registry
+    # entries will not have cmuxCommandKey, so fall back to the worktree path.
+    $cmuxCommandKey = if ($wt.PSObject.Properties.Name -contains 'cmuxCommandKey' -and $wt.cmuxCommandKey) {
+        $wt.cmuxCommandKey
+    } else {
+        $null
+    }
+    Unregister-WtwCmuxProject -ProjectPath $wt.path -CommandKey $cmuxCommandKey
+
     # Drop from SourceGit's managed repository list (macOS only, no-op when app absent)
     Remove-WtwSourceGitRepository -Path $wt.path
 

@@ -56,6 +56,13 @@ function Open-WtwWorkspace {
         return
     }
 
+    # cmux terminal workspace — select existing live workspace when possible,
+    # otherwise create a new cmux workspace rooted at the target directory.
+    if ($editorType -eq 'cmux') {
+        Open-WtwCmuxWorkspace -Target $target
+        return
+    }
+
     # Codex Desktop — prefer the supported CLI app launcher (`codex app <dir>`),
     # falling back to macOS open-app behavior when only the app bundle exists.
     if ($editorType -eq 'codex') {

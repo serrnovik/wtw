@@ -254,6 +254,7 @@ function New-WtwWorktree {
         prettyName          = $PrettyName
         supersetWorkspaceId = $null
         codexProjectPath    = $null
+        cmuxCommandKey      = $null
     }
     $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
@@ -269,6 +270,13 @@ function New-WtwWorktree {
     $codexProjectPath = Register-WtwCodexProject -ProjectPath $worktreePath -PrettyName $PrettyName
     if ($codexProjectPath) {
         $registry.repos.$repoName.worktrees.$Task.codexProjectPath = $codexProjectPath
+        Save-WtwRegistry $registry
+    }
+
+    # Register cmux Command Palette workspace metadata (no-op when cmux is absent).
+    $cmuxCommandKey = Register-WtwCmuxProject -ProjectPath $worktreePath -PrettyName $PrettyName -Color $color -RepoName $repoName -TaskName $Task
+    if ($cmuxCommandKey) {
+        $registry.repos.$repoName.worktrees.$Task.cmuxCommandKey = $cmuxCommandKey
         Save-WtwRegistry $registry
     }
 
