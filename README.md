@@ -110,6 +110,7 @@ wtw cursor auth           # open in Cursor (or: wtw cur auth)
 wtw code auth             # open in VS Code (or: wtw co auth)
 wtw codex auth            # open the worktree in Codex Desktop
 wtw codex auth --skip-restart  # open without closing Codex if the label needs repair
+wtw cmux auth             # open the worktree as a cmux workspace (or: wtw cm auth)
 ```
 
 ### 4. Done with it
@@ -142,6 +143,7 @@ wtw clean                 # interactive selection + removal
 | `wtw windsurf [name]` | Open in Windsurf (aliases: `wind`, `ws`) |
 | `wtw codium [name]` | Open in VSCodium (aliases: `vscodium`) |
 | `wtw codex [name] [--skip-restart]` | Open in Codex Desktop |
+| `wtw cmux [name]` | Open the worktree as a cmux workspace (aliases: `cm`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
 | `wtw workspace <name> [--main] [--worktree-path X]` | Generate workspace file only (no git worktree) |
@@ -431,6 +433,14 @@ them and `wtw remove` cleans that registration up:
   name when the Superset CLI is installed and the repo project can be matched.
 - **SourceGit** — adds/removes the worktree from managed repositories when
   SourceGit is installed.
+- **cmux** — `wtw cmux <name>` (alias `wtw cm <name>`) selects an existing live
+  cmux workspace for the worktree's path, or creates one via
+  `cmux new-workspace --name <pretty> --cwd <path>`. `wtw create` registers a
+  Command-Palette workspace entry in `~/.config/cmux/cmux.json`, and
+  `wtw remove` cleans that entry up. Inside cmux terminals, the `wtw.bash` /
+  `wtw.zsh` shell init stamps the worktree's pretty name, color, and a
+  `wtw:<repo>/<task>` status pill onto the surrounding cmux workspace. All of
+  this is a no-op when the cmux CLI is not installed.
 - **agentctl** — when installed, attaches ignored local AI-agent overlay files
   to the new worktree using the configured profile. Defaults to `team` for
   safety unless a repo/global override selects another profile.

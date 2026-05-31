@@ -44,6 +44,7 @@ function Invoke-Wtw {
         Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
         Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
         Write-Host '    codex [name] [--skip-restart]  Open in Codex'
+        Write-Host '    cmux [name]       Open in cmux terminal workspace (alias: cm)'
         Write-Host '    claude [name]     Open Claude.ai app  (alias: cowork)'
         Write-Host '    claudecode [name] Open Claude Code    (alias: ccode)'
         Write-Host '    t3 [name]         Open T3 Code Alpha  (alias: t3code)'
@@ -190,6 +191,18 @@ function Invoke-Wtw {
                     }
                 }
             }
+        }
+        '__cmux_apply_current' {
+            # Called silently by shell integration when a terminal starts inside
+            # cmux. Socket commands are allowed from inside cmux, unlike the
+            # external app-open fallback path.
+            Initialize-WtwCmuxCurrentSession
+        }
+        '__cmux_init_current' {
+            # PowerShell cmux startup path. Applies the normal wtw terminal title,
+            # env vars, and session script for the cwd target, then refreshes cmux
+            # workspace metadata.
+            Initialize-WtwCmuxCurrentSession -ApplyTerminalSession
         }
         default   {
             # Check if command is an editor shortcut (cursor, cur, code, co, anti, etc.)

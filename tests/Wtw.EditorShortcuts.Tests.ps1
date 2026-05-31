@@ -53,6 +53,16 @@ Describe 'Resolve-WtwEditorCommand' {
         $command.cmd | Should -Be 'codex'
     }
 
+    It 'resolves "cmux" and "cm" to cmux launcher metadata' {
+        $command = Resolve-WtwEditorCommand 'cmux'
+        $alias = Resolve-WtwEditorCommand 'cm'
+
+        $command.type | Should -Be 'cmux'
+        $command.appName | Should -Be 'cmux'
+        $command.cmd | Should -Be 'cmux'
+        $alias.type | Should -Be 'cmux'
+    }
+
     It 'returns null for unknown editor' {
         Resolve-WtwEditorCommand 'vim' | Should -BeNullOrEmpty
     }

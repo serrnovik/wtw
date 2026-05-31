@@ -72,6 +72,16 @@ _wtw_export_env() {
     fi
 }
 
+_wtw_cmux_apply_current() {
+    [ -z "$CMUX_WORKSPACE_ID" ] && return
+    [ ! -f "$_wtw_module" ] && return
+    command -v cmux >/dev/null 2>&1 || return
+    "$_wtw_pwsh" -NoLogo -NoProfile -Command "
+        Import-Module '${_wtw_module}' -DisableNameChecking
+        Invoke-Wtw __cmux_apply_current
+    " >/dev/null 2>&1
+}
+
 # Go to a worktree: resolve via pwsh, cd natively, run session script + set terminal color
 _wtw_go() {
     local name="$1"
@@ -121,8 +131,8 @@ wtw() {
         list|ls|open|help|-h|--help)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
-        # Editor shortcuts — delegate to pwsh (cursor/cur, code/co, antigravity/anti/ag, windsurf/wind, codium/vscodium, sourcegit/sgit/sg, codex, claude/cowork, claudecode/ccode, t3/t3code)
-        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|claude|cowork|claudecode|ccode|t3|t3code)
+        # Editor shortcuts — delegate to pwsh
+        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|cmux|cm|claude|cowork|claudecode|ccode|t3|t3code)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         *)
@@ -180,3 +190,4 @@ _wtw_register_aliases() {
 }
 
 _wtw_register_aliases 2>/dev/null
+_wtw_cmux_apply_current

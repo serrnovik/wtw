@@ -18,6 +18,7 @@ function Resolve-WtwEditorCommand {
         # macOS open-app style — always opens directory, uses: open -a "AppName" <dir>
         # appNameCandidates: ordered list tried at runtime so name changes (Alpha→Beta→stable) work automatically
         @{ prefixes = @('codex');               type = 'codex';  appName = 'Codex';       cmd = 'codex'; appNameCandidates = @('Codex') }
+        @{ prefixes = @('cmux', 'cm');          type = 'cmux';   appName = 'cmux';        cmd = 'cmux' }
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }
         @{ prefixes = @('claudecode', 'ccode'); type = 'macapp'; appName = 'Claude Code'; appNameCandidates = @('Claude Code') }
         @{ prefixes = @('t3', 't3code');        type = 'macapp'; appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
@@ -44,7 +45,10 @@ function Resolve-WtwEditorCommand {
     }
 
     # 2. Fuzzy match
-    $allNames = $editors | ForEach-Object { $_.prefixes } | ForEach-Object { $_ }
+    # Avoid fuzzy-matching arbitrary short commands (e.g. "vim") to two-letter
+    # editor aliases such as "cm" or "co". Exact alias matching above still
+    # handles those shortcuts.
+    $allNames = $editors | ForEach-Object { $_.prefixes } | ForEach-Object { $_ } | Where-Object { $_.Length -ge 3 }
     $fuzzy = Resolve-WtwFuzzyMatch $Name $allNames
     if ($fuzzy.Match) {
         return (Resolve-WtwEditorCommand $fuzzy.Match)
