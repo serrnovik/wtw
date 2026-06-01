@@ -63,6 +63,13 @@ function Open-WtwWorkspace {
         return
     }
 
+    # wmux terminal workspace — Windows counterpart to cmux. The current wmux
+    # CLI supports creating a named workspace at a cwd.
+    if ($editorType -eq 'wmux') {
+        Open-WtwWmuxWorkspace -Target $target
+        return
+    }
+
     # Codex Desktop — prefer the supported CLI app launcher (`codex app <dir>`),
     # falling back to macOS open-app behavior when only the app bundle exists.
     if ($editorType -eq 'codex') {

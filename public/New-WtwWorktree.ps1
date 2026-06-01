@@ -255,6 +255,7 @@ function New-WtwWorktree {
         supersetWorkspaceId = $null
         codexProjectPath    = $null
         cmuxCommandKey      = $null
+        wmuxWorkspaceName   = $null
     }
     $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
@@ -277,6 +278,14 @@ function New-WtwWorktree {
     $cmuxCommandKey = Register-WtwCmuxProject -ProjectPath $worktreePath -PrettyName $PrettyName -Color $color -RepoName $repoName -TaskName $Task
     if ($cmuxCommandKey) {
         $registry.repos.$repoName.worktrees.$Task.cmuxCommandKey = $cmuxCommandKey
+        Save-WtwRegistry $registry
+    }
+
+    # Register wmux live workspace when the Windows wmux CLI is installed and
+    # reachable. wmux has no SourceGit-style static repository registry today.
+    $wmuxWorkspaceName = Register-WtwWmuxProject -ProjectPath $worktreePath -PrettyName $PrettyName -RepoName $repoName -TaskName $Task
+    if ($wmuxWorkspaceName) {
+        $registry.repos.$repoName.worktrees.$Task.wmuxWorkspaceName = $wmuxWorkspaceName
         Save-WtwRegistry $registry
     }
 

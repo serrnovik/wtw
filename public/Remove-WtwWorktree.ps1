@@ -79,6 +79,15 @@ function Remove-WtwWorktree {
     }
     Unregister-WtwCmuxProject -ProjectPath $wt.path -CommandKey $cmuxCommandKey
 
+    $wmuxWorkspaceName = if ($wt.PSObject.Properties.Name -contains 'wmuxWorkspaceName' -and $wt.wmuxWorkspaceName) {
+        $wt.wmuxWorkspaceName
+    } elseif ($wt.PSObject.Properties.Name -contains 'prettyName' -and $wt.prettyName) {
+        $wt.prettyName
+    } else {
+        $Task
+    }
+    Unregister-WtwWmuxProject -PrettyName $wmuxWorkspaceName
+
     # Drop from SourceGit's managed repository list (macOS only, no-op when app absent)
     Remove-WtwSourceGitRepository -Path $wt.path
 

@@ -45,6 +45,7 @@ function Invoke-Wtw {
         Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
         Write-Host '    codex [name] [--skip-restart]  Open in Codex'
         Write-Host '    cmux [name]       Open in cmux terminal workspace (alias: cm)'
+        Write-Host '    wmux [name]       Open in wmux terminal workspace (alias: wm)'
         Write-Host '    claude [name]     Open Claude.ai app  (alias: cowork)'
         Write-Host '    claudecode [name] Open Claude Code    (alias: ccode)'
         Write-Host '    t3 [name]         Open T3 Code Alpha  (alias: t3code)'

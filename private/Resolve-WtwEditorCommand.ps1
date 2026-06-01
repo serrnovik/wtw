@@ -19,6 +19,7 @@ function Resolve-WtwEditorCommand {
         # appNameCandidates: ordered list tried at runtime so name changes (Alpha→Beta→stable) work automatically
         @{ prefixes = @('codex');               type = 'codex';  appName = 'Codex';       cmd = 'codex'; appNameCandidates = @('Codex') }
         @{ prefixes = @('cmux', 'cm');          type = 'cmux';   appName = 'cmux';        cmd = 'cmux' }
+        @{ prefixes = @('wmux', 'wm');          type = 'wmux';   appName = 'wmux';        cmd = 'wmux' }
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }
         @{ prefixes = @('claudecode', 'ccode'); type = 'macapp'; appName = 'Claude Code'; appNameCandidates = @('Claude Code') }
         @{ prefixes = @('t3', 't3code');        type = 'macapp'; appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
