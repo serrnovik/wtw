@@ -31,9 +31,9 @@ function Invoke-Wtw {
         Write-Host '  wtw - Git Worktree + Workspace Manager' -ForegroundColor Cyan
         Write-Host ''
         Write-Host '  Commands:' -ForegroundColor Yellow
-        Write-Host '    init [aliases]    Register current repo (--template <alias> to share settings)'
-        Write-Host '    add [path]        Add existing repo/worktree to registry'
-        Write-Host '    create <task> [--name <pretty>] [--folder <suffix>]  Create worktree + workspace'
+        Write-Host '    init [aliases]    Initialise current repo as a main repo in the registry (run once, from inside it)'
+        Write-Host '    add [path]        Adopt an existing on-disk worktree with full registration (workspace + color + cmux/SourceGit/etc.)'
+        Write-Host '    create <task>     Create worktree + branch (pass --branch <existing-ref> or --adopt to attach to an existing branch)'
         Write-Host '    list [repo] [-d|--detailed] [--wide]  List repos/worktrees'
         Write-Host '    info <name>       Show full details for a repo or worktree  (alias: show)'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
@@ -84,7 +84,16 @@ function Invoke-Wtw {
     # We handle this by manually adding positional params
     switch ($Command) {
         'init'    { if ($pos.Count -gt 0) { $splat['Alias'] = $pos[0] }; Initialize-WtwConfig @splat }
-        'add'     { if ($pos.Count -gt 0) { $splat['Path'] = $pos[0] }; Add-WtwEntry @splat }
+        'add'     {
+            if ($pos.Count -gt 0) { $splat['Path'] = $pos[0] }
+            # Match `wtw create --name <pretty>` ergonomics — splat-key 'Name'
+            # → PrettyName param so the same user-facing flag works here.
+            if ($splat.Contains('Name')) {
+                $splat['PrettyName'] = $splat['Name']
+                $splat.Remove('Name')
+            }
+            Add-WtwEntry @splat
+        }
         'create'  {
             if ($pos.Count -gt 0) {
                 $splat['Task'] = if ($pos.Count -eq 1) { $pos[0] } else { $pos -join ' ' }

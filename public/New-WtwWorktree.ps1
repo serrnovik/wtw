@@ -9,13 +9,29 @@ function New-WtwWorktree {
     .PARAMETER Task
         Branch or task name for the new worktree.
     .PARAMETER Branch
-        Override the git branch name (defaults to the task name).
+        Branch to use. Without -NoBranch this overrides the *new* branch name
+        (defaults to the task name). With -NoBranch this is the *existing* ref
+        to adopt: a local branch name (e.g. `my-feature`) or a remote-tracking
+        ref (e.g. `origin/my-feature`). Defaults to the task name when omitted.
     .PARAMETER Repo
         Target repo alias if not auto-detected from cwd.
     .PARAMETER Open
         Open the workspace in the configured editor after creation.
     .PARAMETER NoBranch
-        Attach to an existing branch instead of creating a new one.
+        Adopt an existing branch instead of creating a new one. The ref is
+        taken from -Branch (or the task name when -Branch is omitted). If the
+        ref is a remote-tracking branch (e.g. `origin/foo`), a local tracking
+        branch is created automatically — the worktree is never detached.
+        All the usual color/workspace/registry/cmux/Superset/SourceGit logic
+        runs after, identical to the new-branch path.
+
+        In most cases you don't need this switch: when -Branch points at a ref
+        that already exists, adoption is inferred automatically. Use -NoBranch
+        (or its alias -Adopt) only when you want to adopt with the task name
+        as the ref (no explicit -Branch).
+    .PARAMETER Adopt
+        Friendlier alias for -NoBranch. "Adopt an existing branch." Same
+        behavior; pick whichever name reads better at the call site.
     .PARAMETER PrettyName
         Human-readable display name stored in the registry and used as the
         Superset workspace name (e.g. "035 Context Building 🔵").
@@ -67,6 +83,20 @@ function New-WtwWorktree {
         new branch is also registered with Graphite (`gt branch track
         --parent <resolved-from>`) so `gt submit --stack` opens the PR
         with the right base immediately.
+    .EXAMPLE
+        wtw create my-feature --branch my-feature
+        Adopt the existing local branch `my-feature`. Adoption is inferred
+        automatically because the ref already exists — no --adopt needed.
+    .EXAMPLE
+        wtw create my-feature --branch origin/my-feature
+        Adopt a remote branch. A local tracking branch is created from
+        `origin/my-feature` so the worktree is on a real branch, not
+        detached HEAD. Adoption is again inferred (the ref resolves).
+    .EXAMPLE
+        wtw create my-feature --adopt
+        Adopt an existing local branch where the branch name equals the
+        task name. Equivalent to `--branch my-feature` here, or to the
+        legacy `--no-branch`.
     #>
     [CmdletBinding()]
     param(
@@ -81,8 +111,18 @@ function New-WtwWorktree {
         [string] $From,
         [switch] $Open,
         [switch] $NoBranch,
+        [switch] $Adopt,
         [switch] $GtTrack
     )
+
+    # --adopt is a friendlier alias for --no-branch (both opt into "adopt
+    # an existing branch instead of creating one"). Collapse to a single
+    # internal flag so downstream logic stays simple.
+    if ($Adopt) { $NoBranch = $true }
+
+    # Track whether the user explicitly passed --branch — used below to
+    # decide if we should implicitly adopt when the ref already exists.
+    $branchExplicit = -not [string]::IsNullOrWhiteSpace($Branch)
 
     $rawTask = $Task
     $Task = ConvertTo-WtwBranchSafeName -Name $Task
@@ -171,8 +211,64 @@ function New-WtwWorktree {
         }
     }
 
+    # Implicit-adopt: when the user passed --branch explicitly AND the ref
+    # already points at an existing branch (local or remote-tracking), we
+    # adopt it rather than trying to create a new branch with the same
+    # name (which would just fail with "branch already exists" from git).
+    # This lets `wtw create my-feature --branch origin/my-feature` Just
+    # Work — no extra --adopt/--no-branch needed.
+    if (-not $NoBranch -and -not $From -and $branchExplicit) {
+        git -C $mainRepo show-ref --verify --quiet "refs/heads/$Branch" 2>$null
+        $branchExists = ($LASTEXITCODE -eq 0)
+        if (-not $branchExists -and $Branch -match '^[^/]+/.+') {
+            # Looks remote-ish (e.g. origin/foo) — verify it resolves.
+            git -C $mainRepo rev-parse --verify "$Branch^{commit}" 2>&1 | Out-Null
+            $branchExists = ($LASTEXITCODE -eq 0)
+        }
+        if ($branchExists) {
+            Write-Host "  --branch '$Branch' refers to an existing ref; adopting (implies --adopt)." -ForegroundColor DarkCyan
+            $NoBranch = $true
+        }
+    }
+
     if ($NoBranch) {
-        $result = git -C $mainRepo worktree add $worktreePath $Branch 2>&1
+        # Adopt an existing branch. The ref in $Branch can be:
+        #   - a local branch        → attach directly
+        #   - a remote-tracking ref → create a local tracking branch so the
+        #                             worktree stays on a real branch, not
+        #                             detached HEAD
+        # Validate first so we fail fast with a clear message instead of
+        # letting git emit a cryptic worktree-add error mid-flight.
+        $refResolved = git -C $mainRepo rev-parse --verify "$Branch^{commit}" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "--no-branch: ref '$Branch' not found in $repoName. Try 'git fetch' first, or pass --branch <existing-branch> / --branch origin/<name>."
+            return
+        }
+
+        git -C $mainRepo show-ref --verify --quiet "refs/heads/$Branch" 2>$null
+        $isLocalBranch = ($LASTEXITCODE -eq 0)
+
+        if ($isLocalBranch) {
+            Write-Host "  Adopting local branch: $Branch" -ForegroundColor Cyan
+            $result = git -C $mainRepo worktree add $worktreePath $Branch 2>&1
+        } else {
+            # Treat as a remote-tracking ref (e.g. origin/foo). Derive the
+            # local branch name by stripping the remote prefix — same DWIM
+            # rule `git checkout --track origin/foo` uses.
+            if ($Branch -notmatch '^[^/]+/.+') {
+                Write-Error "--no-branch: ref '$Branch' resolves to a commit but is neither a local branch nor a remote-tracking ref. Use --from <ref> to start a new branch at a SHA/tag, or check out the branch first."
+                return
+            }
+            $localName = $Branch -replace '^[^/]+/', ''
+            git -C $mainRepo show-ref --verify --quiet "refs/heads/$localName" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Error "--no-branch: cannot create local branch '$localName' tracking '$Branch' — a local branch named '$localName' already exists. Run 'wtw create $Task --no-branch --branch $localName' to adopt the local one instead."
+                return
+            }
+            Write-Host "  Adopting remote branch: $Branch → local '$localName' (tracking)" -ForegroundColor Cyan
+            $result = git -C $mainRepo worktree add -b $localName --track $worktreePath $Branch 2>&1
+            if ($LASTEXITCODE -eq 0) { $Branch = $localName }
+        }
     } elseif ($From) {
         $result = git -C $mainRepo worktree add -b $Branch $worktreePath $From 2>&1
     } else {
@@ -187,116 +283,21 @@ function New-WtwWorktree {
     Write-Host "  Worktree: $worktreePath" -ForegroundColor Green
     Write-Host "  Branch:   $Branch" -ForegroundColor Green
 
-    # Pick color: explicit hex/name/random, else default to random max-contrast pick.
-    $colorKey = "$repoName/$Task"
-    if ($Color) {
-        $color = Resolve-WtwColorInput -Color $Color -ExcludeKey $colorKey
-        if (-not $color) {
-            Write-Error "Invalid --color '$Color'. Use 'random', a hex (#rrggbb / rrggbb), or a known color name."
-            git -C $mainRepo worktree remove $worktreePath --force 2>$null | Out-Null
-            return
-        }
-    } else {
-        $color = Resolve-WtwColorInput -Color 'random' -ExcludeKey $colorKey
+    # All post-worktree-add setup (color, pretty name, workspace file, registry,
+    # Superset/Codex/cmux/wmux/SourceGit/agentctl) is shared with `wtw add`.
+    $meta = Initialize-WtwWorktreeMetadata `
+        -RepoName $repoName -RepoEntry $repoEntry `
+        -Task $Task -Branch $Branch `
+        -WorktreePath $worktreePath -FolderSuffix $folderSuffix `
+        -PrettyName $PrettyName -Color $Color
+
+    if (-not $meta.Success) {
+        # The only failure mode today is a bad --color. We just created the
+        # worktree, so unwind it — `wtw add` doesn't do this because it
+        # adopts a pre-existing on-disk worktree it doesn't own.
+        git -C $mainRepo worktree remove $worktreePath --force 2>$null | Out-Null
+        return
     }
-
-    # Persist assignment so colors.json and registry stay in sync
-    $colorsState = Get-WtwColors
-    $colorsState.assignments | Add-Member -NotePropertyName $colorKey -NotePropertyValue $color -Force
-    Save-WtwColors $colorsState
-
-    Write-Host "  Color:    $color" -ForegroundColor Green
-
-    # Pretty name: default to the folder suffix (i.e. path without the `${repoName}_` prefix);
-    # always prepend a color-circle emoji that matches the assigned color so it surfaces in
-    # SourceGit/Superset and any other UI that reads `prettyName`.
-    if (-not $PrettyName) { $PrettyName = $folderSuffix }
-    $PrettyName = Format-WtwPrettyNameWithCircle -Hex $color -Name $PrettyName
-    Write-Host "  Pretty:   $PrettyName" -ForegroundColor Green
-
-    # Generate workspace file
-    $wsFile = $null
-    $config = Get-WtwConfig
-    # Use template source (.template file) if available, fall back to templateWorkspace
-    $templatePath = if ($repoEntry.template -and (Test-Path $repoEntry.template)) { $repoEntry.template }
-                    elseif ($repoEntry.templateWorkspace -and (Test-Path $repoEntry.templateWorkspace)) { $repoEntry.templateWorkspace }
-                    else { $null }
-
-    if ($config -and $templatePath) {
-        $wsDir = $config.workspacesDir.Replace('~', $HOME)
-        $wsDir = [System.IO.Path]::GetFullPath($wsDir)
-        $wsFile = Join-Path $wsDir "${repoName}_${folderSuffix}.code-workspace"
-
-        New-WtwWorkspaceFile `
-            -RepoName $repoName `
-            -Name "${repoName}_${folderSuffix}" `
-            -CodeFolderPath $worktreePath `
-            -TemplatePath $templatePath `
-            -OutputPath $wsFile `
-            -Color $color `
-            -Branch $Branch `
-            -WorktreePath $worktreePath `
-            -Managed | Out-Null
-
-        Write-Host "  Workspace: $wsFile" -ForegroundColor Green
-    } else {
-        Write-Host '  Workspace: (no template configured, skipped)' -ForegroundColor Yellow
-    }
-
-    # Register in registry
-    $registry = Get-WtwRegistry
-    $wtEntry = [PSCustomObject]@{
-        path                = $worktreePath
-        branch              = $Branch
-        workspace           = $wsFile
-        color               = $color
-        created             = (Get-Date -Format 'o')
-        prettyName          = $PrettyName
-        supersetWorkspaceId = $null
-        codexProjectPath    = $null
-        cmuxCommandKey      = $null
-        wmuxWorkspaceName   = $null
-    }
-    $registry.repos.$repoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
-    Save-WtwRegistry $registry
-
-    # Create Superset workspace (no-op when CLI absent or project not found)
-    $supersetWsId = New-WtwSupersetWorkspace -RepoName $repoName -Branch $Branch -PrettyName $PrettyName -MainRepoPath $registry.repos.$repoName.mainPath
-    if ($supersetWsId) {
-        $registry.repos.$repoName.worktrees.$Task.supersetWorkspaceId = $supersetWsId
-        Save-WtwRegistry $registry
-    }
-
-    # Register Codex Desktop project metadata (no-op when Codex is absent).
-    $codexProjectPath = Register-WtwCodexProject -ProjectPath $worktreePath -PrettyName $PrettyName
-    if ($codexProjectPath) {
-        $registry.repos.$repoName.worktrees.$Task.codexProjectPath = $codexProjectPath
-        Save-WtwRegistry $registry
-    }
-
-    # Register cmux Command Palette workspace metadata (no-op when cmux is absent).
-    $cmuxCommandKey = Register-WtwCmuxProject -ProjectPath $worktreePath -PrettyName $PrettyName -Color $color -RepoName $repoName -TaskName $Task
-    if ($cmuxCommandKey) {
-        $registry.repos.$repoName.worktrees.$Task.cmuxCommandKey = $cmuxCommandKey
-        Save-WtwRegistry $registry
-    }
-
-    # Register wmux live workspace when the Windows wmux CLI is installed and
-    # reachable. wmux has no SourceGit-style static repository registry today.
-    $wmuxWorkspaceName = Register-WtwWmuxProject -ProjectPath $worktreePath -PrettyName $PrettyName -RepoName $repoName -TaskName $Task
-    if ($wmuxWorkspaceName) {
-        $registry.repos.$repoName.worktrees.$Task.wmuxWorkspaceName = $wmuxWorkspaceName
-        Save-WtwRegistry $registry
-    }
-
-    # Register in SourceGit's managed repository list (no-op when app absent).
-    # Pass the assigned hex so SourceGit's Bookmark gets the nearest of its 7 palette slots.
-    Add-WtwSourceGitRepository -Path $worktreePath -Name $PrettyName -Hex $color
-
-    # Attach the user's local AI-agent overlay when the optional personal
-    # `agentctl` helper is installed. This is intentionally best-effort:
-    # worktree creation must not depend on personal dotfiles.
-    Invoke-WtwAgentCtlAttach -WorktreePath $worktreePath -RepoName $repoName -RepoEntry $repoEntry -Config $config | Out-Null
 
     # Optionally register the new branch with Graphite. Done inside the
     # new worktree (gt operates on the cwd's branch) and passes --parent
