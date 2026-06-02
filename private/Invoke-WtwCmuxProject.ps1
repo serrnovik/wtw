@@ -167,7 +167,7 @@ function New-WtwCmuxWorkspaceCommand {
                 surfaces = @(
                     [PSCustomObject]@{
                         type    = 'terminal'
-                        name    = $PrettyName
+                        name    = (Get-WtwCmuxTabLabel -PrettyName $PrettyName)
                         command = 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw __cmux_init_current"'
                         focus   = $true
                     }

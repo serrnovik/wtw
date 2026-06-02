@@ -49,6 +49,9 @@ function Initialize-WtwCmuxCurrentSession {
         }
     }
     if ($env:CMUX_SURFACE_ID -and $prettyName -and $invokeRawCommand) {
-        & $invokeRawCommand -CmuxBin $cmuxBin -ArgumentList @('rename-tab', '--workspace', $env:CMUX_WORKSPACE_ID, '--surface', $env:CMUX_SURFACE_ID, $prettyName) | Out-Null
+        # Tab label gets the console+tree wtw icon prefix; the workspace title (above)
+        # stays as the bare pretty name for the sidebar/switcher.
+        $tabLabel = Get-WtwCmuxTabLabel -PrettyName $prettyName
+        & $invokeRawCommand -CmuxBin $cmuxBin -ArgumentList @('rename-tab', '--workspace', $env:CMUX_WORKSPACE_ID, '--surface', $env:CMUX_SURFACE_ID, $tabLabel) | Out-Null
     }
 }
