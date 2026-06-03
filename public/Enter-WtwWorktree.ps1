@@ -143,6 +143,17 @@ function Enter-WtwWorktree {
             }
             Write-Host "  Switched to: $targetPath" -ForegroundColor Green
         }
+
+        # Inside a cmux surface, also push the workspace/tab metadata (icon'd tab label,
+        # color, status). Set-WtwTerminalColor above only sets the OSC window title, which
+        # cmux ignores for the tab label — the tab is controlled by `cmux rename-tab`.
+        # MUST run BEFORE the finally's Restore-WtwInstalledModule (-Force re-import), which
+        # would otherwise invalidate by-name resolution of the private cmux functions.
+        # Skip when called BY Initialize-WtwCmuxCurrentSession -ApplyTerminalSession (it
+        # applies the metadata itself) so we don't double-apply.
+        if ($env:CMUX_WORKSPACE_ID -and -not $script:WtwCmuxApplyingFromInit) {
+            try { Initialize-WtwCmuxCurrentSession } catch {}
+        }
     } finally {
         Restore-WtwInstalledModule
     }

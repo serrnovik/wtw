@@ -43,7 +43,7 @@ Describe 'cmux project registration' {
         $config.commands[0].workspace.cwd | Should -Be $script:projectPath
         $config.commands[0].workspace.color | Should -Be '#336699'
         $config.commands[0].workspace.restart | Should -Be 'ignore'
-        $config.commands[0].workspace.layout.pane.surfaces[0].name | Should -Be 'Blue Feature'
+        $config.commands[0].workspace.layout.pane.surfaces[0].name | Should -Be '🖥️🌳 Blue Feature'
         $config.commands[0].workspace.layout.pane.surfaces[0].command | Should -Be 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw __cmux_init_current"'
         $config.workspaceGroups.byCwd.PSObject.Properties[$script:projectPath].Value.color | Should -Be '#336699'
 
@@ -293,7 +293,7 @@ Describe 'cmux shell startup metadata hook' {
                 ($ArgumentList -join ' ') -eq 'set-status wtw repo/feature --workspace workspace:9 --icon git-branch --color #96dd2c --priority 90'
             }
             Should -Invoke Invoke-WtwCmuxRawCommand -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
-                ($ArgumentList -join ' ') -eq 'rename-tab --workspace workspace:9 --surface surface:9 🟢 Feature'
+                ($ArgumentList -join ' ') -eq 'rename-tab --workspace workspace:9 --surface surface:9 🖥️🌳 🟢 Feature'
             }
         } finally {
             $env:CMUX_WORKSPACE_ID = $oldWorkspaceId
@@ -339,7 +339,7 @@ Describe 'cmux shell startup metadata hook' {
                 ($ArgumentList -join ' ') -eq 'set-status wtw repo/feature --workspace workspace:10 --icon git-branch --color #96dd2c --priority 90'
             }
             Should -Invoke Invoke-WtwCmuxRawCommand -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
-                ($ArgumentList -join ' ') -eq 'rename-tab --workspace workspace:10 --surface surface:10 🟢 Feature'
+                ($ArgumentList -join ' ') -eq 'rename-tab --workspace workspace:10 --surface surface:10 🖥️🌳 🟢 Feature'
             }
         } finally {
             $env:CMUX_WORKSPACE_ID = $oldWorkspaceId
