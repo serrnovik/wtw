@@ -21,7 +21,7 @@ function Resolve-WtwRealPath {
         # `realpath` is BSD on macOS and GNU on Linux — both follow symlinks
         # and emit a single absolute path on stdout.
         $real = & realpath -- $Path 2>$null
-        if ($LASTEXITCODE -eq 0 -and $real) { return $real.Trim() }
+        if ($LASTEXITCODE -eq 0 -and $real) { return $real.TrimEnd("`r", "`n") }
     }
 
     # Windows / no realpath available: Convert-Path resolves PSDrive
