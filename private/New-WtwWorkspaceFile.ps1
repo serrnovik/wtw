@@ -35,7 +35,28 @@ function New-WtwWorkspaceFile {
         $json = $raw
         $json = $json -replace '\{\{WTW_WORKSPACE_NAME\}\}', $Name
         $json = $json -replace '\{\{WTW_CODE_FOLDER\}\}', ($CodeFolderPath -replace '\\', '\\')
+        
         $workspace = $json | ConvertFrom-Json
+
+        # Resolve {{WTW_ENV_*}} placeholders and drop folders if the env var is missing
+        if ($workspace.folders) {
+            $validFolders = @()
+            foreach ($folder in $workspace.folders) {
+                if ($folder.path -match '\{\{WTW_ENV_([A-Za-z0-9_]+)\}\}') {
+                    $envVar = $Matches[1]
+                    $val = [Environment]::GetEnvironmentVariable($envVar)
+                    if ($val) {
+                        $folder.path = $folder.path -replace "\{\{WTW_ENV_$envVar\}\}", $val
+                        $validFolders += $folder
+                    } else {
+                        Write-Host "  Skipping folder: missing environment variable $envVar" -ForegroundColor DarkGray
+                    }
+                } else {
+                    $validFolders += $folder
+                }
+            }
+            $workspace.folders = $validFolders
+        }
     } else {
         # Legacy: real workspace file - regex replace folder[0] and ${workspaceFolder:X}
         # Strip JSONC artifacts
