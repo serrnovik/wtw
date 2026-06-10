@@ -101,6 +101,13 @@ Each generated workspace has exactly one code folder (the worktree) plus stable 
 
 Worktrees are siblings to the main repo: `{repoBaseName}_{task}`
 
+### Template placeholders
+
+When editing `.code-workspace.template` files, you can use:
+- `{{WTW_WORKSPACE_NAME}}`: Workspace name
+- `{{WTW_CODE_FOLDER}}`: Absolute path to the worktree
+- `{{WTW_ENV_XYZ}}`: Value of the `XYZ` environment variable. If missing, the folder block containing it is automatically omitted.
+
 ### Config location
 
 All config in `~/.wtw/`: `config.json`, `registry.json`, `colors.json`
