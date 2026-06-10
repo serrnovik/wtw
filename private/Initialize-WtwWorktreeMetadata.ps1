@@ -100,6 +100,10 @@ function Initialize-WtwWorktreeMetadata {
                     elseif ($RepoEntry.templateWorkspace -and (Test-Path $RepoEntry.templateWorkspace)) { $RepoEntry.templateWorkspace }
                     else { $null }
 
+    if (-not $templatePath -and $RepoEntry.mainPath -and (Test-Path $RepoEntry.mainPath)) {
+        $templatePath = Resolve-WtwRepoTemplatePath -RepoRoot $RepoEntry.mainPath
+    }
+
     if ($config -and $templatePath) {
         $wsDir = $config.workspacesDir.Replace('~', $HOME)
         $wsDir = [System.IO.Path]::GetFullPath($wsDir)
