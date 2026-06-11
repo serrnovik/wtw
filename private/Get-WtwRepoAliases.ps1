@@ -7,5 +7,5 @@ function Get-WtwRepoAliases {
     } elseif ($Repo.alias) {
         $result = @($Repo.alias)
     }
-    return $result
+    return ,$result
 }
