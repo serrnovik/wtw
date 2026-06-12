@@ -42,14 +42,30 @@ function New-WtwWorkspaceFile {
         if ($workspace.folders) {
             $validFolders = @()
             foreach ($folder in $workspace.folders) {
-                if ($folder.path -match '\{\{WTW_ENV_([A-Za-z0-9_]+)\}\}') {
-                    $envVar = $Matches[1]
-                    $val = [Environment]::GetEnvironmentVariable($envVar)
-                    if ($val) {
-                        $folder.path = $folder.path -replace "\{\{WTW_ENV_$envVar\}\}", $val
+                $envPlaceholders = [regex]::Matches($folder.path, '\{\{WTW_ENV_([A-Za-z0-9_]+)\}\}')
+                if ($envPlaceholders.Count -gt 0) {
+                    $envValues = @{}
+                    $missingEnvVars = @()
+                    foreach ($placeholder in $envPlaceholders) {
+                        $envVar = $placeholder.Groups[1].Value
+                        if (-not $envValues.ContainsKey($envVar)) {
+                            $val = [Environment]::GetEnvironmentVariable($envVar)
+                            if ($val) {
+                                $envValues[$envVar] = $val
+                            } else {
+                                $missingEnvVars += $envVar
+                            }
+                        }
+                    }
+                    if ($missingEnvVars.Count -eq 0) {
+                        $folder.path = [regex]::Replace(
+                            $folder.path,
+                            '\{\{WTW_ENV_([A-Za-z0-9_]+)\}\}',
+                            { param($match) $envValues[$match.Groups[1].Value] }
+                        )
                         $validFolders += $folder
                     } else {
-                        Write-Host "  Skipping folder: missing environment variable $envVar" -ForegroundColor DarkGray
+                        Write-Host "  Skipping folder: missing environment variable $($missingEnvVars -join ', ')" -ForegroundColor DarkGray
                     }
                 } else {
                     $validFolders += $folder
