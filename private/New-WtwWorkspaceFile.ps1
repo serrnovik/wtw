@@ -35,7 +35,44 @@ function New-WtwWorkspaceFile {
         $json = $raw
         $json = $json -replace '\{\{WTW_WORKSPACE_NAME\}\}', $Name
         $json = $json -replace '\{\{WTW_CODE_FOLDER\}\}', ($CodeFolderPath -replace '\\', '\\')
+        
         $workspace = $json | ConvertFrom-Json
+
+        # Resolve {{WTW_ENV_*}} placeholders and drop folders if the env var is missing
+        if ($workspace.folders) {
+            $validFolders = @()
+            foreach ($folder in $workspace.folders) {
+                $envPlaceholders = [regex]::Matches($folder.path, '\{\{WTW_ENV_([A-Za-z0-9_]+)\}\}')
+                if ($envPlaceholders.Count -gt 0) {
+                    $envValues = @{}
+                    $missingEnvVars = @()
+                    foreach ($placeholder in $envPlaceholders) {
+                        $envVar = $placeholder.Groups[1].Value
+                        if (-not $envValues.ContainsKey($envVar)) {
+                            $val = [Environment]::GetEnvironmentVariable($envVar)
+                            if ($val) {
+                                $envValues[$envVar] = $val
+                            } else {
+                                $missingEnvVars += $envVar
+                            }
+                        }
+                    }
+                    if ($missingEnvVars.Count -eq 0) {
+                        $folder.path = [regex]::Replace(
+                            $folder.path,
+                            '\{\{WTW_ENV_([A-Za-z0-9_]+)\}\}',
+                            { param($match) $envValues[$match.Groups[1].Value] }
+                        )
+                        $validFolders += $folder
+                    } else {
+                        Write-Host "  Skipping folder: missing environment variable $($missingEnvVars -join ', ')" -ForegroundColor DarkGray
+                    }
+                } else {
+                    $validFolders += $folder
+                }
+            }
+            $workspace.folders = $validFolders
+        }
     } else {
         # Legacy: real workspace file - regex replace folder[0] and ${workspaceFolder:X}
         # Strip JSONC artifacts

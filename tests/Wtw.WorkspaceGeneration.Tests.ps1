@@ -222,5 +222,37 @@ Describe 'New-WtwWorkspaceFile' {
             $ws = Get-Content $outPath -Raw | ConvertFrom-Json
             $ws.settings.'some.setting' | Should -BeTrue
         }
+
+        It 'replaces every WTW_ENV placeholder in a folder path' {
+            $templatePath = Join-Path $script:tempDir 'tpl-env-multiple.code-workspace.template'
+            @'
+{
+  "folders": [
+    { "path": "{{WTW_ENV_WTW_TEST_ROOT}}/{{WTW_ENV_WTW_TEST_CHILD}}/repo" }
+  ],
+  "settings": {}
+}
+'@ | Set-Content $templatePath
+            $outPath = Join-Path $script:tempDir 'tpl-env-multiple.code-workspace'
+            $oldRoot = [Environment]::GetEnvironmentVariable('WTW_TEST_ROOT')
+            $oldChild = [Environment]::GetEnvironmentVariable('WTW_TEST_CHILD')
+            try {
+                [Environment]::SetEnvironmentVariable('WTW_TEST_ROOT', '/data')
+                [Environment]::SetEnvironmentVariable('WTW_TEST_CHILD', 'project')
+                New-WtwWorkspaceFile `
+                    -RepoName 'testRepo' `
+                    -Name 'myRepo_env' `
+                    -CodeFolderPath '/path' `
+                    -TemplatePath $templatePath `
+                    -OutputPath $outPath `
+                    -Color '#e26d8a'
+
+                $ws = Get-Content $outPath -Raw | ConvertFrom-Json
+                $ws.folders[0].path | Should -Be '/data/project/repo'
+            } finally {
+                [Environment]::SetEnvironmentVariable('WTW_TEST_ROOT', $oldRoot)
+                [Environment]::SetEnvironmentVariable('WTW_TEST_CHILD', $oldChild)
+            }
+        }
     }
 }

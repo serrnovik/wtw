@@ -110,6 +110,13 @@ All config lives in `~/.wtw/`:
 - `registry.json` — repos, aliases, worktrees, templates
 - `colors.json` — palette and per-worktree color assignments
 
+## Templates
+
+When editing `.code-workspace.template` files, agents can use the following placeholders:
+- `{{WTW_WORKSPACE_NAME}}`: Workspace name
+- `{{WTW_CODE_FOLDER}}`: Absolute path to the worktree
+- `{{WTW_ENV_XYZ}}`: Value of the `XYZ` environment variable. If missing, the folder block containing it is automatically omitted.
+
 ## Safety Rules
 
 - NEVER run `wtw clean` without `--dry-run` first

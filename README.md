@@ -214,6 +214,7 @@ Templates define the shared workspace structure and use `{{WTW_*}}` placeholders
 |-------------|---------------|
 | `{{WTW_WORKSPACE_NAME}}` | Workspace name (e.g., `my-app_auth`) |
 | `{{WTW_CODE_FOLDER}}` | Absolute path to the worktree |
+| `{{WTW_ENV_XYZ}}` | Value of the `XYZ` environment variable on the host machine. If `XYZ` is not set, the entire folder block containing this placeholder is safely skipped and omitted from the generated workspace file. |
 
 Colors (`workbench.colorCustomizations`, `peacock.color`) are **not** in the template — wtw injects them automatically from the color palette.
 
