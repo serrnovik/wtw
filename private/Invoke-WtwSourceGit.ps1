@@ -25,8 +25,18 @@ function Get-WtwSourceGitPreferencePath {
         $path = Join-Path $HOME '.sourcegit/preference.json'
     } elseif ($IsWindows -or $env:OS -eq 'Windows_NT') {
         $appData = [Environment]::GetFolderPath('ApplicationData')
-        if ($appData) {
-            $path = Join-Path $appData 'SourceGit/preference.json'
+        $scoopUser = [Environment]::GetEnvironmentVariable('SCOOP')
+        if (-not $scoopUser) { $scoopUser = Join-Path $HOME 'scoop' }
+        
+        $candidates = @()
+        if ($appData) { $candidates += Join-Path $appData 'SourceGit/preference.json' }
+        $candidates += Join-Path $scoopUser 'persist/sourcegit/data/preference.json'
+
+        foreach ($c in $candidates) {
+            if (Test-Path $c) {
+                $path = $c
+                break
+            }
         }
     }
 
