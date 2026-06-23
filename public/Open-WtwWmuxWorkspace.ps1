@@ -21,7 +21,12 @@ function Open-WtwWmuxWorkspace {
     }
 
     if (-not (Test-WtwWmuxPresent)) {
-        Write-Error "wmux is not installed or not on PATH. Install it with 'winget install openwong2kim.wmux'."
+        Write-Error @'
+Could not find the wmux CLI. wmux ships without an installer, so wtw locates it
+via (in order): $env:WMUX_EXE, a running wmux process, `wmux.exe` on PATH, then
+common install dirs. Install wmux from https://github.com/amirlehmam/wmux, or set
+$env:WMUX_EXE to its wmux.exe. (Node is also required: $env:WMUX_NODE or `node` on PATH.)
+'@
         return
     }
 
@@ -39,6 +44,7 @@ function Open-WtwWmuxWorkspace {
     }
 
     $colorSuffix = if ($metadata.Color) { " [$($metadata.Color)]" } else { '' }
-    Write-Host "  wmux: opened workspace '$($metadata.PrettyName)'$colorSuffix" -ForegroundColor Green
+    $verb = if ($result.Created) { 'created' } else { 'opened' }
+    Write-Host "  wmux: $verb workspace '$($metadata.PrettyName)'$colorSuffix" -ForegroundColor Green
     Write-Host "  Path: $($metadata.Path)" -ForegroundColor DarkGray
 }

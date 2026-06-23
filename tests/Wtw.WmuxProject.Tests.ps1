@@ -11,16 +11,18 @@ Describe 'Open-WtwWmuxWorkspace' {
         $script:wmuxCalls = [System.Collections.Generic.List[string]]::new()
 
         Mock Test-WtwWmuxPresent { $true } -ModuleName wtw
+        Mock Test-WtwWmuxRunning { $true } -ModuleName wtw
+        Mock Get-WtwWmuxShell { $null } -ModuleName wtw
         Mock Invoke-WtwWmuxCommand {
             $script:wmuxCalls.Add(($ArgumentList -join ' '))
             $command = $ArgumentList -join ' '
-            if ($command -eq 'list-workspaces --json') {
-                return [PSCustomObject]@{ ExitCode = 0; Output = '[]' }
+            if ($command -eq 'list-workspaces') {
+                return [PSCustomObject]@{ ExitCode = 0; Output = '{"workspaces":[]}' }
             }
-            if ($command -eq 'list-surfaces --json') {
-                return [PSCustomObject]@{ ExitCode = 0; Output = '[]' }
+            if ($ArgumentList[0] -eq 'new-workspace') {
+                return [PSCustomObject]@{ ExitCode = 0; Output = '{"workspaceId":"ws-123"}' }
             }
-            return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+            return [PSCustomObject]@{ ExitCode = 0; Output = '{"ok":true}' }
         } -ModuleName wtw
     }
 
@@ -28,7 +30,7 @@ Describe 'Open-WtwWmuxWorkspace' {
         Remove-Item -Recurse -Force $script:tempDir -ErrorAction SilentlyContinue
     }
 
-    It 'reports wmux integration as pending without invoking workspace commands' {
+    It 'creates a wmux workspace rooted at the worktree path' {
         $target = [PSCustomObject]@{
             RepoName      = 'repo'
             TaskName      = 'feature'
@@ -42,22 +44,67 @@ Describe 'Open-WtwWmuxWorkspace' {
 
         Open-WtwWmuxWorkspace -Target $target
 
-        $script:wmuxCalls.Count | Should -Be 0
+        $createCall = $script:wmuxCalls | Where-Object { $_ -like 'new-workspace *' } | Select-Object -First 1
+        $createCall | Should -Not -BeNullOrEmpty
+        $createCall | Should -Match '--title'
+        $createCall | Should -Match ([regex]::Escape($script:projectPath))
+    } -Skip:(-not $IsWindows)
+}
+
+Describe 'Register-WtwWmuxProject' {
+    # Register-WtwWmuxProject is a private function; run inside the module scope
+    # so mocks of the wmux primitives it calls actually intercept.
+    It 'creates the workspace and returns its pretty name' {
+        InModuleScope wtw {
+            $script:wmuxCalls = [System.Collections.Generic.List[string]]::new()
+            Mock Test-WtwWmuxPresent { $true }
+            Mock Test-WtwWmuxRunning { $true }
+            Mock Get-WtwWmuxShell { $null }
+            Mock Invoke-WtwWmuxCommand {
+                $script:wmuxCalls.Add(($ArgumentList -join ' '))
+                if (($ArgumentList -join ' ') -eq 'list-workspaces') {
+                    return [PSCustomObject]@{ ExitCode = 0; Output = '{"workspaces":[]}' }
+                }
+                if ($ArgumentList[0] -eq 'new-workspace') {
+                    return [PSCustomObject]@{ ExitCode = 0; Output = '{"workspaceId":"ws-123"}' }
+                }
+                return [PSCustomObject]@{ ExitCode = 0; Output = '{"ok":true}' }
+            }
+
+            $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-wmux-reg-" + [guid]::NewGuid())
+            $proj = Join-Path $tmp 'repo_feature'
+            New-Item -ItemType Directory -Path $proj -Force | Out-Null
+            try {
+                $result = Register-WtwWmuxProject -ProjectPath $proj -PrettyName 'Blue Feature' -RepoName 'repo' -TaskName 'feature'
+                $result | Should -Be 'Blue Feature'
+                ($script:wmuxCalls | Where-Object { $_ -like 'new-workspace *' }).Count | Should -Be 1
+            } finally {
+                Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+            }
+        }
     } -Skip:(-not $IsWindows)
 
-    It 'does not register a worktree while wmux substrate support is pending' {
-        Mock Get-WtwColors {
-            [PSCustomObject]@{
-                palette     = @()
-                assignments = [PSCustomObject]@{
-                    'repo/main' = '#228833'
-                }
+    It 'skips creation when wmux is not running and cannot be started' {
+        InModuleScope wtw {
+            $script:wmuxCalls = [System.Collections.Generic.List[string]]::new()
+            Mock Test-WtwWmuxPresent { $true }
+            Mock Test-WtwWmuxRunning { $false }
+            Mock Start-WtwWmuxApp { $false }
+            Mock Invoke-WtwWmuxCommand {
+                $script:wmuxCalls.Add(($ArgumentList -join ' '))
+                return [PSCustomObject]@{ ExitCode = 0; Output = '{"workspaces":[]}' }
             }
-        } -ModuleName wtw
 
-        $result = Register-WtwWmuxProject -ProjectPath $script:projectPath -PrettyName 'Blue Feature' -RepoName 'repo' -TaskName 'feature'
-
-        $result | Should -BeNullOrEmpty
-        $script:wmuxCalls.Count | Should -Be 0
+            $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-wmux-reg-" + [guid]::NewGuid())
+            $proj = Join-Path $tmp 'repo_feature'
+            New-Item -ItemType Directory -Path $proj -Force | Out-Null
+            try {
+                $result = Register-WtwWmuxProject -ProjectPath $proj -PrettyName 'Blue Feature' -RepoName 'repo' -TaskName 'feature'
+                $result | Should -BeNullOrEmpty
+                ($script:wmuxCalls | Where-Object { $_ -like 'new-workspace *' }).Count | Should -Be 0
+            } finally {
+                Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+            }
+        }
     } -Skip:(-not $IsWindows)
 }
