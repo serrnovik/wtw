@@ -444,11 +444,18 @@ them and `wtw remove` cleans that registration up:
   `wtw.zsh` shell init stamps the worktree's pretty name, color, and a
   `wtw:<repo>/<task>` status pill onto the surrounding cmux workspace. All of
   this is a no-op when the cmux CLI is not installed.
-- **wmux** — `wtw wmux <name>` (alias `wtw wm <name>`) is recognized on
-  Windows, but active workspace open/registration is disabled for current wmux
-  builds because the CLI workspace/surface commands are not reliable enough for
-  wtw automation. Keep the shortcut/resolver in place for the substrate/API work
-  tracked upstream in `openwong2kim/wmux#15`.
+- **wmux** — `wtw wmux <name>` (alias `wtw wm <name>`) on Windows selects an
+  existing same-named [wmux](https://github.com/amirlehmam/wmux) workspace for
+  the worktree's path, or creates one via
+  `wmux new-workspace --title <pretty> --cwd <path> --shell pwsh` (starting wmux
+  if it isn't running). `wtw create` / `wtw add` likewise create the workspace,
+  and `wtw remove` closes it. wmux workspaces are live (daemon-backed) rather
+  than a static config registry, so there is no on-disk equivalent of
+  `cmux.json`. wmux ships without an installer; wtw finds its Node CLI
+  (`<install>/resources/cli/wmux.js`) via `$env:WMUX_EXE`, a running wmux
+  process, `wmux.exe` on PATH, then common install dirs — set `$env:WMUX_EXE`
+  (and `$env:WMUX_NODE` if `node` isn't on PATH) to override. All of this is a
+  no-op when wmux / Node are not found.
 - **agentctl** — when installed, attaches ignored local AI-agent overlay files
   to the new worktree using the configured profile. Defaults to `team` for
   safety unless a repo/global override selects another profile.
