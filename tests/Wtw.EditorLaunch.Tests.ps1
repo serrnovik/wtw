@@ -69,6 +69,42 @@ Describe 'Invoke-WtwEditorCli' {
 }
 
 Describe 'Open-WtwWorkspace Codex launcher' {
+    It 'refreshes Cursor recent workspace metadata before opening the code-workspace file' {
+        $worktreeDir = Join-Path $script:tmp 'cursor-worktree'
+        New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
+        $workspaceFile = Join-Path $script:tmp 'cursor-worktree.code-workspace'
+        Set-Content -Path $workspaceFile -Value '{}'
+
+        Mock Resolve-WtwTarget {
+            [PSCustomObject]@{
+                TaskName      = 'cursor-worktree'
+                WorktreeEntry = [PSCustomObject]@{
+                    path       = $worktreeDir
+                    workspace  = $workspaceFile
+                    prettyName = 'Blue Cursor Worktree'
+                    color      = '#336699'
+                }
+                RepoEntry     = [PSCustomObject]@{
+                    mainPath = $script:tmp
+                }
+            }
+        } -ModuleName wtw
+        Mock Register-WtwCursorProject { $WorkspacePath } -ModuleName wtw
+        Mock Invoke-WtwEditorCli {} -ModuleName wtw
+
+        Open-WtwWorkspace -Name 'cursor-worktree' -Editor 'cursor'
+
+        Should -Invoke Register-WtwCursorProject -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+            $WorkspacePath -eq $workspaceFile -and
+            $ProjectPath -eq $worktreeDir -and
+            $PrettyName -eq 'Blue Cursor Worktree' -and
+            $Color -eq '#336699'
+        }
+        Should -Invoke Invoke-WtwEditorCli -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+            $Cmd -eq 'cursor' -and $Path -eq $workspaceFile
+        }
+    }
+
     It 'opens Codex with the worktree directory instead of the code-workspace file' {
         $worktreeDir = Join-Path $script:tmp 'codex-worktree'
         New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
