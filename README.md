@@ -432,6 +432,12 @@ them and `wtw remove` cleans that registration up:
   around the label write so the app does not overwrite the external state edit.
   It skips that prompt when the saved label already matches; pass
   `--skip-restart` to open without repairing a missing/stale label.
+- **Cursor** — registers the generated `.code-workspace` in Cursor's recent
+  workspace list (`state.vscdb`) when Cursor and `sqlite3` are present.
+  `wtw cursor <name>` refreshes that entry before opening it. Cursor does not
+  expose a separate stable label field in this state; it displays the workspace
+  from the generated workspace filename/folder name. Colors come from the
+  workspace's `workbench.colorCustomizations` and `peacock.color` settings.
 - **Superset** — creates/removes a local workspace named from the same pretty
   name when the Superset CLI is installed and the repo project can be matched.
 - **SourceGit** — adds/removes the worktree from managed repositories when

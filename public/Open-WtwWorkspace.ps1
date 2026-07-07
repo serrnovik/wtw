@@ -179,6 +179,18 @@ function Open-WtwWorkspace {
 
     # Workspace file found — open it
     if ($wsFile -and (Test-Path $wsFile)) {
+        if ($editorCmd -eq 'cursor') {
+            $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+            $prettyName = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
+                $target.WorktreeEntry.prettyName
+            } elseif ($target.TaskName) {
+                $target.TaskName
+            } else {
+                Split-Path $dir -Leaf
+            }
+            $color = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'color') { $target.WorktreeEntry.color } else { $null }
+            Register-WtwCursorProject -WorkspacePath $wsFile -ProjectPath $dir -PrettyName $prettyName -Color $color | Out-Null
+        }
         Write-Host "  Opening in ${editorCmd}: $wsFile" -ForegroundColor Green
         Invoke-WtwEditorCli -Cmd $editorCmd -Path $wsFile
         return

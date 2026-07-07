@@ -16,7 +16,7 @@ function Initialize-WtwWorktreeMetadata {
              Color = '#rrggbb'
              PrettyName = '<emoji name>'
              WorkspaceFile = '<path>' or $null
-             SupersetWorkspaceId, CodexProjectPath, CmuxCommandKey, WmuxWorkspaceName }
+             SupersetWorkspaceId, CodexProjectPath, CursorWorkspacePath, CmuxCommandKey, WmuxWorkspaceName }
         Caller is responsible for any rollback on Success=$false (typically
         only relevant when `create` just made the worktree and needs to
         unwind on a bad --color).
@@ -62,6 +62,7 @@ function Initialize-WtwWorktreeMetadata {
         WorkspaceFile       = $null
         SupersetWorkspaceId = $null
         CodexProjectPath    = $null
+        CursorWorkspacePath = $null
         CmuxCommandKey      = $null
         WmuxWorkspaceName   = $null
     }
@@ -138,6 +139,7 @@ function Initialize-WtwWorktreeMetadata {
         prettyName          = $PrettyName
         supersetWorkspaceId = $null
         codexProjectPath    = $null
+        cursorWorkspacePath = $null
         cmuxCommandKey      = $null
         wmuxWorkspaceName   = $null
     }
@@ -158,6 +160,18 @@ function Initialize-WtwWorktreeMetadata {
         $registry.repos.$RepoName.worktrees.$Task.codexProjectPath = $codexProjectPath
         Save-WtwRegistry $registry
         $result.CodexProjectPath = $codexProjectPath
+    }
+
+    # Register Cursor recent-workspace metadata for the generated workspace
+    # file. Cursor displays workspace names from the .code-workspace path, and
+    # the file already carries the per-worktree color settings.
+    if ($wsFile) {
+        $cursorWorkspacePath = Register-WtwCursorProject -WorkspacePath $wsFile -ProjectPath $WorktreePath -PrettyName $PrettyName -Color $resolvedColor
+        if ($cursorWorkspacePath) {
+            $registry.repos.$RepoName.worktrees.$Task.cursorWorkspacePath = $cursorWorkspacePath
+            Save-WtwRegistry $registry
+            $result.CursorWorkspacePath = $cursorWorkspacePath
+        }
     }
 
     # Register cmux Command Palette workspace metadata (no-op when cmux is absent).

@@ -70,6 +70,15 @@ function Remove-WtwWorktree {
         Unregister-WtwCodexProject -ProjectPath $codexProjectPath
     }
 
+    $cursorWorkspacePath = if ($wt.PSObject.Properties.Name -contains 'cursorWorkspacePath' -and $wt.cursorWorkspacePath) {
+        $wt.cursorWorkspacePath
+    } else {
+        $wt.workspace
+    }
+    if ($cursorWorkspacePath) {
+        Unregister-WtwCursorProject -WorkspacePath $cursorWorkspacePath
+    }
+
     # Remove cmux Command Palette metadata if wtw registered it. Older registry
     # entries will not have cmuxCommandKey, so fall back to the worktree path.
     $cmuxCommandKey = if ($wt.PSObject.Properties.Name -contains 'cmuxCommandKey' -and $wt.cmuxCommandKey) {
