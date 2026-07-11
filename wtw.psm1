@@ -13,34 +13,6 @@
 
 $script:WtwModuleRoot = $PSScriptRoot
 
-function Invoke-WtwChatGpt {
-    <#
-    .SYNOPSIS
-        Launch the ChatGPT/Codex CLI through a stable set of shell aliases.
-    .DESCRIPTION
-        Prefers the renamed `chatgpt` executable when installed and falls back
-        to the existing `codex` executable during the transition.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [object[]] $Arguments
-    )
-
-    $launcher = Get-Command chatgpt -CommandType Application -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    if (-not $launcher) {
-        $launcher = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-    }
-
-    if (-not $launcher) {
-        throw 'ChatGPT/Codex CLI is not installed or not on PATH. Install the ChatGPT CLI, then try again.'
-    }
-
-    & $launcher.Source @Arguments
-}
-
 function Get-WtwPwshExecutable {
     # 5.1-safe discovery of a PowerShell 7+ (pwsh) executable.
     # Returns the full path, or $null when pwsh is not installed.
@@ -119,10 +91,7 @@ if ($wtwEdition -ne 'Core') {
     function Register-WtwProfile { }
 
     Set-Alias -Name wtw -Value Invoke-Wtw -Scope Global -Force
-    foreach ($alias in 'chatgpt', 'cgpt', 'codex') {
-        Set-Alias -Name $alias -Value Invoke-WtwChatGpt -Scope Global -Force
-    }
-    Export-ModuleMember -Function 'Invoke-Wtw', 'Invoke-WtwChatGpt', 'Register-WtwProfile' -Alias 'wtw', 'chatgpt', 'cgpt', 'codex'
+    Export-ModuleMember -Function 'Invoke-Wtw', 'Register-WtwProfile' -Alias 'wtw'
     return
 }
 
@@ -152,10 +121,7 @@ foreach ($import in @($private + $public)) {
 Export-ModuleMember -Function $public.BaseName
 
 Set-Alias -Name wtw -Value Invoke-Wtw -Scope Global -Force
-foreach ($alias in 'chatgpt', 'cgpt', 'codex') {
-    Set-Alias -Name $alias -Value Invoke-WtwChatGpt -Scope Global -Force
-}
-Export-ModuleMember -Function Invoke-WtwChatGpt -Alias 'wtw', 'chatgpt', 'cgpt', 'codex'
+Export-ModuleMember -Alias wtw
 
 # Load tab completion
 $completionPath = Join-Path $PSScriptRoot 'completions' 'wtw.auto-completion.ps1'

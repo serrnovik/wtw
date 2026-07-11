@@ -22,10 +22,4 @@ Describe 'wtw module loading' {
     It 'registers the wtw alias' {
         Get-Alias wtw -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
     }
-
-    It 'registers ChatGPT CLI aliases' {
-        foreach ($alias in 'chatgpt', 'cgpt', 'codex') {
-            (Get-Alias $alias -ErrorAction Stop).Definition | Should -Be 'Invoke-WtwChatGpt'
-        }
-    }
 }
