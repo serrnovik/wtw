@@ -70,7 +70,7 @@ function Open-WtwWorkspace {
         return
     }
 
-    # Codex Desktop — prefer the supported CLI app launcher (`codex app <dir>`),
+    # ChatGPT Desktop (formerly Codex) — prefer the supported CLI app launcher (`codex app <dir>`),
     # falling back to macOS open-app behavior when only the app bundle exists.
     if ($editorType -eq 'codex') {
         $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
@@ -93,23 +93,23 @@ function Open-WtwWorkspace {
             Ensure-WtwCodexProjectConfig -ProjectPath $fullDir | Out-Null
             Set-WtwCodexProjectTrust -ProjectPath $fullDir -ConfigPath (Join-Path $codexHome 'config.toml')
             if ($labelAlreadySet) {
-                Write-Host "  Codex: sidebar label already '$prettyName'" -ForegroundColor DarkGray
+                Write-Host "  ChatGPT: sidebar label already '$prettyName'" -ForegroundColor DarkGray
             } elseif ($SkipRestart -and (Test-WtwCodexAppRunning)) {
-                Write-Host "  Codex: sidebar label needs restart; skipped because --skip-restart was set." -ForegroundColor DarkGray
+                Write-Host "  ChatGPT: sidebar label needs restart; skipped because --skip-restart was set." -ForegroundColor DarkGray
             } else {
                 $decision = Resolve-WtwCodexStateConflict -OperationLabel "set sidebar label '$prettyName'"
                 if ($decision.proceed -and (Set-WtwCodexProjectLabel -ProjectPath $fullDir -PrettyName $prettyName -GlobalStatePath $globalStatePath)) {
-                    Write-Host "  Codex: sidebar label '$prettyName'" -ForegroundColor Green
+                    Write-Host "  ChatGPT: sidebar label '$prettyName'" -ForegroundColor Green
                 }
             }
         }
 
         if (Start-WtwCodexApp -ProjectPath $fullDir) {
-            Write-Host "  Opening in Codex: $fullDir" -ForegroundColor Green
+            Write-Host "  Opening in ChatGPT: $fullDir" -ForegroundColor Green
             return
         }
 
-        Write-Error "Codex is not installed or not on PATH. Install the 'codex' CLI or Codex.app first."
+        Write-Error "ChatGPT is not installed or not on PATH. Install ChatGPT.app or the 'codex' CLI first."
         return
     }
 

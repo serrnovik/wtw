@@ -52,7 +52,7 @@ pwsh -Command "wtw init [aliases] [--template X] [--startup-script X]"
 pwsh -Command "wtw open [name]"
 pwsh -Command "wtw cursor [name]"
 pwsh -Command "wtw code [name]"
-pwsh -Command "wtw codex [name] [--skip-restart]"
+pwsh -Command "wtw chatgpt [name] [--skip-restart]" # aliases: cgpt, codex
 
 # Clean stale AI worktrees
 pwsh -Command "wtw clean [--dry-run]"
@@ -94,10 +94,10 @@ Colors from a 20-color palette are auto-assigned on `wtw create`. They apply to:
 - VS Code/Cursor Peacock extension (title bar, activity bar, status bar)
 - Terminal tabs (iTerm2, Windows Terminal, Kitty, Konsole, tmux)
 
-When Codex Desktop is installed/present, `wtw create` also trusts the new
+When ChatGPT Desktop (formerly Codex) is installed/present, `wtw create` also trusts the new
 worktree in `~/.codex/config.toml` and pre-seeds the saved sidebar label when
-Codex is not running. Use `wtw codex <name>` to open/register the workspace in
-Codex Desktop on demand; if Codex is running, it may prompt to close/relaunch so
+ChatGPT is not running. Use `wtw chatgpt <name>` (or `wtw codex <name>`) to open/register the workspace in
+ChatGPT Desktop on demand; if ChatGPT is running, it may prompt to close/relaunch so
 the label write is not overwritten. It skips the prompt when the saved label
 already matches; pass `--skip-restart` to open without repairing a missing/stale
 label. `wtw remove` cleans those Codex entries up.

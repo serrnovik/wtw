@@ -4,6 +4,29 @@ BeforeAll {
 }
 
 Describe 'Codex project integration' {
+    It 'resolves only a real Codex executable, not a shell alias' {
+        Mock Get-Command {
+            [PSCustomObject]@{ Source = '/opt/tools/codex' }
+        } -ParameterFilter { $Name -eq 'codex' -and $CommandType -eq 'Application' }
+
+        Get-WtwCodexCliPath | Should -Be '/opt/tools/codex'
+        Should -Invoke Get-Command -Times 1 -Exactly -ParameterFilter {
+            $Name -eq 'codex' -and $CommandType -eq 'Application'
+        }
+    }
+
+    It 'prefers the renamed ChatGPT app over the legacy Codex app on macOS' {
+        Mock Test-Path { $Path -in '/Applications/ChatGPT.app', '/Applications/Codex.app' }
+
+        Get-WtwCodexMacAppName | Should -Be 'ChatGPT'
+    }
+
+    It 'falls back to the legacy Codex app name on macOS' {
+        Mock Test-Path { $Path -eq '/Applications/Codex.app' }
+
+        Get-WtwCodexMacAppName | Should -Be 'Codex'
+    }
+
     BeforeEach {
         $script:tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-codex-" + [guid]::NewGuid())
         $script:codexHome = Join-Path $script:tempDir '.codex'

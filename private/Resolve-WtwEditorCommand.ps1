@@ -17,7 +17,7 @@ function Resolve-WtwEditorCommand {
            winCmd = 'SourceGit'; linuxCmd = 'sourcegit' }
         # macOS open-app style — always opens directory, uses: open -a "AppName" <dir>
         # appNameCandidates: ordered list tried at runtime so name changes (Alpha→Beta→stable) work automatically
-        @{ prefixes = @('codex');               type = 'codex';  appName = 'Codex';       cmd = 'codex'; appNameCandidates = @('Codex') }
+        @{ prefixes = @('chatgpt', 'cgpt', 'codex'); type = 'codex'; appName = 'ChatGPT'; cmd = 'codex'; appNameCandidates = @('ChatGPT', 'Codex') }
         @{ prefixes = @('cmux', 'cm');          type = 'cmux';   appName = 'cmux';        cmd = 'cmux' }
         @{ prefixes = @('wmux', 'wm');          type = 'wmux';   appName = 'wmux';        cmd = 'wmux' }
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }

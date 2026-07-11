@@ -16,17 +16,42 @@ function Test-WtwCodexPresent {
     )
 
     if ($CodexHome -and (Test-Path $CodexHome)) { return $true }
-    if (Get-Command codex -ErrorAction SilentlyContinue) { return $true }
-    if ($IsMacOS -and (Test-Path '/Applications/Codex.app')) { return $true }
+    if (Get-WtwCodexCliPath) { return $true }
+    if ($IsMacOS -and ((Test-Path '/Applications/ChatGPT.app') -or (Test-Path '/Applications/Codex.app'))) { return $true }
 
     return $false
+}
+
+function Get-WtwCodexCliPath {
+    [CmdletBinding()]
+    param()
+
+    # A shell alias/function named `codex` can point back to wtw. Restrict the
+    # lookup to real executables so Start-Process never tries to launch the
+    # alias source (for example, the literal string "wtw").
+    $command = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($command) { return $command.Source }
+
+    return $null
+}
+
+function Get-WtwCodexMacAppName {
+    [CmdletBinding()]
+    param()
+
+    foreach ($appName in 'ChatGPT', 'Codex') {
+        if (Test-Path "/Applications/$appName.app") { return $appName }
+    }
+
+    return $null
 }
 
 function Test-WtwCodexAppRunning {
     [CmdletBinding()]
     param()
 
-    return [bool](Get-Process -Name 'Codex' -ErrorAction SilentlyContinue)
+    return [bool](Get-Process -Name 'ChatGPT', 'Codex' -ErrorAction SilentlyContinue)
 }
 
 function Start-WtwCodexApp {
@@ -35,14 +60,20 @@ function Start-WtwCodexApp {
         [Parameter(Mandatory)][string] $ProjectPath
     )
 
-    $codexExe = (Get-Command codex -ErrorAction SilentlyContinue)?.Source
-    if ($codexExe) {
-        Start-Process -FilePath $codexExe -ArgumentList @('app', $ProjectPath)
-        return $true
+    # The standalone CLI can lag behind an app rename and still hard-code the
+    # legacy /Applications/Codex.app path. On macOS, launch the installed app
+    # bundle directly and prefer its current ChatGPT name.
+    if ($IsMacOS) {
+        $appName = Get-WtwCodexMacAppName
+        if ($appName) {
+            & open -a $appName $ProjectPath
+            return $true
+        }
     }
 
-    if ($IsMacOS -and (Test-Path '/Applications/Codex.app')) {
-        & open -a Codex $ProjectPath
+    $codexExe = Get-WtwCodexCliPath
+    if ($codexExe) {
+        Start-Process -FilePath $codexExe -ArgumentList @('app', $ProjectPath)
         return $true
     }
 
@@ -53,7 +84,7 @@ function Stop-WtwCodexProcess {
     [CmdletBinding()]
     param([int] $TimeoutSeconds = 10)
 
-    $procs = @(Get-Process -Name 'Codex' -ErrorAction SilentlyContinue)
+    $procs = @(Get-Process -Name 'ChatGPT', 'Codex' -ErrorAction SilentlyContinue)
     if ($procs.Count -eq 0) { return $true }
 
     foreach ($process in $procs) {
@@ -66,7 +97,7 @@ function Stop-WtwCodexProcess {
         Start-Sleep -Milliseconds 250
     }
 
-    foreach ($process in @(Get-Process -Name 'Codex' -ErrorAction SilentlyContinue)) {
+    foreach ($process in @(Get-Process -Name 'ChatGPT', 'Codex' -ErrorAction SilentlyContinue)) {
         try { $process.Kill($true) } catch { try { $process.Kill() } catch { } }
     }
 
@@ -86,11 +117,11 @@ function Resolve-WtwCodexStateConflict {
     if (-not (Test-WtwCodexAppRunning)) { return @{ proceed = $true; relaunch = $false } }
 
     Write-Host ''
-    Write-Host '  Codex is running — it overwrites project labels on exit.' -ForegroundColor Yellow
+    Write-Host '  ChatGPT is running — it overwrites project labels on exit.' -ForegroundColor Yellow
     Write-Host "  How should I $OperationLabel"'?' -ForegroundColor Yellow
-    Write-Host '    [c] Close Codex yourself, then write (I will wait, then relaunch)'
-    Write-Host '    [k] Force-kill Codex, write, relaunch'
-    Write-Host '    [i] Ignore — write anyway (Codex may overwrite it)'
+    Write-Host '    [c] Close ChatGPT yourself, then write (I will wait, then relaunch)'
+    Write-Host '    [k] Force-kill ChatGPT, write, relaunch'
+    Write-Host '    [i] Ignore — write anyway (ChatGPT may overwrite it)'
     Write-Host '    [s] Skip — open without changing the sidebar label'
 
     $answer = (Read-Host '  Choice [c/k/i/s]').Trim().ToLowerInvariant()
@@ -98,26 +129,26 @@ function Resolve-WtwCodexStateConflict {
 
     switch ($answer) {
         'c' {
-            Write-Host '  Waiting for Codex to close (Ctrl+C to abort)...' -ForegroundColor Cyan
+            Write-Host '  Waiting for ChatGPT to close (Ctrl+C to abort)...' -ForegroundColor Cyan
             while (Test-WtwCodexAppRunning) { Start-Sleep -Milliseconds 500 }
-            Write-Host '  Codex closed.' -ForegroundColor Green
+            Write-Host '  ChatGPT closed.' -ForegroundColor Green
             return @{ proceed = $true; relaunch = $true }
         }
         'k' {
-            Write-Host '  Force-closing Codex...' -ForegroundColor Cyan
+            Write-Host '  Force-closing ChatGPT...' -ForegroundColor Cyan
             if (-not (Stop-WtwCodexProcess)) {
-                Write-Host '  Could not stop Codex — skipping label update.' -ForegroundColor Red
+                Write-Host '  Could not stop ChatGPT — skipping label update.' -ForegroundColor Red
                 return @{ proceed = $false; relaunch = $false }
             }
-            Write-Host '  Codex stopped.' -ForegroundColor Green
+            Write-Host '  ChatGPT stopped.' -ForegroundColor Green
             return @{ proceed = $true; relaunch = $true }
         }
         's' {
-            Write-Host '  Skipped Codex label update.' -ForegroundColor DarkGray
+            Write-Host '  Skipped ChatGPT label update.' -ForegroundColor DarkGray
             return @{ proceed = $false; relaunch = $false }
         }
         default {
-            Write-Host '  Writing anyway — quit Codex before restarting if it does not stick.' -ForegroundColor Yellow
+            Write-Host '  Writing anyway — quit ChatGPT before restarting if it does not stick.' -ForegroundColor Yellow
             return @{ proceed = $true; relaunch = $false }
         }
     }
@@ -262,7 +293,7 @@ function Set-WtwCodexProjectLabel {
         try {
             $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
         } catch {
-            Write-Host "  Codex: could not parse desktop state — skipping sidebar label update." -ForegroundColor Yellow
+            Write-Host "  ChatGPT: could not parse desktop state — skipping sidebar label update." -ForegroundColor Yellow
             return $false
         }
     } else {
@@ -281,7 +312,7 @@ function Set-WtwCodexProjectLabel {
         $state | ConvertTo-Json -Depth 80 -Compress | Set-Content -Path $GlobalStatePath -Encoding utf8
         return $true
     } catch {
-        Write-Host "  Codex: could not save desktop state — skipping sidebar label update." -ForegroundColor Yellow
+        Write-Host "  ChatGPT: could not save desktop state — skipping sidebar label update." -ForegroundColor Yellow
         return $false
     }
 }
@@ -340,7 +371,7 @@ function Remove-WtwCodexProjectLabel {
     try {
         $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
     } catch {
-        Write-Host "  Codex: could not parse desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
+        Write-Host "  ChatGPT: could not parse desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
         return $false
     }
 
@@ -357,7 +388,7 @@ function Remove-WtwCodexProjectLabel {
         $state | ConvertTo-Json -Depth 80 -Compress | Set-Content -Path $GlobalStatePath -Encoding utf8
         return $true
     } catch {
-        Write-Host "  Codex: could not save desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
+        Write-Host "  ChatGPT: could not save desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
         return $false
     }
 }
@@ -388,11 +419,11 @@ function Ensure-WtwCodexProjectConfig {
 function Register-WtwCodexProject {
     <#
     .SYNOPSIS
-        Register a worktree as a Codex Desktop workspace when Codex is present.
+        Register a worktree as a ChatGPT Desktop workspace when ChatGPT is present.
     .DESCRIPTION
         Best-effort integration: creates a minimal project config only when
         missing, trusts the worktree path in ~/.codex/config.toml, and updates
-        Codex Desktop's known workspace roots/sidebar label if the desktop
+        ChatGPT Desktop's known workspace roots/sidebar label if the desktop
         state file exists.
     #>
     [CmdletBinding()]
@@ -404,7 +435,7 @@ function Register-WtwCodexProject {
     $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
     $codexHome = Get-WtwCodexHome
     if (-not (Test-WtwCodexPresent -CodexHome $codexHome)) {
-        Write-Host '  Codex: not installed/present — skipping project registration.' -ForegroundColor DarkGray
+        Write-Host '  ChatGPT: not installed/present — skipping project registration.' -ForegroundColor DarkGray
         return $null
     }
 
@@ -417,16 +448,16 @@ function Register-WtwCodexProject {
         Set-WtwCodexProjectLabel -ProjectPath $fullPath -PrettyName $PrettyName -GlobalStatePath (Join-Path $codexHome '.codex-global-state.json')
     }
 
-    Write-Host "  Codex: trusted project $fullPath" -ForegroundColor Green
+    Write-Host "  ChatGPT: trusted project $fullPath" -ForegroundColor Green
     if ($createdProjectConfig) {
-        Write-Host '  Codex: created .codex/config.toml' -ForegroundColor Green
+        Write-Host '  ChatGPT: created .codex/config.toml' -ForegroundColor Green
     }
     if ($labelUpdated) {
-        Write-Host "  Codex: sidebar label '$PrettyName'" -ForegroundColor Green
+        Write-Host "  ChatGPT: sidebar label '$PrettyName'" -ForegroundColor Green
     } elseif ($isAppRunning) {
-        Write-Host "  Codex: app is running; run 'wtw codex' to close/relaunch and finalize sidebar label '$PrettyName'." -ForegroundColor DarkGray
+        Write-Host "  ChatGPT: app is running; run 'wtw chatgpt' to close/relaunch and finalize sidebar label '$PrettyName'." -ForegroundColor DarkGray
     } else {
-        Write-Host "  Codex: run 'wtw codex' from the worktree to open it in Codex Desktop." -ForegroundColor DarkGray
+        Write-Host "  ChatGPT: run 'wtw chatgpt' from the worktree to open it in ChatGPT Desktop." -ForegroundColor DarkGray
     }
 
     return $fullPath
@@ -435,10 +466,10 @@ function Register-WtwCodexProject {
 function Unregister-WtwCodexProject {
     <#
     .SYNOPSIS
-        Remove a worktree from Codex Desktop's local project metadata.
+        Remove a worktree from ChatGPT Desktop's local project metadata.
     .DESCRIPTION
         Best-effort cleanup for the trust entry and sidebar/root state. Safe to
-        call when Codex is absent or the project was never registered.
+        call when ChatGPT is absent or the project was never registered.
     #>
     [CmdletBinding()]
     param(
@@ -452,8 +483,8 @@ function Unregister-WtwCodexProject {
     Remove-WtwCodexProjectTrust -ProjectPath $fullPath -ConfigPath (Join-Path $codexHome 'config.toml')
     $labelRemoved = Remove-WtwCodexProjectLabel -ProjectPath $fullPath -GlobalStatePath (Join-Path $codexHome '.codex-global-state.json')
 
-    Write-Host "  Codex: removed project metadata for $fullPath" -ForegroundColor Green
+    Write-Host "  ChatGPT: removed project metadata for $fullPath" -ForegroundColor Green
     if ($labelRemoved) {
-        Write-Host '  Codex: removed sidebar label/root entries.' -ForegroundColor Green
+        Write-Host '  ChatGPT: removed sidebar label/root entries.' -ForegroundColor Green
     }
 }
