@@ -43,7 +43,7 @@ function Invoke-Wtw {
         Write-Host '    antigravity [name] Open in Antigravity (alias: anti)'
         Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
         Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
-        Write-Host '    codex [name] [--skip-restart]  Open in Codex'
+        Write-Host '    chatgpt [name] [--skip-restart]  Open in ChatGPT (aliases: cgpt, codex)'
         Write-Host '    cmux [name]       Open in cmux terminal workspace (alias: cm)'
         Write-Host '    wmux [name]       Open in wmux terminal workspace (alias: wm)'
         Write-Host '    claude [name]     Open Claude.ai app  (alias: cowork)'

@@ -124,7 +124,9 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'clean';       Tip = 'Clean stale AI worktrees' }
             @{ Name = 'agent';       Tip = 'Configure agentctl profile overlays' }
             @{ Name = 'skill';       Tip = 'Install AI skill into current repo' }
-            @{ Name = 'codex';       Tip = 'Open in Codex' }
+            @{ Name = 'chatgpt';     Tip = 'Open in ChatGPT (aliases: cgpt, codex)' }
+            @{ Name = 'cgpt';        Tip = 'Open in ChatGPT' }
+            @{ Name = 'codex';       Tip = 'Open in ChatGPT' }
             @{ Name = 'claude';      Tip = 'Open Claude.ai app' }
             @{ Name = 'claudecode';  Tip = 'Open Claude Code desktop' }
             @{ Name = 't3';          Tip = 'Open T3 Code (Alpha)' }

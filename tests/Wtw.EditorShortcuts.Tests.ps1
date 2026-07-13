@@ -45,12 +45,15 @@ Describe 'Resolve-WtwEditorCommand' {
         $command.appName | Should -Be 'SourceGit'
     }
 
-    It 'resolves "codex" to Codex Desktop launcher metadata' {
-        $command = Resolve-WtwEditorCommand 'codex'
+    It 'resolves ChatGPT and legacy Codex shortcut names to ChatGPT Desktop' {
+        foreach ($name in 'chatgpt', 'cgpt', 'codex') {
+            $command = Resolve-WtwEditorCommand $name
 
-        $command.type | Should -Be 'codex'
-        $command.appName | Should -Be 'Codex'
-        $command.cmd | Should -Be 'codex'
+            $command.type | Should -Be 'codex'
+            $command.appName | Should -Be 'ChatGPT'
+            $command.cmd | Should -Be 'codex'
+            $command.appNameCandidates | Should -Be @('ChatGPT', 'Codex')
+        }
     }
 
     It 'resolves "cmux" and "cm" to cmux launcher metadata' {
