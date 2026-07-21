@@ -48,6 +48,19 @@ Describe 'Test-WtwEditorCli' {
 }
 
 Describe 'Invoke-WtwEditorCli' {
+    It 'opens Cursor workspaces in a new IDE window' {
+        $script:cursorArguments = $null
+        Mock Test-WtwEditorCli { $true }
+        Mock cursor {
+            param($first, $second)
+            $script:cursorArguments = @($first, $second)
+        }
+
+        Invoke-WtwEditorCli -Cmd 'cursor' -Path '/tmp/cursor-worktree.code-workspace'
+
+        $script:cursorArguments | Should -Be @('--new-window', '/tmp/cursor-worktree.code-workspace')
+    }
+
     It 'prefers the renamed antigravity-ide CLI over the legacy antigravity stub' {
         $script:queried = [System.Collections.Generic.List[string]]::new()
         Mock Test-WtwEditorCli { $script:queried.Add($Cmd); $false }

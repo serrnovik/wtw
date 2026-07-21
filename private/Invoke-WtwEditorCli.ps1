@@ -40,9 +40,17 @@ function Invoke-WtwEditorCli {
     $macApps    = if ($spec) { $spec.macApps }    else { @() }
 
     # 1. First CLI candidate that resolves to a real, runnable binary.
+    # Cursor otherwise follows its last-window behaviour, which can route a
+    # workspace into a standalone Agent window rather than a project IDE.
+    # wtw worktrees need their own IDE window so the project context remains
+    # unambiguous.
     $runnable = $candidates | Where-Object { Test-WtwEditorCli -Cmd $_ } | Select-Object -First 1
     if ($runnable) {
-        & $runnable $Path
+        if ($Cmd -eq 'cursor') {
+            & $runnable --new-window $Path
+        } else {
+            & $runnable $Path
+        }
         return
     }
 
