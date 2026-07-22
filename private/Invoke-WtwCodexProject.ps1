@@ -276,6 +276,75 @@ function Remove-WtwCodexArrayValue {
     $State | Add-Member -NotePropertyName $PropertyName -NotePropertyValue @($items) -Force
 }
 
+function Get-WtwCodexNormalizedPath {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string] $Path)
+
+    try {
+        return [System.IO.Path]::GetFullPath($Path).TrimEnd([char]'/', [char]'\')
+    } catch {
+        return $Path.TrimEnd([char]'/', [char]'\')
+    }
+}
+
+function Get-WtwCodexLocalProjectEntries {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][PSObject] $State,
+        [Parameter(Mandatory)][string] $ProjectPath
+    )
+
+    $projectsProp = $State.PSObject.Properties['local-projects']
+    if (-not ($projectsProp -and $projectsProp.Value)) { return }
+
+    $normalizedProjectPath = Get-WtwCodexNormalizedPath -Path $ProjectPath
+    foreach ($entry in $projectsProp.Value.PSObject.Properties) {
+        $rootsProp = $entry.Value.PSObject.Properties['rootPaths']
+        $rootPaths = @(
+            if ($rootsProp -and $rootsProp.Value) { $rootsProp.Value }
+        )
+        if ($rootPaths.Count -ne 1) { continue }
+
+        $normalizedRootPath = Get-WtwCodexNormalizedPath -Path ([string]($rootPaths[0]))
+        if ($normalizedRootPath -eq $normalizedProjectPath) {
+            Write-Output $entry
+        }
+    }
+}
+
+function Set-WtwCodexLocalProjectName {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][PSObject] $State,
+        [Parameter(Mandatory)][string] $ProjectPath,
+        [Parameter(Mandatory)][string] $PrettyName
+    )
+
+    $projectsProp = $State.PSObject.Properties['local-projects']
+    $projects = if ($projectsProp -and $projectsProp.Value) { $projectsProp.Value } else { [PSCustomObject]@{} }
+    $entry = @(Get-WtwCodexLocalProjectEntries -State $State -ProjectPath $ProjectPath | Select-Object -First 1)[0]
+    $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+    if ($entry) {
+        $project = $entry.Value
+        $project | Add-Member -NotePropertyName 'name' -NotePropertyValue $PrettyName -Force
+        $project | Add-Member -NotePropertyName 'updatedAt' -NotePropertyValue $now -Force
+        return [string]$entry.Name
+    }
+
+    $projectId = [guid]::NewGuid().ToString()
+    $project = [PSCustomObject]@{
+        id        = $projectId
+        name      = $PrettyName
+        rootPaths = @($ProjectPath)
+        createdAt = $now
+        updatedAt = $now
+    }
+    $projects | Add-Member -NotePropertyName $projectId -NotePropertyValue $project -Force
+    $State | Add-Member -NotePropertyName 'local-projects' -NotePropertyValue $projects -Force
+    return $projectId
+}
+
 function Set-WtwCodexProjectLabel {
     [CmdletBinding()]
     param(
@@ -301,7 +370,14 @@ function Set-WtwCodexProjectLabel {
     }
 
     Add-WtwCodexArrayValue -State $state -PropertyName 'electron-saved-workspace-roots' -Value $ProjectPath -Prepend
-    Add-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $ProjectPath -Prepend
+
+    # Current ChatGPT Desktop renders the UUID-keyed local-projects model.
+    # Keep the old root/label fields for backward compatibility, but make the
+    # modern local-project record authoritative and remove its legacy path
+    # duplicate from project-order.
+    $localProjectId = Set-WtwCodexLocalProjectName -State $state -ProjectPath $ProjectPath -PrettyName $PrettyName
+    Add-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $localProjectId -Prepend
+    Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $ProjectPath
 
     $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
     $labels = if ($labelsProp -and $labelsProp.Value) { $labelsProp.Value } else { [PSCustomObject]@{} }
@@ -356,7 +432,16 @@ function Test-WtwCodexProjectLabel {
     )
 
     $label = Get-WtwCodexProjectLabel -ProjectPath $ProjectPath -GlobalStatePath $GlobalStatePath
-    return $label -eq $PrettyName
+    if ($label -ne $PrettyName) { return $false }
+
+    try {
+        $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
+    } catch {
+        return $false
+    }
+
+    $project = @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath | Select-Object -First 1)[0]
+    return $project -and $project.Value.name -eq $PrettyName
 }
 
 function Remove-WtwCodexProjectLabel {
@@ -378,6 +463,12 @@ function Remove-WtwCodexProjectLabel {
     Remove-WtwCodexArrayValue -State $state -PropertyName 'electron-saved-workspace-roots' -Value $ProjectPath
     Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $ProjectPath
     Remove-WtwCodexArrayValue -State $state -PropertyName 'active-workspace-roots' -Value $ProjectPath
+
+    foreach ($project in @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath)) {
+        $projectId = [string]$project.Name
+        $state.'local-projects'.PSObject.Properties.Remove($projectId)
+        Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $projectId
+    }
 
     $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
     if ($labelsProp -and $labelsProp.Value) {

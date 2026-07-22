@@ -64,16 +64,21 @@ Describe 'Codex project integration' {
 
         Set-WtwCodexProjectLabel -ProjectPath $script:projectPath -PrettyName 'Blue Feature' -GlobalStatePath $statePath | Should -BeTrue
         $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
+        $localProject = @($state.'local-projects'.PSObject.Properties | Where-Object { $_.Value.rootPaths -contains $script:projectPath })[0]
 
         @($state.'electron-saved-workspace-roots')[0] | Should -Be $script:projectPath
-        @($state.'project-order')[0] | Should -Be $script:projectPath
+        @($state.'project-order')[0] | Should -Be $localProject.Name
+        @($state.'project-order') | Should -Not -Contain $script:projectPath
         $state.'electron-workspace-root-labels'.PSObject.Properties[$script:projectPath].Value | Should -Be 'Blue Feature'
+        $localProject.Value.name | Should -Be 'Blue Feature'
+        $localProject.Value.id | Should -Be $localProject.Name
 
         Remove-WtwCodexProjectLabel -ProjectPath $script:projectPath -GlobalStatePath $statePath | Should -BeTrue
         $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
 
         @($state.'electron-saved-workspace-roots') | Should -Not -Contain $script:projectPath
         @($state.'project-order') | Should -Not -Contain $script:projectPath
+        $state.'local-projects'.PSObject.Properties.Name | Should -Not -Contain $localProject.Name
         $state.'electron-workspace-root-labels'.PSObject.Properties.Name | Should -Not -Contain $script:projectPath
     }
 
@@ -84,8 +89,9 @@ Describe 'Codex project integration' {
         $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
 
         @($state.'electron-saved-workspace-roots') | Should -Contain $script:projectPath
-        @($state.'project-order') | Should -Contain $script:projectPath
+        @($state.'project-order') | Should -Not -Contain $script:projectPath
         $state.'electron-workspace-root-labels'.PSObject.Properties[$script:projectPath].Value | Should -Be 'Fresh State'
+        @($state.'local-projects'.PSObject.Properties | Where-Object { $_.Value.rootPaths -contains $script:projectPath }).Value.name | Should -Be 'Fresh State'
     }
 
     It 'detects when Codex desktop label is already present' {
