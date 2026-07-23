@@ -48,6 +48,21 @@ Describe 'Test-WtwEditorCli' {
 }
 
 Describe 'Invoke-WtwEditorCli' {
+    BeforeAll {
+        # CI agents don't have the Cursor CLI on PATH, and Pester can only
+        # mock resolvable commands — stub it when absent (locally the real
+        # CLI resolves and no stub is created).
+        if (-not (Get-Command cursor -ErrorAction SilentlyContinue)) {
+            $script:cursorStubbed = $true
+            function global:cursor { }
+        }
+    }
+    AfterAll {
+        if ($script:cursorStubbed) {
+            Remove-Item function:global:cursor -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'opens Cursor workspaces in a new IDE window' {
         $script:cursorArguments = $null
         Mock Test-WtwEditorCli { $true }
