@@ -68,6 +68,30 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     [[ ! "$output" == *"Error"* ]]
 }
 
+@test "wtw go refreshes cmux metadata after switching directories" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        unset CMUX_WORKSPACE_ID CMUX_SURFACE_ID
+        source '$SHELL_FILE' 2>/dev/null
+        function cmux() { return 0 }
+        typeset -gi mock_apply_count=0
+        function mock_pwsh() {
+            if [[ \"\$*\" == *'__resolve'* ]]; then
+                print -r -- \"\$PWD\"\$'\\t''#e05d44'\$'\\t''demo/feature'\$'\\t\\t''feature'\$'\\t''1'
+            elif [[ \"\$*\" == *'__cmux_apply_current'* ]]; then
+                (( mock_apply_count++ ))
+            fi
+        }
+        _wtw_pwsh=mock_pwsh
+        export CMUX_WORKSPACE_ID='workspace:test'
+        export CMUX_SURFACE_ID='surface:test'
+        _wtw_go feature >/dev/null
+        print -r -- \"\$mock_apply_count\"
+    "
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
+}
+
 @test "no bare pwsh calls in wtw.zsh (uses \$_wtw_pwsh)" {
     local bad_lines
     bad_lines=$(grep -n 'pwsh' "$SHELL_FILE" \

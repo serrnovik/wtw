@@ -108,8 +108,8 @@ function Get-WtwList {
                     Workspace = $wtWsDisplay
                     Created   = $createdStr
                     AgentProfile = $agentProfile
-                    PrettyName = $wt.prettyName
-                    SupersetId = $wt.supersetWorkspaceId
+                    PrettyName = Get-WtwPropertyValue -Object $wt -Name 'prettyName'
+                    SupersetId = Get-WtwPropertyValue -Object $wt -Name 'supersetWorkspaceId'
                 }
             }
         }

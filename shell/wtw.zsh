@@ -110,6 +110,9 @@ _wtw_go() {
     if [ -n "$startup_script" ]; then
         _wtw_run_script "${path}/${startup_script}"
     fi
+    # OSC titles do not rename cmux tabs. Refresh cmux after the directory and
+    # session script settle so the active workspace/surface gets the new label.
+    _wtw_cmux_apply_current
 }
 
 # Helper: build a safe pwsh argument string by quoting each arg
@@ -207,6 +210,7 @@ _wtw_register_aliases() {
         if [ -n "$_wtw_s" ]; then
             _wtw_defs+="  _wtw_run_script '${_wtw_p}/${_wtw_s}'"$'\n'
         fi
+        _wtw_defs+="  _wtw_cmux_apply_current"$'\n'
         _wtw_defs+="}"$'\n'
         _wtw_registered_aliases+=("${_wtw_a}")
     done <<< "$_wtw_output"
