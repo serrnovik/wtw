@@ -95,17 +95,24 @@ Describe 'Register-WtwTerminalTitle' {
         $second | Should -Be $first
     }
 
-    It 'builds a title even when the module icon pool is missing' {
-        InModuleScope wtw {
-            $oldIcons = $script:_WtwIcons
-            try {
-                $script:_WtwIcons = $null
+    It 'initializes absent hook globals under strict mode' {
+        Mock Get-WtwCurrentPrNumber { $null } -ModuleName wtw
 
-                { Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' } | Should -Not -Throw
-                Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' | Should -Match 'snowmain1_stripe'
-            } finally {
-                $script:_WtwIcons = $oldIcons
-            }
+        {
+            Set-StrictMode -Version Latest
+            Register-WtwTerminalTitle -RepoRoot '/tmp/fresh-strict-session' | Out-Null
+        } | Should -Not -Throw
+
+        $global:_WtwTerminalTitleHookActive | Should -BeTrue
+        $global:_WtwTerminalTitleHookVersion | Should -Be 2
+    }
+
+    It 'builds a title even when the module icon pool is unavailable' {
+        InModuleScope wtw {
+            Mock Get-WtwIconPool { @() }
+
+            { Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' } | Should -Not -Throw
+            Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' | Should -Match 'snowmain1_stripe'
         }
     }
 }

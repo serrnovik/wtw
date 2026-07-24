@@ -1,10 +1,15 @@
-# Icon pool — deterministically assigned to each repo/branch via FNV hash
-$script:_WtwIcons = @(
+# Icon pool — deterministically assigned to each repo/branch via FNV hash.
+# Keep this in a function instead of a script-scoped variable: PowerShell gives
+# each dot-sourced file its own script scope, so a public command cannot safely
+# read a variable initialized from this private file under StrictMode.
+function Get-WtwIconPool {
+    @(
     '💠', '🔶', '🔷', '🥜', '🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇',
     '🍓', '🍈', '🍒', '🍑', '🍍', '🥝', '🥑', '🍅', '🍆', '🥒', '🥕', '🌽',
     '🌶', '🥔', '🍠', '🌰', '🍯', '🥐', '🍞', '🥖', '🧀', '🥚', '🍳', '🥓',
     '🥞', '🍗', '🍖', '🍕', '🍔', '🍟', '🥙', '🌮', '🌯', '🥗'
-)
+    )
+}
 
 function Get-WtwFNVHash {
     param([string] $InputString)

@@ -82,7 +82,9 @@ function Register-WtwTerminalTitle {
     # another hook; a tab carrying an older hook version is migrated by falling
     # through to reinstall.
     $hookVersion = 2
-    if ($global:_WtwTerminalTitleHookActive -and $global:_WtwTerminalTitleHookVersion -eq $hookVersion) {
+    $activeHook = Get-Variable -Name '_WtwTerminalTitleHookActive' -Scope Global -ValueOnly -ErrorAction SilentlyContinue
+    $activeHookVersion = Get-Variable -Name '_WtwTerminalTitleHookVersion' -Scope Global -ValueOnly -ErrorAction SilentlyContinue
+    if ($activeHook -and $activeHookVersion -eq $hookVersion) {
         return $global:_WtwSessionPrNumber
     }
     $global:_WtwTerminalTitleHookActive = $true
