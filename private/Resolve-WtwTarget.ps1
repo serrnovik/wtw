@@ -31,13 +31,13 @@ function Resolve-WtwTarget {
         $normInput = $Name.TrimEnd('/', '\')
 
         # 0a. Exact path match against repo main or worktree path
-        foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+        foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
             $repo = $registry.repos.$repoName
             if ($repo.mainPath -and $repo.mainPath.TrimEnd('/', '\') -eq $normInput) {
                 return [PSCustomObject]@{ RepoName=$repoName; RepoEntry=$repo; TaskName=$null; WorktreeEntry=$null }
             }
             if ($repo.worktrees) {
-                foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+                foreach ($taskName in (Get-WtwPropertyNames -Object $repo.worktrees)) {
                     $wt = $repo.worktrees.$taskName
                     if ($wt.path -and $wt.path.TrimEnd('/', '\') -eq $normInput) {
                         return [PSCustomObject]@{ RepoName=$repoName; RepoEntry=$repo; TaskName=$taskName; WorktreeEntry=$wt }
@@ -48,10 +48,10 @@ function Resolve-WtwTarget {
 
         # 0b. Path prefix match
         $pathMatches = @()
-        foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+        foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
             $repo = $registry.repos.$repoName
             if ($repo.worktrees) {
-                foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+                foreach ($taskName in (Get-WtwPropertyNames -Object $repo.worktrees)) {
                     $wt = $repo.worktrees.$taskName
                     if ($wt.path -and $wt.path.StartsWith($normInput)) {
                         $pathMatches += [PSCustomObject]@{ RepoName=$repoName; RepoEntry=$repo; TaskName=$taskName; WorktreeEntry=$wt }
@@ -71,7 +71,7 @@ function Resolve-WtwTarget {
     }
 
     # 1. Exact repo alias -> main repo
-    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
         $repo = $registry.repos.$repoName
         if ((Test-WtwAliasMatch $repo $Name) -or $repoName -eq $Name) {
             return [PSCustomObject]@{
@@ -85,7 +85,7 @@ function Resolve-WtwTarget {
 
     # 1b. Repo name/alias prefix match
     $prefixRepos = @()
-    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
         $repo = $registry.repos.$repoName
         $matched = $false
         if ($repoName -like "${Name}*") { $matched = $true }
@@ -114,10 +114,10 @@ function Resolve-WtwTarget {
     if ($Name -match '^(.+?)-(.+)$') {
         $aliasOrName = $Matches[1]
         $taskName    = $Matches[2]
-        foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+        foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
             $repo = $registry.repos.$repoName
             if (((Test-WtwAliasMatch $repo $aliasOrName) -or $repoName -eq $aliasOrName) -and
-                $repo.worktrees -and $repo.worktrees.PSObject.Properties.Name -contains $taskName) {
+                $repo.worktrees -and (Get-WtwPropertyNames -Object $repo.worktrees) -contains $taskName) {
                 return [PSCustomObject]@{
                     RepoName       = $repoName
                     RepoEntry      = $repo
@@ -130,9 +130,9 @@ function Resolve-WtwTarget {
 
     # 3. Bare task name exact match -> search all repos
     $found = @()
-    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
         $repo = $registry.repos.$repoName
-        if ($repo.worktrees -and $repo.worktrees.PSObject.Properties.Name -contains $Name) {
+        if ($repo.worktrees -and (Get-WtwPropertyNames -Object $repo.worktrees) -contains $Name) {
             $found += [PSCustomObject]@{
                 RepoName       = $repoName
                 RepoEntry      = $repo
@@ -153,11 +153,11 @@ function Resolve-WtwTarget {
         $aliasOrName  = $Matches[1]
         $taskPrefix   = $Matches[2]
         $prefixFound  = @()
-        foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+        foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
             $repo = $registry.repos.$repoName
             if (-not ((Test-WtwAliasMatch $repo $aliasOrName) -or $repoName -eq $aliasOrName)) { continue }
             if (-not $repo.worktrees) { continue }
-            foreach ($t in $repo.worktrees.PSObject.Properties.Name) {
+            foreach ($t in (Get-WtwPropertyNames -Object $repo.worktrees)) {
                 if ($t -like "${taskPrefix}*") {
                     $prefixFound += [PSCustomObject]@{
                         RepoName       = $repoName
@@ -184,10 +184,10 @@ function Resolve-WtwTarget {
 
     # 5. Bare task name prefix match -> search all repos
     $prefixFound = @()
-    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
         $repo = $registry.repos.$repoName
         if (-not $repo.worktrees) { continue }
-        foreach ($t in $repo.worktrees.PSObject.Properties.Name) {
+        foreach ($t in (Get-WtwPropertyNames -Object $repo.worktrees)) {
             if ($t -like "${Name}*") {
                 $prefixFound += [PSCustomObject]@{
                     RepoName       = $repoName
@@ -214,10 +214,10 @@ function Resolve-WtwTarget {
     # 5b. Substring match on task names -> "content" matches "my-content-engine"
     $escapedName = [WildcardPattern]::Escape($Name)
     $substringFound = @()
-    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
         $repo = $registry.repos.$repoName
         if (-not $repo.worktrees) { continue }
-        foreach ($t in $repo.worktrees.PSObject.Properties.Name) {
+        foreach ($t in (Get-WtwPropertyNames -Object $repo.worktrees)) {
             if ($t -like "*${escapedName}*") {
                 $substringFound += [PSCustomObject]@{
                     RepoName       = $repoName

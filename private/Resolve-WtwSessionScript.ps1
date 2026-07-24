@@ -22,11 +22,12 @@ function Resolve-WtwSessionScript {
     )
 
     # Check per-shell override
-    if ($Shell -and $RepoEntry.sessionScripts) {
-        $override = $RepoEntry.sessionScripts.$Shell
+    $sessionScripts = Get-WtwPropertyValue -Object $RepoEntry -Name 'sessionScripts'
+    if ($Shell -and $sessionScripts) {
+        $override = Get-WtwPropertyValue -Object $sessionScripts -Name $Shell
         if ($override) { return $override }
     }
 
     # Fall back to default
-    return $RepoEntry.sessionScript ?? ''
+    return Get-WtwPropertyValue -Object $RepoEntry -Name 'sessionScript' -DefaultValue ''
 }

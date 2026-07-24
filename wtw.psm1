@@ -97,6 +97,13 @@ if ($wtwEdition -ne 'Core') {
 
 # ----- PowerShell 7+ (Core): load the full module -----------------------------
 
+# Keep module behavior deterministic regardless of the importing session's
+# strict-mode setting. This also makes the regular test suite exercise the same
+# semantics as strict repository session scripts.
+Set-StrictMode -Version Latest
+
+$script:WtwCmuxApplyingFromInit = $false
+
 $dotSourceParams = @{
     Filter      = '*.ps1'
     Recurse     = $true

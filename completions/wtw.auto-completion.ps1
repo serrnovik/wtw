@@ -4,10 +4,10 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
 
     function Get-WtwRepoAliasesJson {
         param([psobject] $Repo)
-        if ($Repo.PSObject.Properties.Name -contains 'aliases' -and $Repo.aliases) {
+        if ((Get-WtwPropertyNames -Object $Repo) -contains 'aliases' -and $Repo.aliases) {
             return @($Repo.aliases)
         }
-        if ($Repo.PSObject.Properties.Name -contains 'alias' -and $Repo.alias) {
+        if ((Get-WtwPropertyNames -Object $Repo) -contains 'alias' -and $Repo.alias) {
             return @($Repo.alias)
         }
         return @()
@@ -15,7 +15,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
 
     function Get-WtwWorktreePath {
         param([psobject] $WorktreeEntry, [string] $TaskFallback)
-        if ($WorktreeEntry -and $WorktreeEntry.PSObject.Properties.Name -contains 'path' -and $WorktreeEntry.path) {
+        if ($WorktreeEntry -and (Get-WtwPropertyNames -Object $WorktreeEntry) -contains 'path' -and $WorktreeEntry.path) {
             return [string]$WorktreeEntry.path
         }
         return $TaskFallback
@@ -24,7 +24,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     function Build-WtwAllTargets {
         param([psobject] $Registry)
         $list = [System.Collections.Generic.List[object]]::new()
-        foreach ($repoName in $Registry.repos.PSObject.Properties.Name) {
+        foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
             $repo = $Registry.repos.$repoName
             $aliases = @(Get-WtwRepoAliasesJson $repo)
             $mainTip = if ($repo.mainPath) { "$repoName → $([string]$repo.mainPath)" } else { "$repoName (main)" }
@@ -33,7 +33,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
                 if ($a) { $list.Add([ordered]@{ Name = [string]$a; Tip = $mainTip }) }
             }
             if ($repo.worktrees) {
-                foreach ($task in $repo.worktrees.PSObject.Properties.Name) {
+                foreach ($task in (Get-WtwPropertyNames -Object $repo.worktrees)) {
                     $wt = $repo.worktrees.$task
                     $pathTip = Get-WtwWorktreePath -WorktreeEntry $wt -TaskFallback $task
                     $wtTip = "$repoName → $pathTip"
@@ -58,7 +58,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     function Build-WtwRepoFilterList {
         param([psobject] $Registry)
         $byName = @{}
-        foreach ($repoName in $Registry.repos.PSObject.Properties.Name) {
+        foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
             $repo = $Registry.repos.$repoName
             if (-not $byName.ContainsKey($repoName)) {
                 $byName[$repoName] = @{ Name = $repoName; Tip = "repo $repoName" }

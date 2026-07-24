@@ -36,7 +36,7 @@ function Get-WtwList {
     $registry = Get-WtwRegistry
     $config = Get-WtwConfig
     $gitCommand = Get-WtwGitCommand
-    $repoNames = $registry.repos.PSObject.Properties.Name
+    $repoNames = (Get-WtwPropertyNames -Object $registry.repos)
 
     if (-not $repoNames -or $repoNames.Count -eq 0) {
         Write-Host '  No repos registered. Run "wtw init" inside a repo.' -ForegroundColor Yellow
@@ -65,7 +65,7 @@ function Get-WtwList {
             Task      = '-'
             Aliases   = ($aliases -join "`n")
             Branch    = $branch
-            Color     = (Get-WtwColors).assignments."$name/main" ?? '-'
+            Color     = Get-WtwPropertyValue -Object (Get-WtwColors).assignments -Name "$name/main" -DefaultValue '-'
             Path      = $repoEntry.mainPath
             Workspace = $wsDisplay
             Created   = '-'
@@ -74,7 +74,7 @@ function Get-WtwList {
 
         # Worktrees
         if ($repoEntry.worktrees) {
-            foreach ($taskName in $repoEntry.worktrees.PSObject.Properties.Name) {
+            foreach ($taskName in (Get-WtwPropertyNames -Object $repoEntry.worktrees)) {
                 if ($Task -and $taskName -ne $Task) { continue }
                 $wt = $repoEntry.worktrees.$taskName
                 $exists = Test-Path $wt.path
@@ -103,7 +103,7 @@ function Get-WtwList {
                     Task      = $taskName
                     Aliases   = $wtAliases
                     Branch    = $wt.branch
-                    Color     = $wt.color ?? '-'
+                    Color     = Get-WtwPropertyValue -Object $wt -Name 'color' -DefaultValue '-'
                     Path      = $pathDisplay
                     Workspace = $wtWsDisplay
                     Created   = $createdStr

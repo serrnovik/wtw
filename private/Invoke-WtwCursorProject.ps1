@@ -159,13 +159,13 @@ function Set-WtwCursorRecentWorkspace {
     }
 
     $entries = @()
-    if ($state.PSObject.Properties.Name -contains 'entries' -and $state.entries) {
+    if ((Get-WtwPropertyNames -Object $state) -contains 'entries' -and $state.entries) {
         $entries = @($state.entries)
     }
 
     $entries = @($entries | Where-Object {
-        $existingWorkspace = if ($_.PSObject.Properties.Name -contains 'workspace') { $_.workspace } else { $null }
-        $existingConfigPath = if ($existingWorkspace -and $existingWorkspace.PSObject.Properties.Name -contains 'configPath') { $existingWorkspace.configPath } else { $null }
+        $existingWorkspace = if ((Get-WtwPropertyNames -Object $_) -contains 'workspace') { $_.workspace } else { $null }
+        $existingConfigPath = if ($existingWorkspace -and (Get-WtwPropertyNames -Object $existingWorkspace) -contains 'configPath') { $existingWorkspace.configPath } else { $null }
         $existingConfigPath -ne $workspaceUri
     })
     $state | Add-Member -NotePropertyName 'entries' -NotePropertyValue (@($entry) + $entries) -Force
@@ -187,12 +187,12 @@ function Remove-WtwCursorRecentWorkspace {
     if (-not $state) { return $false }
 
     $entries = @()
-    if ($state.PSObject.Properties.Name -contains 'entries' -and $state.entries) {
+    if ((Get-WtwPropertyNames -Object $state) -contains 'entries' -and $state.entries) {
         $entries = @($state.entries)
     }
     $filtered = @($entries | Where-Object {
-        $existingWorkspace = if ($_.PSObject.Properties.Name -contains 'workspace') { $_.workspace } else { $null }
-        $existingConfigPath = if ($existingWorkspace -and $existingWorkspace.PSObject.Properties.Name -contains 'configPath') { $existingWorkspace.configPath } else { $null }
+        $existingWorkspace = if ((Get-WtwPropertyNames -Object $_) -contains 'workspace') { $_.workspace } else { $null }
+        $existingConfigPath = if ($existingWorkspace -and (Get-WtwPropertyNames -Object $existingWorkspace) -contains 'configPath') { $existingWorkspace.configPath } else { $null }
         $existingConfigPath -ne $workspaceUri
     })
 

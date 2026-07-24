@@ -22,6 +22,19 @@ function Get-WtwFNVHash {
 }
 
 function Get-WtwNumberFromRange {
-    param($range, [uint32] $value)
-    return [int]([double]($range / [uint32]::MaxValue) * $value)
+    param(
+        [int] $Range,
+        [uint32] $Value
+    )
+
+    if ($Range -le 0) {
+        throw 'Range must be greater than zero.'
+    }
+
+    # Divide by MaxValue + 1 so every uint32 maps into [0, Range). Casting a
+    # scaled value directly to [int] rounds in PowerShell and can produce Range,
+    # which is one past the last valid array index.
+    return [int][Math]::Floor(
+        ([double]$Value / ([double][uint32]::MaxValue + 1.0)) * $Range
+    )
 }

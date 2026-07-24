@@ -5,17 +5,17 @@ function Ensure-WtwAgentCtlConfig {
         [PSObject] $Config
     )
 
-    if (-not ($Config.PSObject.Properties.Name -contains 'agentctl') -or -not $Config.agentctl) {
+    if (-not ((Get-WtwPropertyNames -Object $Config) -contains 'agentctl') -or -not $Config.agentctl) {
         $Config | Add-Member -NotePropertyName 'agentctl' -NotePropertyValue ([PSCustomObject]@{}) -Force
     }
 
-    if (-not ($Config.agentctl.PSObject.Properties.Name -contains 'enabled')) {
+    if (-not ((Get-WtwPropertyNames -Object $Config.agentctl) -contains 'enabled')) {
         $Config.agentctl | Add-Member -NotePropertyName 'enabled' -NotePropertyValue $true -Force
     }
-    if (-not ($Config.agentctl.PSObject.Properties.Name -contains 'defaultProfile') -or [string]::IsNullOrWhiteSpace($Config.agentctl.defaultProfile)) {
+    if (-not ((Get-WtwPropertyNames -Object $Config.agentctl) -contains 'defaultProfile') -or [string]::IsNullOrWhiteSpace($Config.agentctl.defaultProfile)) {
         $Config.agentctl | Add-Member -NotePropertyName 'defaultProfile' -NotePropertyValue 'team' -Force
     }
-    if (-not ($Config.agentctl.PSObject.Properties.Name -contains 'repoProfiles') -or -not $Config.agentctl.repoProfiles) {
+    if (-not ((Get-WtwPropertyNames -Object $Config.agentctl) -contains 'repoProfiles') -or -not $Config.agentctl.repoProfiles) {
         $Config.agentctl | Add-Member -NotePropertyName 'repoProfiles' -NotePropertyValue ([PSCustomObject]@{}) -Force
     }
 
@@ -57,7 +57,7 @@ function Resolve-WtwAgentCtlRepoName {
         return $RepoName
     }
 
-    foreach ($name in $registry.repos.PSObject.Properties.Name) {
+    foreach ($name in (Get-WtwPropertyNames -Object $registry.repos)) {
         if ($name -eq $RepoName) {
             return $name
         }
@@ -82,7 +82,7 @@ function Set-WtwAgentCtlRepoProfile {
 
     $resolvedRepoName = Resolve-WtwAgentCtlRepoName -RepoName $RepoName
     $config = Get-WtwAgentCtlConfigForEdit
-    if ($resolvedRepoName -ne $RepoName -and ($config.agentctl.repoProfiles.PSObject.Properties.Name -contains $RepoName)) {
+    if ($resolvedRepoName -ne $RepoName -and ((Get-WtwPropertyNames -Object $config.agentctl.repoProfiles) -contains $RepoName)) {
         $config.agentctl.repoProfiles.PSObject.Properties.Remove($RepoName)
     }
     $config.agentctl.repoProfiles | Add-Member -NotePropertyName $resolvedRepoName -NotePropertyValue $Profile -Force
@@ -137,7 +137,7 @@ function Get-WtwAgentCtlProfileSetting {
     Write-Host "agentctl enabled: $($config.agentctl.enabled)"
     Write-Host "default profile:  $($config.agentctl.defaultProfile)"
     Write-Host 'repo profiles:'
-    $names = @($config.agentctl.repoProfiles.PSObject.Properties.Name | Sort-Object)
+    $names = @((Get-WtwPropertyNames -Object $config.agentctl.repoProfiles) | Sort-Object)
     if ($names.Count -eq 0) {
         Write-Host '  (none)'
         return
