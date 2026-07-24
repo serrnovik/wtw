@@ -83,6 +83,20 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     [ "$output" = "_wtw_completion" ]
 }
 
+@test "wtw completion enables arrow-key menu selection" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        autoload -Uz compinit
+        compinit -D
+        source '$SHELL_FILE' 2>/dev/null
+        zmodload -e zsh/complist || exit 1
+        zstyle -s ':completion::complete:wtw::commands' menu menu_style || exit 1
+        print -r -- \"\$menu_style\"
+    "
+    [ "$status" -eq 0 ]
+    [ "$output" = "select" ]
+}
+
 @test "_wtw_set_terminal produces no visible output for unsupported terminal" {
     command -v zsh &>/dev/null || skip "zsh not installed"
     run zsh -c "

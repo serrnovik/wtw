@@ -227,6 +227,11 @@ _wtw_completion() {
 }
 
 _wtw_register_completion() {
+    # Keep menu selection scoped to WTW: Tab opens the candidate menu, arrow
+    # keys move the selection, and Enter accepts it.
+    zmodload -i zsh/complist 2>/dev/null
+    zstyle ':completion:*:*:wtw:*' menu select
+
     if (( ${+functions[compdef]} )); then
         compdef _wtw_completion wtw
         if (( ${+functions[add-zsh-hook]} )); then
