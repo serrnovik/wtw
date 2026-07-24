@@ -94,7 +94,7 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
         print -r -- \"\$menu_style\"
     "
     [ "$status" -eq 0 ]
-    [ "$output" = "select" ]
+    [ "$output" = "yes select" ]
 }
 
 @test "_wtw_set_terminal produces no visible output for unsupported terminal" {
