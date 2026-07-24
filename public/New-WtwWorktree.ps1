@@ -138,7 +138,7 @@ function New-WtwWorktree {
     $repoName, $repoEntry = Resolve-WtwRepo -RepoAlias $Repo
     if (-not $repoName) { return }
 
-    if ($repoEntry.worktrees.PSObject.Properties.Name -contains $Task) {
+    if ((Get-WtwPropertyNames -Object $repoEntry.worktrees) -contains $Task) {
         Write-Error "Worktree '$Task' already exists for $repoName. Use 'wtw go $Task' or 'wtw remove $Task' first."
         return
     }

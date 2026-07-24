@@ -56,6 +56,47 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     [[ "$output" == *"Worktree"* ]] || [[ "$output" == *"wtw"* ]]
 }
 
+@test "wtw registers native completion when compinit ran first" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        autoload -Uz compinit
+        compinit -D
+        source '$SHELL_FILE' 2>/dev/null
+        print -r -- \"\${_comps[wtw]:-missing}\"
+    "
+    [ "$status" -eq 0 ]
+    [ "$output" = "_wtw_completion" ]
+}
+
+@test "wtw registers native completion when sourced before compinit" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        source '$SHELL_FILE' 2>/dev/null
+        autoload -Uz compinit
+        compinit -D
+        for hook in \"\${precmd_functions[@]}\"; do
+            \"\$hook\"
+        done
+        print -r -- \"\${_comps[wtw]:-missing}\"
+    "
+    [ "$status" -eq 0 ]
+    [ "$output" = "_wtw_completion" ]
+}
+
+@test "wtw completion enables arrow-key menu selection" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        autoload -Uz compinit
+        compinit -D
+        source '$SHELL_FILE' 2>/dev/null
+        zmodload -e zsh/complist || exit 1
+        zstyle -s ':completion::complete:wtw::commands' menu menu_style || exit 1
+        print -r -- \"\$menu_style\"
+    "
+    [ "$status" -eq 0 ]
+    [ "$output" = "yes select" ]
+}
+
 @test "_wtw_set_terminal produces no visible output for unsupported terminal" {
     command -v zsh &>/dev/null || skip "zsh not installed"
     run zsh -c "
@@ -66,6 +107,30 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     [ "$status" -eq 0 ]
     [[ ! "$output" == *"error"* ]]
     [[ ! "$output" == *"Error"* ]]
+}
+
+@test "wtw go refreshes cmux metadata after switching directories" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        unset CMUX_WORKSPACE_ID CMUX_SURFACE_ID
+        source '$SHELL_FILE' 2>/dev/null
+        function cmux() { return 0 }
+        typeset -gi mock_apply_count=0
+        function mock_pwsh() {
+            if [[ \"\$*\" == *'__resolve'* ]]; then
+                print -r -- \"\$PWD\"\$'\\t''#e05d44'\$'\\t''demo/feature'\$'\\t\\t''feature'\$'\\t''1'
+            elif [[ \"\$*\" == *'__cmux_apply_current'* ]]; then
+                (( mock_apply_count++ ))
+            fi
+        }
+        _wtw_pwsh=mock_pwsh
+        export CMUX_WORKSPACE_ID='workspace:test'
+        export CMUX_SURFACE_ID='surface:test'
+        _wtw_go feature >/dev/null
+        print -r -- \"\$mock_apply_count\"
+    "
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
 }
 
 @test "no bare pwsh calls in wtw.zsh (uses \$_wtw_pwsh)" {

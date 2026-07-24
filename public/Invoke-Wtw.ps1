@@ -159,7 +159,11 @@ function Invoke-Wtw {
             $target = & { Resolve-WtwTarget $pos[0] } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
-            $c = if ($target.WorktreeEntry) { $target.WorktreeEntry.color } else { (Get-WtwColors).assignments."$($target.RepoName)/main" }
+            $c = if ($target.WorktreeEntry) {
+                $target.WorktreeEntry.color
+            } else {
+                Get-WtwPropertyValue -Object (Get-WtwColors).assignments -Name "$($target.RepoName)/main"
+            }
             $t = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
             $s = Resolve-WtwSessionScript -RepoEntry $target.RepoEntry -Shell $shellType
             # Compute worktree index for env vars
@@ -167,7 +171,7 @@ function Invoke-Wtw {
             $wtIndex = 0
             if ($target.TaskName -and $target.RepoEntry.worktrees) {
                 $i = 1
-                foreach ($tn in $target.RepoEntry.worktrees.PSObject.Properties.Name) {
+                foreach ($tn in (Get-WtwPropertyNames -Object $target.RepoEntry.worktrees)) {
                     if ($tn -eq $target.TaskName) { $wtIndex = $i; break }
                     $i++
                 }
@@ -180,19 +184,19 @@ function Invoke-Wtw {
             $shellType = $splat['Shell'] ?? ''
             $registry = Get-WtwRegistry
             $colors = Get-WtwColors
-            foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+            foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
                 $repo = $registry.repos.$repoName
                 $aliases = Get-WtwRepoAliases $repo
                 $ss = Resolve-WtwSessionScript -RepoEntry $repo -Shell $shellType
-                $mainColor = $colors.assignments."$repoName/main" ?? ''
+                $mainColor = Get-WtwPropertyValue -Object $colors.assignments -Name "$repoName/main" -DefaultValue ''
                 foreach ($a in $aliases) {
                     Write-Output "${a}`t$($repo.mainPath)`t${mainColor}`t${repoName}`t${ss}`t`t0"
                 }
                 if ($repo.worktrees) {
                     $wtIdx = 1
-                    foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+                    foreach ($taskName in (Get-WtwPropertyNames -Object $repo.worktrees)) {
                         $wt = $repo.worktrees.$taskName
-                        $wtColor = $wt.color ?? ''
+                        $wtColor = Get-WtwPropertyValue -Object $wt -Name 'color' -DefaultValue ''
                         $wtTitle = "$repoName/$taskName"
                         foreach ($a in $aliases) {
                             Write-Output "${a}-${taskName}`t$($wt.path)`t${wtColor}`t${wtTitle}`t${ss}`t${taskName}`t${wtIdx}"

@@ -69,7 +69,7 @@ function Get-WtwCmuxLiveWorkspaces {
     $parsed = ConvertFrom-WtwCmuxJsonOutput -Output $result.Output
     if ($parsed) {
         if ($parsed -is [array]) { return @($parsed) }
-        if ($parsed.PSObject.Properties.Name -contains 'workspaces') { return @($parsed.workspaces) }
+        if ((Get-WtwPropertyNames -Object $parsed) -contains 'workspaces') { return @($parsed.workspaces) }
         return @($parsed)
     }
 
@@ -86,7 +86,7 @@ function Find-WtwCmuxWorkspace {
     )
 
     $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
-    $workspaces = Get-WtwCmuxLiveWorkspaces
+    $workspaces = @(Get-WtwCmuxLiveWorkspaces)
     if ($workspaces.Count -eq 0) { return $null }
 
     $byCwd = $workspaces | Where-Object {
@@ -237,14 +237,14 @@ function Open-WtwCmuxWorkspace {
     }
 
     $fullDir = [System.IO.Path]::GetFullPath($dir)
-    $prettyName = if ($Target.WorktreeEntry -and $Target.WorktreeEntry.PSObject.Properties.Name -contains 'prettyName' -and $Target.WorktreeEntry.prettyName) {
+    $prettyName = if ($Target.WorktreeEntry -and (Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'prettyName' -and $Target.WorktreeEntry.prettyName) {
         $Target.WorktreeEntry.prettyName
     } elseif ($Target.TaskName) {
         $Target.TaskName
     } else {
         Split-Path $fullDir -Leaf
     }
-    $color = if ($Target.WorktreeEntry -and $Target.WorktreeEntry.PSObject.Properties.Name -contains 'color') { $Target.WorktreeEntry.color } else { $null }
+    $color = if ($Target.WorktreeEntry -and (Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'color') { $Target.WorktreeEntry.color } else { $null }
     $statusValue = if ($Target.TaskName) { "$($Target.RepoName)/$($Target.TaskName)" } else { $Target.RepoName }
 
     Register-WtwCmuxProject `

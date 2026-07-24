@@ -41,7 +41,7 @@ function Unregister-WtwEntry {
     if ($Repo) {
         $registryCheck = Get-WtwRegistry
         $resolvedRepoName = $null
-        foreach ($rn in $registryCheck.repos.PSObject.Properties.Name) {
+        foreach ($rn in (Get-WtwPropertyNames -Object $registryCheck.repos)) {
             $r = $registryCheck.repos.$rn
             if ($rn -eq $Repo -or (Test-WtwAliasMatch $r $Repo)) {
                 $resolvedRepoName = $rn
@@ -78,7 +78,7 @@ function Unregister-WtwEntry {
 
         $registry = Get-WtwRegistry
         $worktrees = $registry.repos.$repoName.worktrees
-        if (-not $worktrees -or ($worktrees.PSObject.Properties.Name -notcontains $task)) {
+        if (-not $worktrees -or ((Get-WtwPropertyNames -Object $worktrees) -notcontains $task)) {
             Write-Warning "Worktree '$task' not present in registry (nothing to do)."
             return
         }
@@ -94,7 +94,7 @@ function Unregister-WtwEntry {
 
         $colors = Get-WtwColors
         $colorKey = "$repoName/$task"
-        if ($colors.assignments.PSObject.Properties.Name -contains $colorKey) {
+        if ((Get-WtwPropertyNames -Object $colors.assignments) -contains $colorKey) {
             $newAssignments = [PSCustomObject]@{}
             foreach ($prop in $colors.assignments.PSObject.Properties) {
                 if ($prop.Name -ne $colorKey) {
@@ -114,8 +114,8 @@ function Unregister-WtwEntry {
     Write-Host ''
     Write-Host "  Unregister repo from wtw: $repoName" -ForegroundColor Yellow
     Write-Host "  Main path: $($repoEntry.mainPath)"
-    if ($repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name.Count -gt 0) {
-        $wtNames = $repoEntry.worktrees.PSObject.Properties.Name -join ', '
+    if ($repoEntry.worktrees -and (Get-WtwPropertyNames -Object $repoEntry.worktrees).Count -gt 0) {
+        $wtNames = (Get-WtwPropertyNames -Object $repoEntry.worktrees) -join ', '
         Write-Host "  Also drops registry entries for worktrees: $wtNames"
     }
     Write-Host "  (Git, checkouts, and workspace files are not modified.)" -ForegroundColor DarkGray
@@ -129,7 +129,7 @@ function Unregister-WtwEntry {
     }
 
     $registry = Get-WtwRegistry
-    if ($registry.repos.PSObject.Properties.Name -notcontains $repoName) {
+    if ((Get-WtwPropertyNames -Object $registry.repos) -notcontains $repoName) {
         Write-Warning "Repo '$repoName' not in registry (nothing to do)."
         return
     }

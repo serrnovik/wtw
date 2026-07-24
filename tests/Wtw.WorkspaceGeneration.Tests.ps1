@@ -22,11 +22,10 @@ Describe 'New-WtwWorkspaceFile' {
         }
         $template | ConvertTo-Json -Depth 10 | Set-Content $script:templatePath
 
-        # Fake registry so New-WtwWorkspaceFile can resolve mainPath leaf
-        $script:origRegistry = $null
-        if (Test-Path (Join-Path $HOME '.wtw' 'registry.json')) {
-            $script:origRegistry = Get-Content (Join-Path $HOME '.wtw' 'registry.json') -Raw
-        }
+        # Fake registry so New-WtwWorkspaceFile can resolve mainPath leaf without
+        # reading or modifying the user's ~/.wtw registry.
+        $script:originalRegistryPath = $script:WtwRegistryPath
+        $script:WtwRegistryPath = Join-Path $script:tempDir 'registry.json'
         $fakeRegistry = [PSCustomObject]@{
             repos = [PSCustomObject]@{
                 testRepo = [PSCustomObject]@{
@@ -36,19 +35,12 @@ Describe 'New-WtwWorkspaceFile' {
                 }
             }
         }
-        $wtwDir = Join-Path $HOME '.wtw'
-        if (-not (Test-Path $wtwDir)) {
-            New-Item -Path $wtwDir -ItemType Directory -Force | Out-Null
-        }
-        $fakeRegistry | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $wtwDir 'registry.json')
+        $fakeRegistry | ConvertTo-Json -Depth 10 | Set-Content $script:WtwRegistryPath
     }
 
     AfterAll {
+        $script:WtwRegistryPath = $script:originalRegistryPath
         Remove-Item -Path $script:tempDir -Recurse -Force -ErrorAction SilentlyContinue
-        # Restore original registry
-        if ($script:origRegistry) {
-            $script:origRegistry | Set-Content (Join-Path $HOME '.wtw' 'registry.json')
-        }
     }
 
     It 'generates workspace with replaced code folder' {

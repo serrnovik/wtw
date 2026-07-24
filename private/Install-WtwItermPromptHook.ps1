@@ -22,7 +22,8 @@ function Install-WtwItermPromptHook {
     param()
 
     if ($env:TERM_PROGRAM -ne 'iTerm.app') { return }
-    if ($global:_WtwItermPromptHookActive) { return }
+    $activeHook = Get-Variable -Name '_WtwItermPromptHookActive' -Scope Global -ValueOnly -ErrorAction SilentlyContinue
+    if ($activeHook) { return }
     $global:_WtwItermPromptHookActive = $true
 
     $prior = Get-Item function:prompt -ErrorAction SilentlyContinue

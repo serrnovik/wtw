@@ -233,7 +233,7 @@ function Add-WtwSourceGitRepository {
         return
     }
 
-    if (-not ($prefs.PSObject.Properties.Name -contains 'RepositoryNodes') -or -not $prefs.RepositoryNodes) {
+    if (-not ((Get-WtwPropertyNames -Object $prefs) -contains 'RepositoryNodes') -or -not $prefs.RepositoryNodes) {
         $prefs | Add-Member -NotePropertyName 'RepositoryNodes' -NotePropertyValue @() -Force
     }
 
@@ -285,7 +285,7 @@ function Remove-WtwSourceGitRepository {
     $prefs = Read-WtwSourceGitPreferences -Path $prefPath
     if (-not $prefs) { return }
 
-    if (-not ($prefs.PSObject.Properties.Name -contains 'RepositoryNodes') -or -not $prefs.RepositoryNodes) { return }
+    if (-not ((Get-WtwPropertyNames -Object $prefs) -contains 'RepositoryNodes') -or -not $prefs.RepositoryNodes) { return }
 
     $id = ConvertTo-WtwSourceGitId -Path $Path
     $nodes = @($prefs.RepositoryNodes)

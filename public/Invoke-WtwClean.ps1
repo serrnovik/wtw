@@ -117,7 +117,7 @@ function Invoke-WtwClean {
 
     # 2. Scan registered repos for detached HEAD worktrees
     $registry = Get-WtwRegistry
-    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
         $repo = $registry.repos.$repoName
         if (-not (Test-Path $repo.mainPath)) { continue }
 
@@ -206,7 +206,7 @@ function Invoke-WtwClean {
         try {
             # Try git worktree remove first
             $parentRepo = $null
-            foreach ($rn in $registry.repos.PSObject.Properties.Name) {
+            foreach ($rn in (Get-WtwPropertyNames -Object $registry.repos)) {
                 $r = $registry.repos.$rn
                 if ($item.Path.StartsWith($r.mainPath) -or $item.Repo -eq (Split-Path $r.mainPath -Leaf)) {
                     $parentRepo = $r.mainPath
@@ -232,7 +232,7 @@ function Invoke-WtwClean {
     }
 
     # Prune all registered repos
-    foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
         $repo = $registry.repos.$repoName
         if (Test-Path $repo.mainPath) {
             git -C $repo.mainPath worktree prune 2>$null

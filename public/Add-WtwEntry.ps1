@@ -96,7 +96,7 @@ function Add-WtwEntry {
 
         $parentCanonical = Resolve-WtwRealPath $parentRepoPath
         $registry = Get-WtwRegistry
-        foreach ($name in $registry.repos.PSObject.Properties.Name) {
+        foreach ($name in (Get-WtwPropertyNames -Object $registry.repos)) {
             $r = $registry.repos.$name
             $rCanonical = Resolve-WtwRealPath $r.mainPath
             if ($rCanonical -eq $parentCanonical) {
@@ -112,7 +112,7 @@ function Add-WtwEntry {
     }
 
     $registry = Get-WtwRegistry
-    if ($registry.repos.PSObject.Properties.Name -notcontains $Repo) {
+    if ((Get-WtwPropertyNames -Object $registry.repos) -notcontains $Repo) {
         Write-Error "Repo '$Repo' not in registry. Run 'wtw init' from the main repo first."
         return
     }
@@ -125,7 +125,7 @@ function Add-WtwEntry {
         Write-Host "  Task name: $Task" -ForegroundColor DarkGray
     }
 
-    if ($repoEntry.worktrees.PSObject.Properties.Name -contains $Task) {
+    if ((Get-WtwPropertyNames -Object $repoEntry.worktrees) -contains $Task) {
         Write-Error "Worktree '$Task' is already registered under '$Repo'. Use 'wtw remove $Task' first, or pick a different --task."
         return
     }

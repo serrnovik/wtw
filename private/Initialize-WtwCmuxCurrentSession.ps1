@@ -23,14 +23,14 @@ function Initialize-WtwCmuxCurrentSession {
     $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
     if (-not ($dir -and (Test-Path $dir))) { return }
 
-    $prettyName = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
+    $prettyName = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
         $target.WorktreeEntry.prettyName
     } elseif ($target.TaskName) {
         $target.TaskName
     } else {
         Split-Path ([System.IO.Path]::GetFullPath($dir)) -Leaf
     }
-    $color = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'color') { $target.WorktreeEntry.color } else { $null }
+    $color = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'color') { $target.WorktreeEntry.color } else { $null }
     $statusValue = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
     $cmuxBin = Get-WtwCmuxBin
     $invokeRawCommand = Get-Command Invoke-WtwCmuxRawCommand -ErrorAction SilentlyContinue

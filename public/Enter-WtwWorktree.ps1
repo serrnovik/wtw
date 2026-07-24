@@ -56,7 +56,7 @@ function Enter-WtwWorktree {
     $targetColor = if ($target.WorktreeEntry) {
         $target.WorktreeEntry.color
     } else {
-        (Get-WtwColors).assignments."$($target.RepoName)/main"
+        Get-WtwPropertyValue -Object (Get-WtwColors).assignments -Name "$($target.RepoName)/main"
     }
     $targetTitle = if ($target.TaskName) {
         "$($target.RepoName)/$($target.TaskName)"

@@ -67,7 +67,7 @@ function Invoke-WtwSbx {
         if ($repoName -and $repoEntry -and $root) {
             $rootResolved = [System.IO.Path]::GetFullPath($root)
             if ($repoEntry.worktrees) {
-                foreach ($taskName in $repoEntry.worktrees.PSObject.Properties.Name) {
+                foreach ($taskName in (Get-WtwPropertyNames -Object $repoEntry.worktrees)) {
                     $wt = $repoEntry.worktrees.$taskName
                     if ($wt.path -and [System.IO.Path]::GetFullPath($wt.path) -eq $rootResolved) {
                         $workspaceFile = $wt.workspace

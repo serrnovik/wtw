@@ -127,7 +127,8 @@ function Format-WtwTable {
         $widths[$col] = [Math]::Max($col.Length, 0)
         foreach ($item in $Items) {
             $val = "$($item.$col)"
-            $isHexColorCell = $col -eq 'Color' -and ((ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val)).Count -eq 1) -and $val -match '^#[0-9a-fA-F]{6}$'
+            $cellLines = @(ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val))
+            $isHexColorCell = $col -eq 'Color' -and $cellLines.Count -eq 1 -and $val -match '^#[0-9a-fA-F]{6}$'
             if ($isHexColorCell) {
                 $swatchText = Format-WtwColorSwatch $val
                 $visibleSwatchWidth = Get-WtwVisibleStringLength $swatchText
@@ -158,12 +159,12 @@ function Format-WtwTable {
         $maxLineCount = 1
         foreach ($col in $Columns) {
             $val = "$($item.$col)"
-            $linesPreview = ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val)
+            $linesPreview = @(ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val))
             $hexColorForCell = $col -eq 'Color' -and $linesPreview.Count -eq 1 -and $val -match '^#[0-9a-fA-F]{6}$'
             if ($hexColorForCell) {
                 $columnLineArrays[$col] = @([string]$val)
             } else {
-                $lines = ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val)
+                $lines = @(ConvertTo-WtwTableCellLineArray (Split-WtwTableCellIntoLines $val))
                 $columnLineArrays[$col] = $lines
                 if ($lines.Count -gt $maxLineCount) {
                     $maxLineCount = $lines.Count

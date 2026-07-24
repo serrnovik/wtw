@@ -58,7 +58,7 @@ function Set-WtwColor {
     # Show current color if no color arg
     if (-not $Color) {
         $current = $null
-        if ($colors.assignments.PSObject.Properties.Name -contains $colorKey) {
+        if ((Get-WtwPropertyNames -Object $colors.assignments) -contains $colorKey) {
             $current = $colors.assignments.$colorKey
         }
         if ($current) {

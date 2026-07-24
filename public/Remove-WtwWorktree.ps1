@@ -61,7 +61,7 @@ function Remove-WtwWorktree {
     # Remove Codex Desktop project metadata if wtw registered it. Older
     # registry entries will not have codexProjectPath, so fall back to the
     # worktree path being removed.
-    $codexProjectPath = if ($wt.PSObject.Properties.Name -contains 'codexProjectPath' -and $wt.codexProjectPath) {
+    $codexProjectPath = if ((Get-WtwPropertyNames -Object $wt) -contains 'codexProjectPath' -and $wt.codexProjectPath) {
         $wt.codexProjectPath
     } else {
         $wt.path
@@ -70,7 +70,7 @@ function Remove-WtwWorktree {
         Unregister-WtwCodexProject -ProjectPath $codexProjectPath
     }
 
-    $cursorWorkspacePath = if ($wt.PSObject.Properties.Name -contains 'cursorWorkspacePath' -and $wt.cursorWorkspacePath) {
+    $cursorWorkspacePath = if ((Get-WtwPropertyNames -Object $wt) -contains 'cursorWorkspacePath' -and $wt.cursorWorkspacePath) {
         $wt.cursorWorkspacePath
     } else {
         $wt.workspace
@@ -81,16 +81,16 @@ function Remove-WtwWorktree {
 
     # Remove cmux Command Palette metadata if wtw registered it. Older registry
     # entries will not have cmuxCommandKey, so fall back to the worktree path.
-    $cmuxCommandKey = if ($wt.PSObject.Properties.Name -contains 'cmuxCommandKey' -and $wt.cmuxCommandKey) {
+    $cmuxCommandKey = if ((Get-WtwPropertyNames -Object $wt) -contains 'cmuxCommandKey' -and $wt.cmuxCommandKey) {
         $wt.cmuxCommandKey
     } else {
         $null
     }
     Unregister-WtwCmuxProject -ProjectPath $wt.path -CommandKey $cmuxCommandKey
 
-    $wmuxWorkspaceName = if ($wt.PSObject.Properties.Name -contains 'wmuxWorkspaceName' -and $wt.wmuxWorkspaceName) {
+    $wmuxWorkspaceName = if ((Get-WtwPropertyNames -Object $wt) -contains 'wmuxWorkspaceName' -and $wt.wmuxWorkspaceName) {
         $wt.wmuxWorkspaceName
-    } elseif ($wt.PSObject.Properties.Name -contains 'prettyName' -and $wt.prettyName) {
+    } elseif ((Get-WtwPropertyNames -Object $wt) -contains 'prettyName' -and $wt.prettyName) {
         $wt.prettyName
     } else {
         $Task
@@ -135,7 +135,7 @@ function Remove-WtwWorktree {
     # Recycle color
     $colors = Get-WtwColors
     $colorKey = "$repoName/$Task"
-    if ($colors.assignments.PSObject.Properties.Name -contains $colorKey) {
+    if ((Get-WtwPropertyNames -Object $colors.assignments) -contains $colorKey) {
         $newAssignments = [PSCustomObject]@{}
         foreach ($prop in $colors.assignments.PSObject.Properties) {
             if ($prop.Name -ne $colorKey) {
