@@ -56,6 +56,33 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     [[ "$output" == *"Worktree"* ]] || [[ "$output" == *"wtw"* ]]
 }
 
+@test "wtw registers native completion when compinit ran first" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        autoload -Uz compinit
+        compinit -D
+        source '$SHELL_FILE' 2>/dev/null
+        print -r -- \"\${_comps[wtw]:-missing}\"
+    "
+    [ "$status" -eq 0 ]
+    [ "$output" = "_wtw_completion" ]
+}
+
+@test "wtw registers native completion when sourced before compinit" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        source '$SHELL_FILE' 2>/dev/null
+        autoload -Uz compinit
+        compinit -D
+        for hook in \"\${precmd_functions[@]}\"; do
+            \"\$hook\"
+        done
+        print -r -- \"\${_comps[wtw]:-missing}\"
+    "
+    [ "$status" -eq 0 ]
+    [ "$output" = "_wtw_completion" ]
+}
+
 @test "_wtw_set_terminal produces no visible output for unsupported terminal" {
     command -v zsh &>/dev/null || skip "zsh not installed"
     run zsh -c "

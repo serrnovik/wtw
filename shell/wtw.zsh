@@ -126,6 +126,117 @@ _wtw_quote_args() {
     echo "$result"
 }
 
+# Native zsh completion. PowerShell's Register-ArgumentCompleter does not apply
+# to this wrapper, so without a compdef zsh falls back to completing local files.
+_wtw_completion() {
+    local -a commands targets options
+    local subcommand="${words[2]}"
+
+    commands=(
+        'init:Register the current repository'
+        'add:Register an existing worktree'
+        'create:Create a worktree and workspace'
+        'list:List registered repositories and worktrees'
+        'go:Switch to a registered target'
+        'open:Open a target in the configured editor'
+        'remove:Remove a worktree'
+        'unregister:Remove a registry entry only'
+        'workspace:Generate a workspace file'
+        'copy:Copy a workspace template'
+        'sync:Synchronize workspace settings'
+        'color:Set or show a workspace color'
+        'clean:Find stale worktrees'
+        'agent:Configure agent profiles'
+        'install:Install or update WTW'
+        'skill:Install the WTW agent skill'
+        'cursor:Open a target in Cursor'
+        'code:Open a target in VS Code'
+        'antigravity:Open a target in Antigravity'
+        'windsurf:Open a target in Windsurf'
+        'codium:Open a target in VSCodium'
+        'sourcegit:Open a target in SourceGit'
+        'codex:Open a target in ChatGPT'
+        'cmux:Open a target in cmux'
+        'wmux:Open a target in wmux'
+        'claude:Open a target in Claude'
+        'claudecode:Open a target in Claude Code'
+        't3:Open a target in T3 Code'
+        'help:Show WTW help'
+    )
+
+    if (( CURRENT == 2 )); then
+        _describe -t commands 'wtw command' commands
+        return 0
+    fi
+
+    if [[ "$PREFIX" == -* ]]; then
+        case "$subcommand" in
+            init)
+                options=('--template:workspace template' '--startup-script:session script' '--startup-script-zsh:zsh session script' '--startup-script-bash:bash session script' '--workspaces-dir:workspace directory' '--name:display name')
+                ;;
+            add)
+                options=('--repo:repository' '--task:task name' '--branch:branch name')
+                ;;
+            create)
+                options=('--name:display name' '--folder:worktree folder' '--branch:existing branch' '--color:workspace color' '--repo:repository' '--open:open after creation' '--no-branch:do not create a branch' '--from:base branch' '--gt-track:Graphite parent')
+                ;;
+            list|ls)
+                options=('-d:detailed view' '--detailed:detailed view' '--wide:untruncated columns' '--repo:repository')
+                ;;
+            remove|rm|delete|del|unregister|unreg)
+                options=('--repo:repository' '--force:skip confirmation')
+                ;;
+            open)
+                options=('--repo:repository' '--editor:editor name')
+                ;;
+            sync)
+                options=('--all:all workspaces' '--repo:repository' '--template:workspace template' '--dry-run:preview changes' '--color-source:color source')
+                ;;
+            color)
+                options=('--no-sync:skip workspace synchronization')
+                ;;
+            clean)
+                options=('--dry-run:preview cleanup' '--force:skip confirmation')
+                ;;
+            skill)
+                options=('--agent:agent format')
+                ;;
+        esac
+        if (( ${#options[@]} )); then
+            _describe -t options 'wtw option' options
+        fi
+        return 0
+    fi
+
+    targets=("${_wtw_registered_aliases[@]}")
+    case "$subcommand" in
+        list|ls|go|open|remove|rm|delete|del|unregister|unreg|workspace|ws|copy|sync|color|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
+            if (( ${#targets[@]} )); then
+                _describe -t targets 'wtw target' targets
+            fi
+            ;;
+        agent)
+            local -a agent_commands=(
+                'profile:configure a repository profile'
+                'default:configure the default profile'
+            )
+            _describe -t commands 'agent command' agent_commands
+            ;;
+    esac
+    return 0
+}
+
+_wtw_register_completion() {
+    if (( ${+functions[compdef]} )); then
+        compdef _wtw_completion wtw
+        if (( ${+functions[add-zsh-hook]} )); then
+            add-zsh-hook -d precmd _wtw_register_completion 2>/dev/null
+        fi
+        return 0
+    fi
+    return 1
+}
+
 # Main wtw function — dispatches commands
 wtw() {
     case "$1" in
@@ -221,3 +332,11 @@ _wtw_register_aliases() {
 # Register aliases on load (silently)
 _wtw_register_aliases 2>/dev/null
 _wtw_cmux_apply_current
+
+# Some profiles source WTW before compinit. Register immediately when possible;
+# otherwise install a one-shot precmd hook that runs after profile loading.
+if ! _wtw_register_completion; then
+    autoload -Uz add-zsh-hook
+    add-zsh-hook -d precmd _wtw_register_completion 2>/dev/null
+    add-zsh-hook precmd _wtw_register_completion
+fi
