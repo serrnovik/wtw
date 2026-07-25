@@ -159,6 +159,45 @@ Describe 'Open-WtwCmuxWorkspace' {
         $script:cmuxCalls | Should -Contain 'set-status wtw repo/feature --workspace workspace:2 --icon git-branch --color #336699 --priority 90'
     }
 
+    It 'uses the default status color when the target color is empty' {
+        Mock Invoke-WtwCmuxCommand {
+            $script:cmuxCalls.Add(($ArgumentList -join ' '))
+            $command = $ArgumentList -join ' '
+            if ($command -eq 'list-workspaces --json') {
+                return [PSCustomObject]@{
+                    ExitCode = 0
+                    Output   = @"
+{
+  "workspaces": [
+    {
+      "ref": "workspace:2",
+      "title": "Uncoloured Feature",
+      "current_directory": "$($script:projectPath.Replace('\', '\\'))"
+    }
+  ]
+}
+"@
+                }
+            }
+            return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+        } -ModuleName wtw
+
+        $target = [PSCustomObject]@{
+            RepoName       = 'repo'
+            TaskName       = 'uncoloured'
+            WorktreeEntry  = [PSCustomObject]@{
+                path       = $script:projectPath
+                prettyName = 'Uncoloured Feature'
+                color      = ''
+            }
+            RepoEntry      = [PSCustomObject]@{ mainPath = $script:tempDir }
+        }
+
+        { Open-WtwCmuxWorkspace -Target $target } | Should -Not -Throw
+
+        $script:cmuxCalls | Should -Contain 'set-status wtw repo/uncoloured --workspace workspace:2 --icon git-branch --color #7A4FD8 --priority 90'
+    }
+
     It 'creates a named cwd workspace when none is already open' {
         Mock Invoke-WtwCmuxCommand {
             $script:cmuxCalls.Add(($ArgumentList -join ' '))

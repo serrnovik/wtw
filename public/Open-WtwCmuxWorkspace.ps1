@@ -120,7 +120,8 @@ function Set-WtwCmuxWorkspaceMetadata {
         Invoke-WtwCmuxCommand -ArgumentList @('workspace-action', '--workspace', $WorkspaceRef, '--action', 'set-color', '--color', $Color) | Out-Null
     }
     if ($StatusValue) {
-        Invoke-WtwCmuxCommand -ArgumentList @('set-status', 'wtw', $StatusValue, '--workspace', $WorkspaceRef, '--icon', 'git-branch', '--color', ($Color ?? '#7A4FD8'), '--priority', '90') | Out-Null
+        $statusColor = if ([string]::IsNullOrWhiteSpace($Color)) { '#7A4FD8' } else { $Color }
+        Invoke-WtwCmuxCommand -ArgumentList @('set-status', 'wtw', $StatusValue, '--workspace', $WorkspaceRef, '--icon', 'git-branch', '--color', $statusColor, '--priority', '90') | Out-Null
     }
 }
 
