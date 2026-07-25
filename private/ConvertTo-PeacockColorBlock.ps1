@@ -38,6 +38,8 @@ function ConvertTo-PeacockColorBlock {
         'activityBarBadge.background'     = $complementHue
         'activityBarBadge.foreground'     = $fg
         'commandCenter.border'            = "${fg}99"
+        'commandCenter.activeForeground'  = $fg
+        'commandCenter.inactiveForeground' = $fg
         'sash.hoverBorder'                = $lighter
         'statusBarItem.hoverBackground'   = $lighter
         'statusBarItem.remoteBackground'  = $base
