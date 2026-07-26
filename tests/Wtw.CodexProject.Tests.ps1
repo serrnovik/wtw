@@ -54,7 +54,7 @@ Describe 'Codex project integration' {
         $content | Should -Not -Match ([regex]::Escape("[projects.`"$script:projectPath`"]"))
     }
 
-    It 'updates Codex desktop roots and labels' {
+    It 'updates ChatGPT Desktop local projects, roots, and legacy labels' {
         $statePath = Join-Path $script:codexHome '.codex-global-state.json'
         @{
             'electron-saved-workspace-roots' = @('/existing')
@@ -66,7 +66,12 @@ Describe 'Codex project integration' {
         $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
 
         @($state.'electron-saved-workspace-roots')[0] | Should -Be $script:projectPath
-        @($state.'project-order')[0] | Should -Be $script:projectPath
+        $localProject = @($state.'local-projects'.PSObject.Properties | Where-Object {
+            @($_.Value.rootPaths) -contains $script:projectPath
+        })[0]
+        $localProject.Value.name | Should -Be 'Blue Feature'
+        @($state.'project-order')[0] | Should -Be $localProject.Name
+        @($state.'project-order') | Should -Not -Contain $script:projectPath
         $state.'electron-workspace-root-labels'.PSObject.Properties[$script:projectPath].Value | Should -Be 'Blue Feature'
 
         Remove-WtwCodexProjectLabel -ProjectPath $script:projectPath -GlobalStatePath $statePath | Should -BeTrue
@@ -74,7 +79,33 @@ Describe 'Codex project integration' {
 
         @($state.'electron-saved-workspace-roots') | Should -Not -Contain $script:projectPath
         @($state.'project-order') | Should -Not -Contain $script:projectPath
+        $state.'local-projects'.PSObject.Properties.Value.rootPaths | Should -Not -Contain $script:projectPath
         $state.'electron-workspace-root-labels'.PSObject.Properties.Name | Should -Not -Contain $script:projectPath
+    }
+
+    It 'renames the existing ChatGPT Desktop local project for a worktree' {
+        $statePath = Join-Path $script:codexHome '.codex-global-state.json'
+        $projectId = [guid]::NewGuid().ToString()
+        [PSCustomObject]@{
+            'local-projects' = [PSCustomObject]@{
+                $projectId = [PSCustomObject]@{
+                    id = $projectId
+                    name = 'repo_feature'
+                    rootPaths = @($script:projectPath)
+                    createdAt = 100
+                    updatedAt = 100
+                }
+            }
+            'project-order' = @($projectId, $script:projectPath)
+        } | ConvertTo-Json -Depth 10 | Set-Content -Path $statePath -Encoding utf8
+
+        Set-WtwCodexProjectLabel -ProjectPath $script:projectPath -PrettyName '🟠 Feature Worktree' -GlobalStatePath $statePath | Should -BeTrue
+        $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
+
+        $state.'local-projects'.PSObject.Properties[$projectId].Value.name | Should -Be '🟠 Feature Worktree'
+        $state.'local-projects'.PSObject.Properties.Count | Should -Be 1
+        @($state.'project-order') | Should -Be @($projectId)
+        Get-WtwCodexProjectLabel -ProjectPath $script:projectPath -GlobalStatePath $statePath | Should -Be '🟠 Feature Worktree'
     }
 
     It 'creates Codex desktop state when it is missing' {
@@ -84,7 +115,10 @@ Describe 'Codex project integration' {
         $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
 
         @($state.'electron-saved-workspace-roots') | Should -Contain $script:projectPath
-        @($state.'project-order') | Should -Contain $script:projectPath
+        $localProject = @($state.'local-projects'.PSObject.Properties | Where-Object {
+            @($_.Value.rootPaths) -contains $script:projectPath
+        })[0]
+        @($state.'project-order') | Should -Contain $localProject.Name
         $state.'electron-workspace-root-labels'.PSObject.Properties[$script:projectPath].Value | Should -Be 'Fresh State'
     }
 
