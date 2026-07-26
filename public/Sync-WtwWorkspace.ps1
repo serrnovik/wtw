@@ -55,6 +55,7 @@ function Resolve-WtwSyncTargetFromFile {
         wsFile         = $TargetPath
         repoName       = $rn
         wsName         = $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
+        displayName    = $wsContent.settings.'wtw.prettyName' ?? $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
         codeFolderPath = $wsContent.settings.'wtw.worktreePath' ?? ($wsContent.folders[0].path)
         color          = $resolvedColor
         branch         = $wsContent.settings.'wtw.branch'
@@ -185,6 +186,7 @@ function Sync-WtwWorkspace {
                     wsFile         = $repoEntry.templateWorkspace
                     repoName       = $repoName
                     wsName         = $repoDir
+                    displayName    = $repoDir
                     codeFolderPath = $repoEntry.mainPath
                     color          = $mainColor
                     branch         = $null
@@ -202,7 +204,8 @@ function Sync-WtwWorkspace {
                         $syncTargets += [PSCustomObject]@{
                             wsFile         = $wt.workspace
                             repoName       = $repoName
-                            wsName         = "${repoName}_${taskName}"
+                            wsName         = $taskName
+                            displayName    = $wt.prettyName ?? "${repoName}_${taskName}"
                             codeFolderPath = $wt.path
                             color          = $wt.color
                             branch         = $wt.branch
@@ -269,10 +272,11 @@ function Sync-WtwWorkspace {
 
         New-WtwWorkspaceFile `
             -RepoName (Get-WtwPropertyValue -Object $item -Name 'repoName' -DefaultValue 'unknown') `
-            -Name $item.wsName `
+            -Name $item.displayName `
             -CodeFolderPath $item.codeFolderPath `
             -TemplatePath $tpl `
             -OutputPath $item.wsFile `
+            -TaskName $item.wsName `
             -Color $item.color `
             -Branch $item.branch `
             -WorktreePath $item.worktreePath `

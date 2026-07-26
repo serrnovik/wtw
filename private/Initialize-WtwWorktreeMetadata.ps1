@@ -33,8 +33,8 @@ function Initialize-WtwWorktreeMetadata {
     .PARAMETER WorktreePath
         Absolute path to the worktree directory.
     .PARAMETER FolderSuffix
-        The directory's `${repoName}_<suffix>` tail. Used as the workspace
-        file name and as the default pretty name.
+        The directory's `${repoName}_<suffix>` tail. Used as the default
+        pretty name.
     .PARAMETER PrettyName
         Optional human-readable display name. Defaults to $FolderSuffix.
         A color-circle emoji is always prepended so downstream UIs render
@@ -108,14 +108,23 @@ function Initialize-WtwWorktreeMetadata {
     if ($config -and $templatePath) {
         $wsDir = $config.workspacesDir.Replace('~', $HOME)
         $wsDir = [System.IO.Path]::GetFullPath($wsDir)
-        $wsFile = Join-Path $wsDir "${RepoName}_${FolderSuffix}.code-workspace"
+        # Cursor's Workspaces sidebar renders the .code-workspace file name.
+        # New files can therefore use the human label without touching an
+        # existing workspace identity or its chat history.
+        $workspaceFileStem = ConvertTo-WtwWorkspaceFileStem -Name $PrettyName
+        $wsFile = Join-Path $wsDir "${workspaceFileStem}.code-workspace"
+        if (Test-Path $wsFile) {
+            $workspaceFileStem = ConvertTo-WtwWorkspaceFileStem -Name "$RepoName — $PrettyName"
+            $wsFile = Join-Path $wsDir "${workspaceFileStem}.code-workspace"
+        }
 
         New-WtwWorkspaceFile `
             -RepoName $RepoName `
-            -Name "${RepoName}_${FolderSuffix}" `
+            -Name $PrettyName `
             -CodeFolderPath $WorktreePath `
             -TemplatePath $templatePath `
             -OutputPath $wsFile `
+            -TaskName $Task `
             -Color $resolvedColor `
             -Branch $Branch `
             -WorktreePath $WorktreePath `

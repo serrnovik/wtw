@@ -68,7 +68,7 @@ Describe 'Invoke-WtwEditorCli' {
     }
 }
 
-Describe 'Open-WtwWorkspace Codex launcher' {
+Describe 'Open-WtwWorkspace editor launchers' {
     It 'refreshes Cursor recent workspace metadata before opening the code-workspace file' {
         $worktreeDir = Join-Path $script:tmp 'cursor-worktree'
         New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
@@ -77,6 +77,7 @@ Describe 'Open-WtwWorkspace Codex launcher' {
 
         Mock Resolve-WtwTarget {
             [PSCustomObject]@{
+                RepoName      = 'sample'
                 TaskName      = 'cursor-worktree'
                 WorktreeEntry = [PSCustomObject]@{
                     path       = $worktreeDir
@@ -89,6 +90,7 @@ Describe 'Open-WtwWorkspace Codex launcher' {
                 }
             }
         } -ModuleName wtw
+        Mock Get-WtwCursorPrettyWorkspacePath { $WorkspacePath } -ModuleName wtw
         Mock Register-WtwCursorProject { $WorkspacePath } -ModuleName wtw
         Mock Invoke-WtwEditorCli {} -ModuleName wtw
 
@@ -102,6 +104,61 @@ Describe 'Open-WtwWorkspace Codex launcher' {
         }
         Should -Invoke Invoke-WtwEditorCli -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
             $Cmd -eq 'cursor' -and $Path -eq $workspaceFile
+        }
+    }
+
+    It 'migrates a legacy Cursor workspace before opening it from the Agents view' {
+        $worktreeDir = Join-Path $script:tmp 'legacy-cursor-worktree'
+        New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
+        $legacyWorkspace = Join-Path $script:tmp 'legacy-cursor-worktree.code-workspace'
+        $prettyWorkspace = Join-Path $script:tmp 'sample - Blue Cursor Worktree.code-workspace'
+        Set-Content -Path $legacyWorkspace -Value '{}'
+        $worktreeEntry = [PSCustomObject]@{
+            path       = $worktreeDir
+            workspace  = $legacyWorkspace
+            prettyName = 'Blue Cursor Worktree'
+            color      = '#336699'
+        }
+        $registry = [PSCustomObject]@{
+            repos = [PSCustomObject]@{
+                sample = [PSCustomObject]@{
+                    worktrees = [PSCustomObject]@{
+                        'legacy-cursor-worktree' = $worktreeEntry
+                    }
+                }
+            }
+        }
+
+        Mock Resolve-WtwTarget {
+            [PSCustomObject]@{
+                RepoName      = 'sample'
+                TaskName      = 'legacy-cursor-worktree'
+                WorktreeEntry = $worktreeEntry
+                RepoEntry     = [PSCustomObject]@{ mainPath = $script:tmp }
+            }
+        } -ModuleName wtw
+        Mock Get-WtwCursorPrettyWorkspacePath { $prettyWorkspace } -ModuleName wtw
+        Mock Resolve-WtwCursorStateConflict { $true } -ModuleName wtw
+        Mock Move-WtwCursorWorkspaceForAgents { $prettyWorkspace } -ModuleName wtw
+        Mock Get-WtwRegistry { $registry } -ModuleName wtw
+        Mock Save-WtwRegistry {} -ModuleName wtw
+        Mock Register-WtwCursorProject { $WorkspacePath } -ModuleName wtw
+        Mock Invoke-WtwEditorCli {} -ModuleName wtw
+
+        Open-WtwWorkspace -Name 'legacy-cursor-worktree' -Editor 'cursor'
+
+        $worktreeEntry.workspace | Should -Be $prettyWorkspace
+        Should -Invoke Move-WtwCursorWorkspaceForAgents -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+            $WorkspacePath -eq $legacyWorkspace -and
+            $PrettyName -eq 'Blue Cursor Worktree' -and
+            $RepoName -eq 'sample'
+        }
+        Should -Invoke Save-WtwRegistry -ModuleName wtw -Times 1 -Exactly
+        Should -Invoke Register-WtwCursorProject -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+            $WorkspacePath -eq $prettyWorkspace
+        }
+        Should -Invoke Invoke-WtwEditorCli -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+            $Cmd -eq 'cursor' -and $Path -eq $prettyWorkspace
         }
     }
 

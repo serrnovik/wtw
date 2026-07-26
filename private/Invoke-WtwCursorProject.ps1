@@ -46,11 +46,16 @@ function ConvertTo-WtwCursorWorkspaceId {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string] $WorkspacePath)
 
-    $uri = ConvertTo-WtwFileUri -Path $WorkspacePath
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($uri)
-    $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
-    $hex = -join ($hash | ForEach-Object { $_.ToString('x2') })
-    return $hex.Substring(0, 32)
+    # VS Code/Cursor define saved-workspace identity as MD5(originalFSPath).
+    # macOS and Windows normalize the path to lower-case; Linux does not.
+    # This must match Cursor exactly because the id also names workspaceStorage.
+    $hashInput = [System.IO.Path]::GetFullPath($WorkspacePath)
+    if (-not $IsLinux) {
+        $hashInput = $hashInput.ToLowerInvariant()
+    }
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($hashInput)
+    $hash = [System.Security.Cryptography.MD5]::HashData($bytes)
+    return (-join ($hash | ForEach-Object { $_.ToString('x2') }))
 }
 
 function ConvertTo-WtwSqliteLiteral {
@@ -66,6 +71,289 @@ function Get-WtwSqliteCommand {
     param()
 
     return (Get-Command sqlite3 -ErrorAction SilentlyContinue)?.Source
+}
+
+function Read-WtwCursorStateValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $StatePath,
+        [Parameter(Mandatory)][string] $Key
+    )
+
+    if (-not (Test-Path $StatePath)) { return $null }
+    $sqlite = Get-WtwSqliteCommand
+    if (-not $sqlite) { return $null }
+
+    $keyLiteral = ConvertTo-WtwSqliteLiteral $Key
+    $raw = & $sqlite -readonly $StatePath "select value from ItemTable where key = $keyLiteral limit 1;" 2>$null
+    if ($LASTEXITCODE -ne 0) { return $null }
+    return ($raw -join [Environment]::NewLine)
+}
+
+function Test-WtwCursorAppRunning {
+    [CmdletBinding()]
+    param()
+
+    return [bool](Get-Process -Name 'Cursor' -ErrorAction SilentlyContinue)
+}
+
+function Stop-WtwCursorProcess {
+    [CmdletBinding()]
+    param([int] $TimeoutSeconds = 10)
+
+    $processes = @(Get-Process -Name 'Cursor' -ErrorAction SilentlyContinue)
+    if ($processes.Count -eq 0) { return $true }
+
+    foreach ($process in $processes) {
+        try { $process.CloseMainWindow() | Out-Null } catch { }
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Test-WtwCursorAppRunning)) { return $true }
+        Start-Sleep -Milliseconds 250
+    }
+
+    foreach ($process in @(Get-Process -Name 'Cursor' -ErrorAction SilentlyContinue)) {
+        try { $process.Kill($true) } catch { try { $process.Kill() } catch { } }
+    }
+
+    $deadline = (Get-Date).AddSeconds(5)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Test-WtwCursorAppRunning)) { return $true }
+        Start-Sleep -Milliseconds 250
+    }
+
+    return -not (Test-WtwCursorAppRunning)
+}
+
+function Resolve-WtwCursorStateConflict {
+    [CmdletBinding()]
+    param([string] $PrettyName = 'the WTW workspace')
+
+    if (-not (Test-WtwCursorAppRunning)) { return $true }
+
+    Write-Host ''
+    Write-Host '  Cursor is running — it can overwrite Agents workspace metadata on exit.' -ForegroundColor Yellow
+    Write-Host "  Close Cursor once to migrate the Agents label to '$PrettyName'." -ForegroundColor Yellow
+    Write-Host '    [c] Close Cursor yourself, then migrate (I will wait)'
+    Write-Host '    [k] Force-close Cursor, then migrate'
+    Write-Host '    [s] Skip — open with the existing Agents label'
+
+    $answer = (Read-Host '  Choice [c/k/s]').Trim().ToLowerInvariant()
+    if (-not $answer) { $answer = 'c' }
+
+    switch ($answer) {
+        'c' {
+            Write-Host '  Waiting for Cursor to close (Ctrl+C to abort)...' -ForegroundColor Cyan
+            while (Test-WtwCursorAppRunning) { Start-Sleep -Milliseconds 500 }
+            Write-Host '  Cursor closed.' -ForegroundColor Green
+            return $true
+        }
+        'k' {
+            Write-Host '  Force-closing Cursor...' -ForegroundColor Cyan
+            if (-not (Stop-WtwCursorProcess)) {
+                Write-Host '  Could not stop Cursor — skipping Agents label migration.' -ForegroundColor Red
+                return $false
+            }
+            Write-Host '  Cursor stopped.' -ForegroundColor Green
+            return $true
+        }
+        default {
+            Write-Host '  Skipped Cursor Agents label migration.' -ForegroundColor DarkGray
+            return $false
+        }
+    }
+}
+
+function Get-WtwCursorPrettyWorkspacePath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $WorkspacePath,
+        [Parameter(Mandatory)][string] $PrettyName,
+        [string] $RepoName
+    )
+
+    $workspaceDirectory = Split-Path ([System.IO.Path]::GetFullPath($WorkspacePath)) -Parent
+    $stem = ConvertTo-WtwWorkspaceFileStem -Name $PrettyName
+    $candidate = Join-Path $workspaceDirectory "$stem.code-workspace"
+    if (-not (Test-Path $candidate) -or
+        [System.IO.Path]::GetFullPath($candidate) -eq [System.IO.Path]::GetFullPath($WorkspacePath)) {
+        return $candidate
+    }
+
+    if ($RepoName) {
+        $stem = ConvertTo-WtwWorkspaceFileStem -Name "$RepoName — $PrettyName"
+        return (Join-Path $workspaceDirectory "$stem.code-workspace")
+    }
+
+    return $candidate
+}
+
+function Move-WtwCursorWorkspaceForAgents {
+    <#
+    .SYNOPSIS
+        Rename a saved workspace while preserving Cursor Agents project history.
+    .DESCRIPTION
+        Cursor's Agents window renders a saved workspace from the
+        .code-workspace filename. Renaming it changes Cursor's MD5 workspace id,
+        so this migrates the workspace file, workspaceStorage directory, recent
+        paths, workspace metadata, and local Agents project identifiers together.
+        Cursor must be closed by the caller.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $WorkspacePath,
+        [Parameter(Mandatory)][string] $PrettyName,
+        [string] $RepoName,
+        [string] $DataHome = (Get-WtwCursorDataHome)
+    )
+
+    $oldPath = [System.IO.Path]::GetFullPath($WorkspacePath)
+    $newPath = Get-WtwCursorPrettyWorkspacePath -WorkspacePath $oldPath -PrettyName $PrettyName -RepoName $RepoName
+    $newPath = [System.IO.Path]::GetFullPath($newPath)
+    if ($oldPath -eq $newPath) { return $oldPath }
+
+    if (Test-Path $newPath) {
+        Write-Host "  Cursor: Agents label target already exists; keeping '$oldPath'." -ForegroundColor Yellow
+        return $oldPath
+    }
+    if (Test-WtwCursorAppRunning) {
+        Write-Host '  Cursor: close Cursor before migrating an existing Agents workspace label.' -ForegroundColor Yellow
+        return $oldPath
+    }
+
+    $sqlite = Get-WtwSqliteCommand
+    $statePath = Get-WtwCursorGlobalStatePath -DataHome $DataHome
+    if ((Test-Path $statePath) -and -not $sqlite) {
+        Write-Host '  Cursor: sqlite3 is required to preserve Agents history; label migration skipped.' -ForegroundColor Yellow
+        return $oldPath
+    }
+
+    $oldId = ConvertTo-WtwCursorWorkspaceId -WorkspacePath $oldPath
+    $newId = ConvertTo-WtwCursorWorkspaceId -WorkspacePath $newPath
+    $oldUri = ConvertTo-WtwFileUri -Path $oldPath
+    $newUri = ConvertTo-WtwFileUri -Path $newPath
+    $workspaceStorageRoot = Join-Path $DataHome 'User/workspaceStorage'
+    $oldStoragePath = Join-Path $workspaceStorageRoot $oldId
+    $newStoragePath = Join-Path $workspaceStorageRoot $newId
+    if ((Test-Path $oldStoragePath) -and (Test-Path $newStoragePath)) {
+        Write-Host "  Cursor: workspace state already exists for '$newPath'; migration skipped." -ForegroundColor Yellow
+        return $oldPath
+    }
+
+    $backupRoot = Join-Path $DataHome ('User/wtw-backups/{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $oldId)
+    New-Item -Path $backupRoot -ItemType Directory -Force | Out-Null
+    Copy-Item -LiteralPath $oldPath -Destination (Join-Path $backupRoot (Split-Path $oldPath -Leaf)) -Force
+
+    $keysToMigrate = @(
+        'history.recentlyOpenedPathsList',
+        'glass.localAgentProjects.v1',
+        'workspaceMetadata.entries',
+        '__$__targetStorageMarker'
+    )
+    $stateValues = [ordered]@{}
+    if (Test-Path $statePath) {
+        foreach ($key in $keysToMigrate) {
+            $stateValues[$key] = Read-WtwCursorStateValue -StatePath $statePath -Key $key
+        }
+        [ordered]@{
+            oldPath = $oldPath
+            newPath = $newPath
+            oldId   = $oldId
+            newId   = $newId
+            values  = [ordered]@{
+                'history.recentlyOpenedPathsList' = $stateValues['history.recentlyOpenedPathsList']
+                'glass.localAgentProjects.v1' = $stateValues['glass.localAgentProjects.v1']
+                'workspaceMetadata.entries' = $stateValues['workspaceMetadata.entries']
+            }
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $backupRoot 'cursor-state-rows.json') -Encoding utf8
+    }
+
+    $storageJsonPath = Join-Path $DataHome 'User/globalStorage/storage.json'
+    if (Test-Path $storageJsonPath) {
+        Copy-Item -LiteralPath $storageJsonPath -Destination (Join-Path $backupRoot 'storage.json') -Force
+    }
+
+    $movedWorkspace = $false
+    $movedStorage = $false
+    try {
+        Move-Item -LiteralPath $oldPath -Destination $newPath
+        $movedWorkspace = $true
+
+        if (Test-Path $oldStoragePath) {
+            Move-Item -LiteralPath $oldStoragePath -Destination $newStoragePath
+            $movedStorage = $true
+            $workspaceJsonPath = Join-Path $newStoragePath 'workspace.json'
+            if (Test-Path $workspaceJsonPath) {
+                $workspaceJson = Get-Content -LiteralPath $workspaceJsonPath -Raw
+                $workspaceJson.Replace($oldUri, $newUri).Replace($oldPath, $newPath) |
+                    Set-Content -LiteralPath $workspaceJsonPath -Encoding utf8
+            }
+        }
+
+        if (Test-Path $storageJsonPath) {
+            $storageJson = Get-Content -LiteralPath $storageJsonPath -Raw
+            $storageJson.Replace($oldUri, $newUri).Replace($oldPath, $newPath).Replace($oldId, $newId) |
+                Set-Content -LiteralPath $storageJsonPath -Encoding utf8
+        }
+
+        if (Test-Path $statePath) {
+            $statements = [System.Collections.Generic.List[string]]::new()
+            $statements.Add('begin immediate;')
+            foreach ($key in $keysToMigrate) {
+                $value = $stateValues[$key]
+                if ([string]::IsNullOrEmpty($value)) { continue }
+                $updatedValue = $value.Replace($oldUri, $newUri).Replace($oldPath, $newPath).Replace($oldId, $newId)
+                $updateStatement = 'update ItemTable set value = {0} where key = {1};' -f @(
+                    (ConvertTo-WtwSqliteLiteral $updatedValue),
+                    (ConvertTo-WtwSqliteLiteral $key)
+                )
+                $statements.Add($updateStatement)
+            }
+            $oldIdLiteral = ConvertTo-WtwSqliteLiteral $oldId
+            $newIdLiteral = ConvertTo-WtwSqliteLiteral $newId
+            $statements.Add(@"
+insert or replace into ItemTable (key, value)
+select replace(key, $oldIdLiteral, $newIdLiteral), value
+from ItemTable
+where instr(key, $oldIdLiteral) > 0
+  and (key like 'agentData.cacheStorage.%' or key like 'cursor/glass.%');
+"@)
+            $statements.Add(@"
+delete from ItemTable
+where instr(key, $oldIdLiteral) > 0
+  and (key like 'agentData.cacheStorage.%' or key like 'cursor/glass.%');
+"@)
+            $statements.Add('commit;')
+            & $sqlite $statePath ($statements -join [Environment]::NewLine) 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Cursor state database migration failed.'
+            }
+        }
+    } catch {
+        if (Test-Path (Join-Path $backupRoot 'storage.json')) {
+            Copy-Item -LiteralPath (Join-Path $backupRoot 'storage.json') -Destination $storageJsonPath -Force
+        }
+        if ($movedStorage -and (Test-Path $newStoragePath) -and -not (Test-Path $oldStoragePath)) {
+            $workspaceJsonPath = Join-Path $newStoragePath 'workspace.json'
+            if (Test-Path $workspaceJsonPath) {
+                $workspaceJson = Get-Content -LiteralPath $workspaceJsonPath -Raw
+                $workspaceJson.Replace($newUri, $oldUri).Replace($newPath, $oldPath) |
+                    Set-Content -LiteralPath $workspaceJsonPath -Encoding utf8
+            }
+            Move-Item -LiteralPath $newStoragePath -Destination $oldStoragePath
+        }
+        if ($movedWorkspace -and (Test-Path $newPath) -and -not (Test-Path $oldPath)) {
+            Move-Item -LiteralPath $newPath -Destination $oldPath
+        }
+        Write-Host "  Cursor: Agents label migration failed: $($_.Exception.Message)" -ForegroundColor Red
+        return $oldPath
+    }
+
+    Write-Host "  Cursor: Agents workspace label '$PrettyName'" -ForegroundColor Green
+    Write-Host "  Cursor: migration backup $backupRoot" -ForegroundColor DarkGray
+    return $newPath
 }
 
 function Read-WtwCursorRecentlyOpenedState {

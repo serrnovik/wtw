@@ -126,6 +126,28 @@ Describe 'New-WtwWorkspaceFile' {
         $ws.settings.'wtw.branch' | Should -Be 'feat/meta'
     }
 
+    It 'keeps the registry task separate from the Cursor display title' {
+        $outPath = Join-Path $script:tempDir 'output-pretty.code-workspace'
+        New-WtwWorkspaceFile `
+            -RepoName 'testRepo' `
+            -Name '🟠 Feature workspace' `
+            -TaskName 'feature-workspace' `
+            -CodeFolderPath '/path' `
+            -TemplatePath $script:templatePath `
+            -OutputPath $outPath `
+            -Managed
+
+        $ws = Get-Content $outPath -Raw | ConvertFrom-Json
+        $ws.folders[0].name | Should -Be '🟠 Feature workspace'
+        $ws.settings.'wtw.task' | Should -Be 'feature-workspace'
+        $ws.settings.'wtw.prettyName' | Should -Be '🟠 Feature workspace'
+        $ws.settings.'window.title' | Should -Be '🟠 Feature workspace ${separator} ${dirty}${activeEditorShort}${separator}${appName}'
+    }
+
+    It 'keeps emoji while making a cross-platform workspace file stem' {
+        ConvertTo-WtwWorkspaceFileStem -Name '🟠 Feature: review/one?' | Should -Be '🟠 Feature- review-one-'
+    }
+
     It 'omits wtw metadata when not -Managed' {
         $outPath = Join-Path $script:tempDir 'output6.code-workspace'
         New-WtwWorkspaceFile `

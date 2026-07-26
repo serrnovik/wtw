@@ -189,6 +189,31 @@ function Open-WtwWorkspace {
                 Split-Path $dir -Leaf
             }
             $color = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'color') { $target.WorktreeEntry.color } else { $null }
+            if ($target.WorktreeEntry) {
+                $prettyWorkspacePath = Get-WtwCursorPrettyWorkspacePath -WorkspacePath $wsFile -PrettyName $prettyName -RepoName $target.RepoName
+                $needsAgentsLabelMigration = [System.IO.Path]::GetFullPath($prettyWorkspacePath) -ne [System.IO.Path]::GetFullPath($wsFile)
+                $canMigrate = -not $needsAgentsLabelMigration
+                if ($needsAgentsLabelMigration) {
+                    if ($SkipRestart -and (Test-WtwCursorAppRunning)) {
+                        Write-Host '  Cursor: Agents label migration skipped because --skip-restart was set.' -ForegroundColor DarkGray
+                    } else {
+                        $canMigrate = Resolve-WtwCursorStateConflict -PrettyName $prettyName
+                    }
+                }
+                if ($needsAgentsLabelMigration -and $canMigrate) {
+                    $migratedWorkspace = Move-WtwCursorWorkspaceForAgents `
+                        -WorkspacePath $wsFile `
+                        -PrettyName $prettyName `
+                        -RepoName $target.RepoName
+                    if ($migratedWorkspace -ne $wsFile) {
+                        $wsFile = $migratedWorkspace
+                        $target.WorktreeEntry | Add-Member -NotePropertyName 'workspace' -NotePropertyValue $wsFile -Force
+                        $registry = Get-WtwRegistry
+                        $registry.repos.$($target.RepoName).worktrees.$($target.TaskName) = $target.WorktreeEntry
+                        Save-WtwRegistry $registry
+                    }
+                }
+            }
             Register-WtwCursorProject -WorkspacePath $wsFile -ProjectPath $dir -PrettyName $prettyName -Color $color | Out-Null
         }
         Write-Host "  Opening in ${editorCmd}: $wsFile" -ForegroundColor Green
