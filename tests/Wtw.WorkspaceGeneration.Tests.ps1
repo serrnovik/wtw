@@ -22,11 +22,10 @@ Describe 'New-WtwWorkspaceFile' {
         }
         $template | ConvertTo-Json -Depth 10 | Set-Content $script:templatePath
 
-        # Fake registry so New-WtwWorkspaceFile can resolve mainPath leaf
-        $script:origRegistry = $null
-        if (Test-Path (Join-Path $HOME '.wtw' 'registry.json')) {
-            $script:origRegistry = Get-Content (Join-Path $HOME '.wtw' 'registry.json') -Raw
-        }
+        # Fake registry so New-WtwWorkspaceFile can resolve mainPath leaf without
+        # reading or modifying the user's ~/.wtw registry.
+        $script:originalRegistryPath = $script:WtwRegistryPath
+        $script:WtwRegistryPath = Join-Path $script:tempDir 'registry.json'
         $fakeRegistry = [PSCustomObject]@{
             repos = [PSCustomObject]@{
                 testRepo = [PSCustomObject]@{
@@ -36,19 +35,12 @@ Describe 'New-WtwWorkspaceFile' {
                 }
             }
         }
-        $wtwDir = Join-Path $HOME '.wtw'
-        if (-not (Test-Path $wtwDir)) {
-            New-Item -Path $wtwDir -ItemType Directory -Force | Out-Null
-        }
-        $fakeRegistry | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $wtwDir 'registry.json')
+        $fakeRegistry | ConvertTo-Json -Depth 10 | Set-Content $script:WtwRegistryPath
     }
 
     AfterAll {
+        $script:WtwRegistryPath = $script:originalRegistryPath
         Remove-Item -Path $script:tempDir -Recurse -Force -ErrorAction SilentlyContinue
-        # Restore original registry
-        if ($script:origRegistry) {
-            $script:origRegistry | Set-Content (Join-Path $HOME '.wtw' 'registry.json')
-        }
     }
 
     It 'generates workspace with replaced code folder' {
@@ -132,6 +124,28 @@ Describe 'New-WtwWorkspaceFile' {
         $ws.settings.'wtw.repo' | Should -Be 'testRepo'
         $ws.settings.'wtw.task' | Should -Be 'testRepo_meta'
         $ws.settings.'wtw.branch' | Should -Be 'feat/meta'
+    }
+
+    It 'keeps the registry task separate from the Cursor display title' {
+        $outPath = Join-Path $script:tempDir 'output-pretty.code-workspace'
+        New-WtwWorkspaceFile `
+            -RepoName 'testRepo' `
+            -Name '🟠 Feature workspace' `
+            -TaskName 'feature-workspace' `
+            -CodeFolderPath '/path' `
+            -TemplatePath $script:templatePath `
+            -OutputPath $outPath `
+            -Managed
+
+        $ws = Get-Content $outPath -Raw | ConvertFrom-Json
+        $ws.folders[0].name | Should -Be '🟠 Feature workspace'
+        $ws.settings.'wtw.task' | Should -Be 'feature-workspace'
+        $ws.settings.'wtw.prettyName' | Should -Be '🟠 Feature workspace'
+        $ws.settings.'window.title' | Should -Be '🟠 Feature workspace ${separator} ${dirty}${activeEditorShort}${separator}${appName}'
+    }
+
+    It 'keeps emoji while making a cross-platform workspace file stem' {
+        ConvertTo-WtwWorkspaceFileStem -Name '🟠 Feature: review/one?' | Should -Be '🟠 Feature- review-one-'
     }
 
     It 'omits wtw metadata when not -Managed' {

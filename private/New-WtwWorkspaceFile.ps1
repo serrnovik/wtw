@@ -16,6 +16,9 @@ function New-WtwWorkspaceFile {
         [Parameter(Mandatory)]
         [string] $OutputPath,
 
+        # Registry worktree key. Defaults to the display name for backwards
+        # compatibility with hand-created workspaces.
+        [string] $TaskName,
         [string] $Color,
         [string] $Branch,
         [string] $WorktreePath,
@@ -107,9 +110,13 @@ function New-WtwWorkspaceFile {
 
     # Add wtw metadata
     if ($Managed) {
+        $metadataTaskName = if ($TaskName) { $TaskName } else { $Name }
         $workspace.settings | Add-Member -NotePropertyName 'wtw.managed' -NotePropertyValue $true -Force
         $workspace.settings | Add-Member -NotePropertyName 'wtw.repo' -NotePropertyValue $RepoName -Force
-        $workspace.settings | Add-Member -NotePropertyName 'wtw.task' -NotePropertyValue $Name -Force
+        $workspace.settings | Add-Member -NotePropertyName 'wtw.task' -NotePropertyValue $metadataTaskName -Force
+        $workspace.settings | Add-Member -NotePropertyName 'wtw.prettyName' -NotePropertyValue $Name -Force
+        $windowTitle = '{0} ${{separator}} ${{dirty}}${{activeEditorShort}}${{separator}}${{appName}}' -f $Name
+        $workspace.settings | Add-Member -NotePropertyName 'window.title' -NotePropertyValue $windowTitle -Force
         $workspace.settings | Add-Member -NotePropertyName 'wtw.templateSource' -NotePropertyValue $TemplatePath -Force
         $workspace.settings | Add-Member -NotePropertyName 'wtw.generatedAt' -NotePropertyValue (Get-Date -Format 'o') -Force
         if ($Branch) {

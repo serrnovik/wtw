@@ -6,14 +6,14 @@ function Get-WtwAllTargetNames {
     #>
     param([PSObject] $Registry)
     $targets = @()
-    foreach ($repoName in $Registry.repos.PSObject.Properties.Name) {
+    foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
         $repo = $Registry.repos.$repoName
         $targets += $repoName
         foreach ($alias in (Get-WtwRepoAliases $repo)) {
             $targets += $alias
         }
         if ($repo.worktrees) {
-            foreach ($task in $repo.worktrees.PSObject.Properties.Name) {
+            foreach ($task in (Get-WtwPropertyNames -Object $repo.worktrees)) {
                 $targets += $task
                 foreach ($alias in (Get-WtwRepoAliases $repo)) {
                     $targets += "$alias-$task"

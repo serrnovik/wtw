@@ -23,7 +23,7 @@ function Set-WtwWorktreeEnv {
         $index = 0
         if ($RepoEntry.worktrees) {
             $i = 1
-            foreach ($t in $RepoEntry.worktrees.PSObject.Properties.Name) {
+            foreach ($t in (Get-WtwPropertyNames -Object $RepoEntry.worktrees)) {
                 if ($t -eq $TaskName) { $index = $i; break }
                 $i++
             }

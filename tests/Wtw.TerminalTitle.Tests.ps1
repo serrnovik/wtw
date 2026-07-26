@@ -7,7 +7,8 @@ Describe 'Register-WtwTerminalTitle' {
     BeforeEach {
         Remove-Variable -Scope Global -ErrorAction SilentlyContinue -Name `
             _WtwTerminalTitleHookActive, _WtwTerminalTitleHookVersion, _WtwTerminalTitleState,
-            _WtwSessionPrNumber, _WtwTitleRepoRoot, _WtwTitleFolderName, _WtwTitleIsAdmin, _WtwTitleLabel
+            _WtwSessionPrNumber, _WtwTitleRepoRoot, _WtwTitleFolderName, _WtwTitleIsAdmin, _WtwTitleLabel,
+            _WtwItermPromptHookActive
         $script:savedPrompt = (Get-Item function:prompt -ErrorAction SilentlyContinue)?.ScriptBlock
         # Register-WtwTerminalTitle is exported from the module, so its internal
         # calls resolve module-scoped commands — mocks must target -ModuleName wtw.
@@ -95,17 +96,65 @@ Describe 'Register-WtwTerminalTitle' {
         $second | Should -Be $first
     }
 
-    It 'builds a title even when the module icon pool is missing' {
-        InModuleScope wtw {
-            $oldIcons = $script:_WtwIcons
-            try {
-                $script:_WtwIcons = $null
+    It 'initializes absent hook globals under strict mode' {
+        Mock Get-WtwCurrentPrNumber { $null } -ModuleName wtw
 
-                { Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' } | Should -Not -Throw
-                Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' | Should -Match 'snowmain1_stripe'
+        {
+            Set-StrictMode -Version Latest
+            Register-WtwTerminalTitle -RepoRoot '/tmp/fresh-strict-session' | Out-Null
+        } | Should -Not -Throw
+
+        $global:_WtwTerminalTitleHookActive | Should -BeTrue
+        $global:_WtwTerminalTitleHookVersion | Should -Be 2
+    }
+
+    It 'builds a title even when the module icon pool is unavailable' {
+        InModuleScope wtw {
+            Mock Get-WtwIconPool { @() }
+
+            { Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' } | Should -Not -Throw
+            Get-WtwWindowTitle -RepoRoot '/tmp/snowmain1_stripe' -FolderName 'snowmain1_stripe' | Should -Match 'snowmain1_stripe'
+        }
+    }
+
+    It 'keeps icon indices inside the array at the uint32 upper boundary' {
+        InModuleScope wtw {
+            Get-WtwNumberFromRange -Range 46 -Value ([uint32]::MaxValue) | Should -Be 45
+        }
+    }
+
+    It 'builds the reported Kulissa worktree title under strict mode' {
+        InModuleScope wtw {
+            {
+                Get-WtwWindowTitle `
+                    -RepoRoot '/Users/sno/Data/git/tn1/kulissa-landing_KLVH001-voice-harness-implementation' `
+                    -FolderName 'kulissa-landing_KLVH001-voice-harness-implementation'
+            } | Should -Not -Throw
+        }
+    }
+
+    It 'installs the iTerm prompt hook when its global guard is absent' {
+        InModuleScope wtw {
+            $savedTermProgram = $env:TERM_PROGRAM
+            try {
+                $env:TERM_PROGRAM = 'iTerm.app'
+                Remove-Variable -Name '_WtwItermPromptHookActive' -Scope Global -ErrorAction SilentlyContinue
+
+                { Install-WtwItermPromptHook } | Should -Not -Throw
+                $global:_WtwItermPromptHookActive | Should -BeTrue
             } finally {
-                $script:_WtwIcons = $oldIcons
+                $env:TERM_PROGRAM = $savedTermProgram
             }
         }
+    }
+
+    It 'runs the terminal prompt when LASTEXITCODE has not been initialized' {
+        Mock Get-WtwCurrentPrNumber { $null } -ModuleName wtw
+        Mock Get-WtwWindowTitle { 'strict title' } -ModuleName wtw
+
+        Register-WtwTerminalTitle -RepoRoot '/tmp/fresh-strict-session' | Out-Null
+        Remove-Variable -Name 'LASTEXITCODE' -Scope Global -ErrorAction SilentlyContinue
+
+        { & (Get-Item function:prompt).ScriptBlock | Out-Null } | Should -Not -Throw
     }
 }

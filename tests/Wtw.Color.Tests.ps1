@@ -12,6 +12,8 @@ Describe 'ConvertTo-PeacockColorBlock' {
         # peacock.color is set separately, not in the block
         $result.Keys | Should -Contain 'activityBar.activeBackground'
         $result.Keys | Should -Contain 'statusBarItem.remoteBackground'
+        $result.Keys | Should -Contain 'commandCenter.activeForeground'
+        $result.Keys | Should -Contain 'commandCenter.inactiveForeground'
     }
 
     It 'uses the base color for titleBar.activeBackground' {

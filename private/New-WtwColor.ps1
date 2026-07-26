@@ -12,7 +12,7 @@ function New-WtwColor {
     $key = "$RepoName/$TaskName"
 
     # Already assigned?
-    if ($colors.assignments.PSObject.Properties.Name -contains $key) {
+    if ((Get-WtwPropertyNames -Object $colors.assignments) -contains $key) {
         return $colors.assignments.$key
     }
 

@@ -14,7 +14,7 @@ function Register-WtwProfile {
     param()
 
     $registry = Get-WtwRegistry
-    $repoNames = $registry.repos.PSObject.Properties.Name
+    $repoNames = (Get-WtwPropertyNames -Object $registry.repos)
 
     if (-not $repoNames -or $repoNames.Count -eq 0) {
         Write-Verbose 'wtw: No repos registered, skipping profile aliases.'
@@ -48,7 +48,7 @@ function Register-WtwProfile {
         }.GetNewClosure()
 
         # Resolve main repo color
-        $mainColor = (Get-WtwColors).assignments."$repoName/main"
+        $mainColor = Get-WtwPropertyValue -Object (Get-WtwColors).assignments -Name "$repoName/main"
 
         # Create function + aliases for main repo (one function, multiple aliases)
         $primaryAlias = $aliases[0]
@@ -63,7 +63,7 @@ function Register-WtwProfile {
 
         # Per-worktree aliases: create for each repo alias
         if ($repo.worktrees) {
-            foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+            foreach ($taskName in (Get-WtwPropertyNames -Object $repo.worktrees)) {
                 $wt = $repo.worktrees.$taskName
                 $wtPath = $wt.path
                 $wtColor = $wt.color

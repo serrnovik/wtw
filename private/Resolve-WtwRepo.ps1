@@ -23,7 +23,7 @@ function Resolve-WtwRepo {
 
     $registry = Get-WtwRegistry
     if ($RepoAlias) {
-        foreach ($name in $registry.repos.PSObject.Properties.Name) {
+        foreach ($name in (Get-WtwPropertyNames -Object $registry.repos)) {
             $repo = $registry.repos.$name
             if ((Test-WtwAliasMatch $repo $RepoAlias) -or $name -eq $RepoAlias) {
                 return $name, $repo

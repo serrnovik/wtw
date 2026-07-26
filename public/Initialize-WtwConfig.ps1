@@ -93,7 +93,7 @@ function Initialize-WtwConfig {
 
     # Alias collision check
     $registry = Get-WtwRegistry
-    foreach ($existingName in $registry.repos.PSObject.Properties.Name) {
+    foreach ($existingName in (Get-WtwPropertyNames -Object $registry.repos)) {
         if ($existingName -eq $registryKey) { continue }
         $existingRepo = $registry.repos.$existingName
         $existingAliases = Get-WtwRepoAliases $existingRepo
@@ -116,10 +116,13 @@ function Initialize-WtwConfig {
 
     if ($Template) {
         # From another repo's template
-        foreach ($rn in $registry.repos.PSObject.Properties.Name) {
+        foreach ($rn in (Get-WtwPropertyNames -Object $registry.repos)) {
             $r = $registry.repos.$rn
             if ($rn -eq $Template -or (Test-WtwAliasMatch $r $Template)) {
-                $src = $r.template ?? $r.templateWorkspace
+                $src = Get-WtwPropertyValue -Object $r -Name 'template'
+                if (-not $src) {
+                    $src = Get-WtwPropertyValue -Object $r -Name 'templateWorkspace'
+                }
                 if ($src -and (Test-Path $src)) {
                     $templateSource = $src
                     Write-Host "  Template from repo: $rn" -ForegroundColor Cyan
@@ -212,7 +215,7 @@ function Initialize-WtwConfig {
             aliases           = $aliasArray
             worktrees         = [PSCustomObject]@{}
         }
-        if ($registry.repos.PSObject.Properties.Name -contains $registryKey) {
+        if ((Get-WtwPropertyNames -Object $registry.repos) -contains $registryKey) {
             $existing = $registry.repos.$registryKey
             if ($existing.worktrees) { $repoEntry.worktrees = $existing.worktrees }
         }
@@ -245,7 +248,7 @@ function Initialize-WtwConfig {
             aliases           = $aliasArray
             worktrees         = [PSCustomObject]@{}
         }
-        if ($registry.repos.PSObject.Properties.Name -contains $registryKey) {
+        if ((Get-WtwPropertyNames -Object $registry.repos) -contains $registryKey) {
             $existing = $registry.repos.$registryKey
             if ($existing.worktrees) { $repoEntry.worktrees = $existing.worktrees }
         }

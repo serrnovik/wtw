@@ -78,7 +78,7 @@ function Copy-WtwWorkspace {
     Write-Host "  Created:     $wsFile" -ForegroundColor Green
 
     if ($Open) {
-        $editor = $config.editor ?? 'code'
+        $editor = Get-WtwPropertyValue -Object $config -Name 'editor' -DefaultValue 'code'
         Write-Host "  Opening in ${editor}..." -ForegroundColor Green
         Invoke-WtwEditorCli -Cmd $editor -Path $wsFile
     }

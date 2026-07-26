@@ -57,7 +57,7 @@ function New-WtwWorkspace {
         [System.IO.Path]::GetFullPath($WorktreePath)
     } else {
         # Try to find existing worktree by name
-        if ($repoEntry.worktrees.PSObject.Properties.Name -contains $Name) {
+        if ((Get-WtwPropertyNames -Object $repoEntry.worktrees) -contains $Name) {
             $repoEntry.worktrees.$Name.path
         } else {
             # Check if path exists as sibling
@@ -102,7 +102,7 @@ function New-WtwWorkspace {
     Write-Host "  Workspace:   $wsFile" -ForegroundColor Green
 
     if ($Open) {
-        $editor = $config.editor ?? 'code'
+        $editor = Get-WtwPropertyValue -Object $config -Name 'editor' -DefaultValue 'code'
         Write-Host "  Opening in ${editor}..." -ForegroundColor Green
         Invoke-WtwEditorCli -Cmd $editor -Path $wsFile
     }

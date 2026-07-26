@@ -303,11 +303,13 @@ function Get-WtwCodexLocalProjectEntries {
         $rootPaths = @(
             if ($rootsProp -and $rootsProp.Value) { $rootsProp.Value }
         )
-        if ($rootPaths.Count -ne 1) { continue }
-
-        $normalizedRootPath = Get-WtwCodexNormalizedPath -Path ([string]($rootPaths[0]))
-        if ($normalizedRootPath -eq $normalizedProjectPath) {
-            Write-Output $entry
+        foreach ($rootPath in $rootPaths) {
+            if (-not $rootPath) { continue }
+            $normalizedRootPath = Get-WtwCodexNormalizedPath -Path ([string]$rootPath)
+            if ($normalizedRootPath -eq $normalizedProjectPath) {
+                Write-Output $entry
+                break
+            }
         }
     }
 }
@@ -327,6 +329,7 @@ function Set-WtwCodexLocalProjectName {
 
     if ($entry) {
         $project = $entry.Value
+        $project | Add-Member -NotePropertyName 'id' -NotePropertyValue ([string]$entry.Name) -Force
         $project | Add-Member -NotePropertyName 'name' -NotePropertyValue $PrettyName -Force
         $project | Add-Member -NotePropertyName 'updatedAt' -NotePropertyValue $now -Force
         return [string]$entry.Name
@@ -408,6 +411,9 @@ function Get-WtwCodexProjectLabel {
         return $null
     }
 
+    $project = @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath | Select-Object -First 1)[0]
+    if ($project) { return [string]$project.Value.name }
+
     $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
     if (-not ($labelsProp -and $labelsProp.Value)) { return $null }
 
@@ -464,10 +470,18 @@ function Remove-WtwCodexProjectLabel {
     Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $ProjectPath
     Remove-WtwCodexArrayValue -State $state -PropertyName 'active-workspace-roots' -Value $ProjectPath
 
+    $normalizedProjectPath = Get-WtwCodexNormalizedPath -Path $ProjectPath
     foreach ($project in @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath)) {
         $projectId = [string]$project.Name
-        $state.'local-projects'.PSObject.Properties.Remove($projectId)
-        Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $projectId
+        $remainingRoots = @($project.Value.rootPaths) | Where-Object {
+            $_ -and (Get-WtwCodexNormalizedPath -Path ([string]$_)) -ne $normalizedProjectPath
+        }
+        if ($remainingRoots.Count -eq 0) {
+            $state.'local-projects'.PSObject.Properties.Remove($projectId)
+            Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $projectId
+        } else {
+            $project.Value | Add-Member -NotePropertyName 'rootPaths' -NotePropertyValue @($remainingRoots) -Force
+        }
     }
 
     $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']

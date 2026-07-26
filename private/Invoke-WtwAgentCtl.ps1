@@ -8,20 +8,20 @@ function Get-WtwAgentCtlProfile {
         [object] $Config
     )
 
-    if ($RepoEntry -and ($RepoEntry.PSObject.Properties.Name -contains 'agentctlProfile') -and -not [string]::IsNullOrWhiteSpace($RepoEntry.agentctlProfile)) {
+    if ($RepoEntry -and ((Get-WtwPropertyNames -Object $RepoEntry) -contains 'agentctlProfile') -and -not [string]::IsNullOrWhiteSpace($RepoEntry.agentctlProfile)) {
         return [string] $RepoEntry.agentctlProfile
     }
 
-    if ($Config -and ($Config.PSObject.Properties.Name -contains 'agentctl')) {
+    if ($Config -and ((Get-WtwPropertyNames -Object $Config) -contains 'agentctl')) {
         $agentctlConfig = $Config.agentctl
-        if ($agentctlConfig -and ($agentctlConfig.PSObject.Properties.Name -contains 'repoProfiles')) {
+        if ($agentctlConfig -and ((Get-WtwPropertyNames -Object $agentctlConfig) -contains 'repoProfiles')) {
             $repoProfiles = $agentctlConfig.repoProfiles
-            if ($repoProfiles -and ($repoProfiles.PSObject.Properties.Name -contains $RepoName) -and -not [string]::IsNullOrWhiteSpace($repoProfiles.$RepoName)) {
+            if ($repoProfiles -and ((Get-WtwPropertyNames -Object $repoProfiles) -contains $RepoName) -and -not [string]::IsNullOrWhiteSpace($repoProfiles.$RepoName)) {
                 return [string] $repoProfiles.$RepoName
             }
         }
 
-        if ($agentctlConfig -and ($agentctlConfig.PSObject.Properties.Name -contains 'defaultProfile') -and -not [string]::IsNullOrWhiteSpace($agentctlConfig.defaultProfile)) {
+        if ($agentctlConfig -and ((Get-WtwPropertyNames -Object $agentctlConfig) -contains 'defaultProfile') -and -not [string]::IsNullOrWhiteSpace($agentctlConfig.defaultProfile)) {
             return [string] $agentctlConfig.defaultProfile
         }
     }
@@ -48,9 +48,9 @@ function Invoke-WtwAgentCtlAttach {
         return $false
     }
 
-    if ($Config -and ($Config.PSObject.Properties.Name -contains 'agentctl')) {
+    if ($Config -and ((Get-WtwPropertyNames -Object $Config) -contains 'agentctl')) {
         $agentctlConfig = $Config.agentctl
-        if ($agentctlConfig -and ($agentctlConfig.PSObject.Properties.Name -contains 'enabled') -and $agentctlConfig.enabled -eq $false) {
+        if ($agentctlConfig -and ((Get-WtwPropertyNames -Object $agentctlConfig) -contains 'enabled') -and $agentctlConfig.enabled -eq $false) {
             Write-Host '  agentctl: skipped (disabled in ~/.wtw/config.json)' -ForegroundColor DarkGray
             return $false
         }

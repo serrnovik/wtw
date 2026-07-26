@@ -18,17 +18,17 @@ function Resolve-WtwSyncTargetFromFile {
     $colors = Get-WtwColors
     $taskKey = if ($tn -and $rn) {
         $reg = Get-WtwRegistry
-        $repoEntry = if ($rn -and $reg.repos.PSObject.Properties.Name -contains $rn) { $reg.repos.$rn } else { $null }
+        $repoEntry = if ($rn -and (Get-WtwPropertyNames -Object $reg.repos) -contains $rn) { $reg.repos.$rn } else { $null }
         # wtw.task may store the workspace name (e.g. "repo_task") rather than the
         # registry worktree key ("task"). Try exact match first, then strip repo prefix.
         $wtName = $tn
-        if ($repoEntry -and $repoEntry.worktrees -and -not ($repoEntry.worktrees.PSObject.Properties.Name -contains $wtName)) {
+        if ($repoEntry -and $repoEntry.worktrees -and -not ((Get-WtwPropertyNames -Object $repoEntry.worktrees) -contains $wtName)) {
             $prefix = "${rn}_"
             if ($tn.StartsWith($prefix) -and $tn.Length -gt $prefix.Length) { $wtName = $tn.Substring($prefix.Length) }
         }
-        if ($repoEntry -and $repoEntry.worktrees -and $repoEntry.worktrees.PSObject.Properties.Name -contains $wtName) { "$rn/$wtName" } else { "$rn/main" }
+        if ($repoEntry -and $repoEntry.worktrees -and (Get-WtwPropertyNames -Object $repoEntry.worktrees) -contains $wtName) { "$rn/$wtName" } else { "$rn/main" }
     } else { $null }
-    $authColor = if ($taskKey -and $colors.assignments.PSObject.Properties.Name -contains $taskKey) { $colors.assignments.$taskKey } else { $null }
+    $authColor = if ($taskKey -and (Get-WtwPropertyNames -Object $colors.assignments) -contains $taskKey) { $colors.assignments.$taskKey } else { $null }
     $workspacePeacockColor = $wsContent.settings.'peacock.color'
 
     # Determine color source preference
@@ -55,6 +55,7 @@ function Resolve-WtwSyncTargetFromFile {
         wsFile         = $TargetPath
         repoName       = $rn
         wsName         = $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
+        displayName    = $wsContent.settings.'wtw.prettyName' ?? $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
         codeFolderPath = $wsContent.settings.'wtw.worktreePath' ?? ($wsContent.folders[0].path)
         color          = $resolvedColor
         branch         = $wsContent.settings.'wtw.branch'
@@ -164,21 +165,28 @@ function Sync-WtwWorkspace {
 
     } elseif ($All) {
         # All registered repos — main workspace + worktree workspaces
-        foreach ($repoName in $registry.repos.PSObject.Properties.Name) {
+        foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
             $repoEntry = $registry.repos.$repoName
             if ($Repo -and -not (Test-WtwAliasMatch $repoEntry $Repo) -and $repoName -ne $Repo) { continue }
 
-            $tpl = $templateOverride ?? $repoEntry.template ?? $repoEntry.templateWorkspace
+            $tpl = $templateOverride
+            if (-not $tpl) {
+                $tpl = Get-WtwPropertyValue -Object $repoEntry -Name 'template'
+            }
+            if (-not $tpl) {
+                $tpl = Get-WtwPropertyValue -Object $repoEntry -Name 'templateWorkspace'
+            }
             $repoDir = Split-Path $repoEntry.mainPath -Leaf
 
             # Main workspace
             if ($repoEntry.templateWorkspace -and (Test-Path $repoEntry.templateWorkspace)) {
                 $colors = Get-WtwColors
-                $mainColor = $colors.assignments."$repoName/main"
+                $mainColor = Get-WtwPropertyValue -Object $colors.assignments -Name "$repoName/main"
                 $syncTargets += [PSCustomObject]@{
                     wsFile         = $repoEntry.templateWorkspace
                     repoName       = $repoName
                     wsName         = $repoDir
+                    displayName    = $repoDir
                     codeFolderPath = $repoEntry.mainPath
                     color          = $mainColor
                     branch         = $null
@@ -190,13 +198,14 @@ function Sync-WtwWorkspace {
 
             # Worktree workspaces
             if ($repoEntry.worktrees) {
-                foreach ($taskName in $repoEntry.worktrees.PSObject.Properties.Name) {
+                foreach ($taskName in (Get-WtwPropertyNames -Object $repoEntry.worktrees)) {
                     $wt = $repoEntry.worktrees.$taskName
                     if ($wt.workspace -and (Test-Path $wt.workspace)) {
                         $syncTargets += [PSCustomObject]@{
                             wsFile         = $wt.workspace
                             repoName       = $repoName
-                            wsName         = "${repoName}_${taskName}"
+                            wsName         = $taskName
+                            displayName    = $wt.prettyName ?? "${repoName}_${taskName}"
                             codeFolderPath = $wt.path
                             color          = $wt.color
                             branch         = $wt.branch
@@ -262,11 +271,12 @@ function Sync-WtwWorkspace {
         }
 
         New-WtwWorkspaceFile `
-            -RepoName ($item.repoName ?? 'unknown') `
-            -Name $item.wsName `
+            -RepoName (Get-WtwPropertyValue -Object $item -Name 'repoName' -DefaultValue 'unknown') `
+            -Name $item.displayName `
             -CodeFolderPath $item.codeFolderPath `
             -TemplatePath $tpl `
             -OutputPath $item.wsFile `
+            -TaskName $item.wsName `
             -Color $item.color `
             -Branch $item.branch `
             -WorktreePath $item.worktreePath `

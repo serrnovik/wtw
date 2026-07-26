@@ -82,7 +82,9 @@ function Register-WtwTerminalTitle {
     # another hook; a tab carrying an older hook version is migrated by falling
     # through to reinstall.
     $hookVersion = 2
-    if ($global:_WtwTerminalTitleHookActive -and $global:_WtwTerminalTitleHookVersion -eq $hookVersion) {
+    $activeHook = Get-Variable -Name '_WtwTerminalTitleHookActive' -Scope Global -ValueOnly -ErrorAction SilentlyContinue
+    $activeHookVersion = Get-Variable -Name '_WtwTerminalTitleHookVersion' -Scope Global -ValueOnly -ErrorAction SilentlyContinue
+    if ($activeHook -and $activeHookVersion -eq $hookVersion) {
         return $global:_WtwSessionPrNumber
     }
     $global:_WtwTerminalTitleHookActive = $true
@@ -94,7 +96,8 @@ function Register-WtwTerminalTitle {
     Set-Item -Path function:global:prompt -Value {
         # ERROR PROPAGATION: capture before any other call clobbers these
         $realSuccess  = $?
-        $realExitCode = $global:LASTEXITCODE
+        $lastExitCodeVariable = Get-Variable -Name 'LASTEXITCODE' -Scope Global -ErrorAction SilentlyContinue
+        $realExitCode = if ($lastExitCodeVariable) { $lastExitCodeVariable.Value } else { 0 }
 
         $state = $global:_WtwTerminalTitleState
         $currentTitle = if ($state) {
@@ -133,7 +136,7 @@ function Register-WtwTerminalTitle {
         $esc = [char]27; $bel = [char]7
         "${promptOutput}${esc}]0;${currentTitle}${bel}"
 
-        Remove-Variable realSuccess, realExitCode -ErrorAction SilentlyContinue
+        Remove-Variable realSuccess, realExitCode, lastExitCodeVariable -ErrorAction SilentlyContinue
     }.GetNewClosure()
 
     return $global:_WtwSessionPrNumber

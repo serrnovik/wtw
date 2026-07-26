@@ -44,7 +44,7 @@ function Open-WtwWorkspace {
 
     $editorType = if ($editorCmd -is [System.Collections.IDictionary]) {
         $editorCmd['type']
-    } elseif ($editorCmd.PSObject.Properties.Name -contains 'type') {
+    } elseif ((Get-WtwPropertyNames -Object $editorCmd) -contains 'type') {
         $editorCmd.type
     } else {
         $null
@@ -78,7 +78,7 @@ function Open-WtwWorkspace {
             Write-Error "No directory found for '$Name'."
             return
         }
-        $prettyName = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
+        $prettyName = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
             $target.WorktreeEntry.prettyName
         } elseif ($target.TaskName) {
             $target.TaskName
@@ -123,7 +123,7 @@ function Open-WtwWorkspace {
         }
 
         if ($IsMacOS) {
-            $candidates = $editorCmd.appNameCandidates ?? @($appName)
+            $candidates = Get-WtwPropertyValue -Object $editorCmd -Name 'appNameCandidates' -DefaultValue @($appName)
             $found = $candidates | Where-Object { Test-Path "/Applications/$_.app" } | Select-Object -First 1
             if (-not $found) {
                 $tried = ($candidates | ForEach-Object { "$_.app" }) -join ', '
@@ -181,14 +181,39 @@ function Open-WtwWorkspace {
     if ($wsFile -and (Test-Path $wsFile)) {
         if ($editorCmd -eq 'cursor') {
             $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
-            $prettyName = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
+            $prettyName = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
                 $target.WorktreeEntry.prettyName
             } elseif ($target.TaskName) {
                 $target.TaskName
             } else {
                 Split-Path $dir -Leaf
             }
-            $color = if ($target.WorktreeEntry -and $target.WorktreeEntry.PSObject.Properties.Name -contains 'color') { $target.WorktreeEntry.color } else { $null }
+            $color = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'color') { $target.WorktreeEntry.color } else { $null }
+            if ($target.WorktreeEntry) {
+                $prettyWorkspacePath = Get-WtwCursorPrettyWorkspacePath -WorkspacePath $wsFile -PrettyName $prettyName -RepoName $target.RepoName
+                $needsAgentsLabelMigration = [System.IO.Path]::GetFullPath($prettyWorkspacePath) -ne [System.IO.Path]::GetFullPath($wsFile)
+                $canMigrate = -not $needsAgentsLabelMigration
+                if ($needsAgentsLabelMigration) {
+                    if ($SkipRestart -and (Test-WtwCursorAppRunning)) {
+                        Write-Host '  Cursor: Agents label migration skipped because --skip-restart was set.' -ForegroundColor DarkGray
+                    } else {
+                        $canMigrate = Resolve-WtwCursorStateConflict -PrettyName $prettyName
+                    }
+                }
+                if ($needsAgentsLabelMigration -and $canMigrate) {
+                    $migratedWorkspace = Move-WtwCursorWorkspaceForAgents `
+                        -WorkspacePath $wsFile `
+                        -PrettyName $prettyName `
+                        -RepoName $target.RepoName
+                    if ($migratedWorkspace -ne $wsFile) {
+                        $wsFile = $migratedWorkspace
+                        $target.WorktreeEntry | Add-Member -NotePropertyName 'workspace' -NotePropertyValue $wsFile -Force
+                        $registry = Get-WtwRegistry
+                        $registry.repos.$($target.RepoName).worktrees.$($target.TaskName) = $target.WorktreeEntry
+                        Save-WtwRegistry $registry
+                    }
+                }
+            }
             Register-WtwCursorProject -WorkspacePath $wsFile -ProjectPath $dir -PrettyName $prettyName -Color $color | Out-Null
         }
         Write-Host "  Opening in ${editorCmd}: $wsFile" -ForegroundColor Green

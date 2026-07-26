@@ -82,6 +82,68 @@ Describe 'Codex project integration' {
         $state.'electron-workspace-root-labels'.PSObject.Properties.Name | Should -Not -Contain $script:projectPath
     }
 
+    It 'renames the existing ChatGPT Desktop local project for a worktree' {
+        $statePath = Join-Path $script:codexHome '.codex-global-state.json'
+        $projectId = [guid]::NewGuid().ToString()
+        [PSCustomObject]@{
+            'local-projects' = [PSCustomObject]@{
+                $projectId = [PSCustomObject]@{
+                    id = 'stale-id'
+                    name = 'repo_feature'
+                    rootPaths = @($script:projectPath)
+                    createdAt = 100
+                    updatedAt = 100
+                }
+            }
+            'project-order' = @($projectId, $script:projectPath)
+        } | ConvertTo-Json -Depth 10 | Set-Content -Path $statePath -Encoding utf8
+
+        Set-WtwCodexProjectLabel -ProjectPath $script:projectPath -PrettyName '🟠 Feature Worktree' -GlobalStatePath $statePath | Should -BeTrue
+        $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
+
+        $state.'local-projects'.PSObject.Properties[$projectId].Value.id | Should -Be $projectId
+        $state.'local-projects'.PSObject.Properties[$projectId].Value.name | Should -Be '🟠 Feature Worktree'
+        $state.'local-projects'.PSObject.Properties.Count | Should -Be 1
+        @($state.'project-order') | Should -Be @($projectId)
+        Get-WtwCodexProjectLabel -ProjectPath $script:projectPath -GlobalStatePath $statePath | Should -Be '🟠 Feature Worktree'
+    }
+
+    It 'matches normalized roots and preserves the rest of a multi-root project' {
+        $statePath = Join-Path $script:codexHome '.codex-global-state.json'
+        $projectId = [guid]::NewGuid().ToString()
+        $alternateRoot = Join-Path $script:tempDir 'shared-root'
+        [PSCustomObject]@{
+            'local-projects' = [PSCustomObject]@{
+                $projectId = [PSCustomObject]@{
+                    id = $projectId
+                    name = 'Shared Project'
+                    rootPaths = @("$script:projectPath/", $alternateRoot)
+                }
+            }
+            'project-order' = @($projectId)
+        } | ConvertTo-Json -Depth 10 | Set-Content -Path $statePath -Encoding utf8
+
+        Get-WtwCodexProjectLabel -ProjectPath $script:projectPath -GlobalStatePath $statePath | Should -Be 'Shared Project'
+        Remove-WtwCodexProjectLabel -ProjectPath $script:projectPath -GlobalStatePath $statePath | Should -BeTrue
+        $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
+
+        $state.'local-projects'.PSObject.Properties[$projectId].Value.rootPaths | Should -Be @($alternateRoot)
+        @($state.'project-order') | Should -Contain $projectId
+    }
+
+    It 'does not treat a legacy label as a complete modern project label' {
+        $statePath = Join-Path $script:codexHome '.codex-global-state.json'
+        [PSCustomObject]@{
+            'electron-workspace-root-labels' = [PSCustomObject]@{
+                $script:projectPath = 'Legacy Label'
+            }
+        } | ConvertTo-Json -Depth 10 | Set-Content -Path $statePath -Encoding utf8
+
+        Get-WtwCodexProjectLabel -ProjectPath $script:projectPath -GlobalStatePath $statePath | Should -Be 'Legacy Label'
+        Test-WtwCodexProjectLabel -ProjectPath $script:projectPath -PrettyName 'Legacy Label' -GlobalStatePath $statePath |
+            Should -BeFalse
+    }
+
     It 'creates Codex desktop state when it is missing' {
         $statePath = Join-Path $script:codexHome '.codex-global-state.json'
 
@@ -89,6 +151,10 @@ Describe 'Codex project integration' {
         $state = Get-Content -Path $statePath -Raw | ConvertFrom-Json
 
         @($state.'electron-saved-workspace-roots') | Should -Contain $script:projectPath
+        $localProject = @($state.'local-projects'.PSObject.Properties | Where-Object {
+            @($_.Value.rootPaths) -contains $script:projectPath
+        })[0]
+        @($state.'project-order') | Should -Contain $localProject.Name
         @($state.'project-order') | Should -Not -Contain $script:projectPath
         $state.'electron-workspace-root-labels'.PSObject.Properties[$script:projectPath].Value | Should -Be 'Fresh State'
         @($state.'local-projects'.PSObject.Properties | Where-Object { $_.Value.rootPaths -contains $script:projectPath }).Value.name | Should -Be 'Fresh State'

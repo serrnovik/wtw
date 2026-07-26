@@ -7,7 +7,7 @@ function Resolve-WtwCurrentTarget {
     $root = Resolve-WtwRepoRoot
     if ($repo.worktrees -and $root) {
         $rootResolved = [System.IO.Path]::GetFullPath($root)
-        foreach ($taskName in $repo.worktrees.PSObject.Properties.Name) {
+        foreach ($taskName in (Get-WtwPropertyNames -Object $repo.worktrees)) {
             $wt = $repo.worktrees.$taskName
             if ($wt.path -and [System.IO.Path]::GetFullPath($wt.path) -eq $rootResolved) {
                 return $taskName

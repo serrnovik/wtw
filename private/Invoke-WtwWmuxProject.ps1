@@ -318,7 +318,7 @@ function Get-WtwWmuxLiveWorkspaces {
 
     $parsed = ConvertFrom-WtwWmuxJsonOutput -Output $result.Output
     if (-not $parsed) { return @() }
-    if ($parsed.PSObject.Properties.Name -contains 'workspaces') { return @($parsed.workspaces) }
+    if ((Get-WtwPropertyNames -Object $parsed) -contains 'workspaces') { return @($parsed.workspaces) }
     if ($parsed -is [array]) { return @($parsed) }
     return @($parsed)
 }

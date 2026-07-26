@@ -23,11 +23,11 @@ function Resolve-WtwTerminalWorkspaceMetadata {
     $statusValue = if ($Target.TaskName) { "$($Target.RepoName)/$($Target.TaskName)" } else { $Target.RepoName }
 
     if ($Target.WorktreeEntry) {
-        if ($Target.WorktreeEntry.PSObject.Properties.Name -contains 'color') {
+        if ((Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'color') {
             $color = $Target.WorktreeEntry.color
         }
 
-        if ($Target.WorktreeEntry.PSObject.Properties.Name -contains 'prettyName' -and $Target.WorktreeEntry.prettyName) {
+        if ((Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'prettyName' -and $Target.WorktreeEntry.prettyName) {
             $baseName = $Target.WorktreeEntry.prettyName
         } elseif ($Target.TaskName) {
             $baseName = $Target.TaskName

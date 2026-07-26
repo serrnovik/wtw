@@ -198,10 +198,10 @@ function Set-WtwCmuxWorkspaceGroup {
 
     if (-not $Color) { return }
 
-    if (-not ($Config.PSObject.Properties.Name -contains 'workspaceGroups') -or -not $Config.workspaceGroups) {
+    if (-not ((Get-WtwPropertyNames -Object $Config) -contains 'workspaceGroups') -or -not $Config.workspaceGroups) {
         $Config | Add-Member -NotePropertyName 'workspaceGroups' -NotePropertyValue ([PSCustomObject]@{}) -Force
     }
-    if (-not ($Config.workspaceGroups.PSObject.Properties.Name -contains 'byCwd') -or -not $Config.workspaceGroups.byCwd) {
+    if (-not ((Get-WtwPropertyNames -Object $Config.workspaceGroups) -contains 'byCwd') -or -not $Config.workspaceGroups.byCwd) {
         $Config.workspaceGroups | Add-Member -NotePropertyName 'byCwd' -NotePropertyValue ([PSCustomObject]@{}) -Force
     }
 
@@ -270,7 +270,7 @@ function Register-WtwCmuxProject {
     if (-not $config) {
         $config = New-WtwCmuxConfig
     }
-    if (-not ($config.PSObject.Properties.Name -contains 'commands') -or -not $config.commands) {
+    if (-not ((Get-WtwPropertyNames -Object $config) -contains 'commands') -or -not $config.commands) {
         $config | Add-Member -NotePropertyName 'commands' -NotePropertyValue @() -Force
     }
 
@@ -280,9 +280,9 @@ function Register-WtwCmuxProject {
     Set-WtwCmuxWorkspaceGroup -Config $config -ProjectPath $fullPath -Color $Color
 
     $commands = @($config.commands) | Where-Object {
-        $id = if ($_.PSObject.Properties.Name -contains 'id') { $_.id } else { $null }
-        $name = if ($_.PSObject.Properties.Name -contains 'name') { $_.name } else { $null }
-        $cwd = if ($_.PSObject.Properties.Name -contains 'workspace' -and $_.workspace -and $_.workspace.PSObject.Properties.Name -contains 'cwd') {
+        $id = if ((Get-WtwPropertyNames -Object $_) -contains 'id') { $_.id } else { $null }
+        $name = if ((Get-WtwPropertyNames -Object $_) -contains 'name') { $_.name } else { $null }
+        $cwd = if ((Get-WtwPropertyNames -Object $_) -contains 'workspace' -and $_.workspace -and (Get-WtwPropertyNames -Object $_.workspace) -contains 'cwd') {
             $_.workspace.cwd
         } else {
             $null
@@ -325,7 +325,7 @@ function Unregister-WtwCmuxProject {
 
     $rawConfig = Get-Content -Path $resolvedConfigPath -Raw
     $config = Read-JsoncFile $resolvedConfigPath
-    if (-not ($config -and $config.PSObject.Properties.Name -contains 'commands')) { return }
+    if (-not ($config -and (Get-WtwPropertyNames -Object $config) -contains 'commands')) { return }
 
     $fullPath = if ($ProjectPath) { [System.IO.Path]::GetFullPath($ProjectPath) } else { $null }
     if (-not $CommandKey -and $fullPath) {
@@ -334,8 +334,8 @@ function Unregister-WtwCmuxProject {
 
     $before = ConvertTo-WtwCmuxConfigJson -Config $config
     $config.commands = @($config.commands) | Where-Object {
-        $id = if ($_.PSObject.Properties.Name -contains 'id') { $_.id } else { $null }
-        $cwd = if ($_.PSObject.Properties.Name -contains 'workspace' -and $_.workspace -and $_.workspace.PSObject.Properties.Name -contains 'cwd') {
+        $id = if ((Get-WtwPropertyNames -Object $_) -contains 'id') { $_.id } else { $null }
+        $cwd = if ((Get-WtwPropertyNames -Object $_) -contains 'workspace' -and $_.workspace -and (Get-WtwPropertyNames -Object $_.workspace) -contains 'cwd') {
             $_.workspace.cwd
         } else {
             $null
