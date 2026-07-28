@@ -110,6 +110,7 @@ wtw cursor auth           # open in Cursor (or: wtw cur auth)
 wtw code auth             # open in VS Code (or: wtw co auth)
 wtw chatgpt auth          # open in ChatGPT Desktop (aliases: cgpt, codex)
 wtw chatgpt auth --skip-restart  # open without closing ChatGPT if the label needs repair
+wtw claudecode auth       # new Claude Code chat rooted at the worktree (or: wtw ccode auth)
 wtw cmux auth             # open the worktree as a cmux workspace (or: wtw cm auth)
 wtw wmux auth             # Windows: open the worktree as a wmux workspace (or: wtw wm auth)
 ```
@@ -144,6 +145,8 @@ wtw clean                 # interactive selection + removal
 | `wtw windsurf [name]` | Open in Windsurf (aliases: `wind`, `ws`) |
 | `wtw codium [name]` | Open in VSCodium (aliases: `vscodium`) |
 | `wtw chatgpt [name] [--skip-restart]` | Open in ChatGPT Desktop (aliases: `cgpt`, `codex`) |
+| `wtw claude [name]` | Bring the Claude desktop app forward (aliases: `cowork`) |
+| `wtw claudecode [name] [--prompt X]` | Start a new Claude Code chat rooted at the worktree (aliases: `ccode`) |
 | `wtw cmux [name]` | Open the worktree as a cmux workspace (aliases: `cm`) |
 | `wtw wmux [name]` | Open the worktree as a wmux workspace on Windows (aliases: `wm`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
@@ -432,6 +435,15 @@ them and `wtw remove` cleans that registration up:
   around the label write so the app does not overwrite the external state edit.
   It skips that prompt when the saved label already matches; pass
   `--skip-restart` to open without repairing a missing/stale label.
+- **Claude Code (Claude for Desktop)** — `wtw claudecode <name>` (alias
+  `wtw ccode <name>`) starts a *new* Claude Code chat rooted at the worktree via
+  the app's `claude://code/new?folder=<path>` deep link, launching Claude first
+  if it is not running. There is no registration step to clean up, and no
+  wtw-settable label: the desktop app titles sessions itself (auto-generated
+  from the first message, renameable in the UI) and identifies them by folder.
+  `--prompt <text>` pre-fills the new chat's composer without submitting it,
+  which is the closest equivalent to the sidebar labels wtw writes for
+  ChatGPT/Cursor. Plain `wtw claude <name>` just brings the app forward.
 - **Cursor** — registers the generated `.code-workspace` in Cursor's recent
   workspace list (`state.vscdb`) when Cursor and `sqlite3` are present.
   `wtw cursor <name>` refreshes that entry before opening it. Cursor does not

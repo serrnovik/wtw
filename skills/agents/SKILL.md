@@ -53,6 +53,7 @@ pwsh -Command "wtw open [name]"
 pwsh -Command "wtw cursor [name]"
 pwsh -Command "wtw code [name]"
 pwsh -Command "wtw chatgpt [name] [--skip-restart]" # aliases: cgpt, codex
+pwsh -Command "wtw claudecode [name] [--prompt X]"  # aliases: ccode — new Claude Code chat in the worktree
 
 # Clean stale AI worktrees
 pwsh -Command "wtw clean [--dry-run]"
@@ -101,6 +102,12 @@ ChatGPT Desktop on demand; if ChatGPT is running, it may prompt to close/relaunc
 the label write is not overwritten. It skips the prompt when the saved label
 already matches; pass `--skip-restart` to open without repairing a missing/stale
 label. `wtw remove` cleans those Codex entries up.
+
+`wtw claudecode <name>` (alias `ccode`) opens a new Claude Code chat rooted at
+the worktree via the Claude desktop app's `claude://code/new?folder=<path>` deep
+link. Nothing is registered or cleaned up, and the chat title is owned by the
+app (auto-generated, renameable in the UI) — `--prompt <text>` only pre-fills
+the composer. `wtw claude <name>` just brings the Claude app forward.
 
 ## Config
 

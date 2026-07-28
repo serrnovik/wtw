@@ -21,7 +21,9 @@ function Resolve-WtwEditorCommand {
         @{ prefixes = @('cmux', 'cm');          type = 'cmux';   appName = 'cmux';        cmd = 'cmux' }
         @{ prefixes = @('wmux', 'wm');          type = 'wmux';   appName = 'wmux';        cmd = 'wmux' }
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }
-        @{ prefixes = @('claudecode', 'ccode'); type = 'macapp'; appName = 'Claude Code'; appNameCandidates = @('Claude Code') }
+        # Claude Code ships inside the Claude desktop app, not as its own bundle —
+        # `claude://code/new?folder=<dir>` starts a chat rooted at the worktree.
+        @{ prefixes = @('claudecode', 'ccode'); type = 'claudecode'; appName = 'Claude Code'; appNameCandidates = @('Claude') }
         @{ prefixes = @('t3', 't3code');        type = 'macapp'; appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
         # Superset — find matching workspace and open Superset app, or print hints
         @{ prefixes = @('ss', 'superset', 'supersetsh'); type = 'superset'; appName = 'Superset' }

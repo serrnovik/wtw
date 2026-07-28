@@ -23,6 +23,7 @@ function Open-WtwWorkspace {
 
         [string] $Repo,
         [object] $Editor,  # string for CLI editors; hashtable @{type='macapp'; appName=...} for open-app style
+        [string] $Prompt,  # claudecode only: pre-fills the new chat's composer
         [switch] $SkipRestart
     )
 
@@ -67,6 +68,13 @@ function Open-WtwWorkspace {
     # CLI supports creating a named workspace at a cwd.
     if ($editorType -eq 'wmux') {
         Open-WtwWmuxWorkspace -Target $target
+        return
+    }
+
+    # Claude Code — the Claude desktop app hosts it, so open a new chat rooted at
+    # the target directory via the app's `claude://code/new` deep link.
+    if ($editorType -eq 'claudecode') {
+        Open-WtwClaudeCodeWorkspace -Target $target -Editor $editorCmd -Prompt $Prompt
         return
     }
 
@@ -131,7 +139,7 @@ function Open-WtwWorkspace {
                 return
             }
             Write-Host "  Opening in ${found}: $dir" -ForegroundColor Green
-            if ($editorCmd.macArgsViaCli) {
+            if (Get-WtwPropertyValue -Object $editorCmd -Name 'macArgsViaCli' -DefaultValue $false) {
                 # `open -a` routes paths as Apple "open file" events; many Avalonia apps don't handle them,
                 # and `open -n --args` silently drops --args when LSMultipleInstancesProhibited is set.
                 # Invoke the inner Mach-O directly so argv reaches main() — for IPC-aware apps (e.g.

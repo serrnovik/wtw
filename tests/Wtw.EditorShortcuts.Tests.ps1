@@ -76,6 +76,27 @@ Describe 'Resolve-WtwEditorCommand' {
         $alias.type | Should -Be 'wmux'
     }
 
+    It 'resolves "claude" and "cowork" to a plain Claude app launch' {
+        foreach ($name in 'claude', 'cowork') {
+            $command = Resolve-WtwEditorCommand $name
+
+            $command.type | Should -Be 'macapp'
+            $command.appName | Should -Be 'Claude'
+            $command.appNameCandidates | Should -Be @('Claude')
+        }
+    }
+
+    It 'resolves "claudecode" and "ccode" to the Claude Code deep-link launcher' {
+        foreach ($name in 'claudecode', 'ccode') {
+            $command = Resolve-WtwEditorCommand $name
+
+            $command.type | Should -Be 'claudecode'
+            $command.appName | Should -Be 'Claude Code'
+            # Claude Code has no bundle of its own — it lives inside Claude.app.
+            $command.appNameCandidates | Should -Be @('Claude')
+        }
+    }
+
     It 'returns null for unknown editor' {
         Resolve-WtwEditorCommand 'vim' | Should -BeNullOrEmpty
     }
