@@ -438,12 +438,18 @@ them and `wtw remove` cleans that registration up:
 - **Claude Code (Claude for Desktop)** — `wtw claudecode <name>` (alias
   `wtw ccode <name>`) starts a *new* Claude Code chat rooted at the worktree via
   the app's `claude://code/new?folder=<path>` deep link, launching Claude first
-  if it is not running. There is no registration step to clean up, and no
-  wtw-settable label: the desktop app titles sessions itself (auto-generated
-  from the first message, renameable in the UI) and identifies them by folder.
-  `--prompt <text>` pre-fills the new chat's composer without submitting it,
-  which is the closest equivalent to the sidebar labels wtw writes for
-  ChatGPT/Cursor. Plain `wtw claude <name>` just brings the app forward.
+  if it is not running. `wtw create` pre-accepts the "Trust this workspace?"
+  prompt for the new worktree by setting `hasTrustDialogAccepted` under
+  `projects.<path>` in `~/.claude.json` (honours `$env:CLAUDE_CONFIG_DIR`), and
+  `wtw remove` drops that project entry again. Both are no-ops when the file
+  does not exist. **Note:** pre-trusting means Claude Code may read, write, and
+  execute in the worktree without asking first — the same posture wtw already
+  takes for Codex's `trust_level = "trusted"`.
+  There is no wtw-settable session label: the desktop app titles sessions itself
+  (auto-generated from the first message, renameable in the UI) and identifies
+  them by folder. `--prompt <text>` pre-fills the new chat's composer without
+  submitting it, which is the closest equivalent to the sidebar labels wtw
+  writes for ChatGPT/Cursor. Plain `wtw claude <name>` just brings the app forward.
 - **Cursor** — registers the generated `.code-workspace` in Cursor's recent
   workspace list (`state.vscdb`) when Cursor and `sqlite3` are present.
   `wtw cursor <name>` refreshes that entry before opening it. Cursor does not

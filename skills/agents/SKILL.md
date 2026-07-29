@@ -105,9 +105,11 @@ label. `wtw remove` cleans those Codex entries up.
 
 `wtw claudecode <name>` (alias `ccode`) opens a new Claude Code chat rooted at
 the worktree via the Claude desktop app's `claude://code/new?folder=<path>` deep
-link. Nothing is registered or cleaned up, and the chat title is owned by the
-app (auto-generated, renameable in the UI) — `--prompt <text>` only pre-fills
-the composer. `wtw claude <name>` just brings the Claude app forward.
+link. `wtw create` pre-accepts the workspace-trust prompt in `~/.claude.json`
+(`projects.<path>.hasTrustDialogAccepted`) and `wtw remove` drops that entry.
+The chat title is owned by the app (auto-generated, renameable in the UI) —
+`--prompt <text>` only pre-fills the composer. `wtw claude <name>` just brings
+the Claude app forward.
 
 ## Config
 

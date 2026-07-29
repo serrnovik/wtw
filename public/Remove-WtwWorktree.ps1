@@ -70,6 +70,18 @@ function Remove-WtwWorktree {
         Unregister-WtwCodexProject -ProjectPath $codexProjectPath
     }
 
+    # Drop the worktree's Claude Code project state (trust answer, per-directory
+    # prompt history) — the directory itself is going away. Older registry
+    # entries will not have claudeCodeTrustPath, so fall back to the worktree path.
+    $claudeCodeTrustPath = if ((Get-WtwPropertyNames -Object $wt) -contains 'claudeCodeTrustPath' -and $wt.claudeCodeTrustPath) {
+        $wt.claudeCodeTrustPath
+    } else {
+        $wt.path
+    }
+    if ($claudeCodeTrustPath) {
+        Unregister-WtwClaudeCodeProject -ProjectPath $claudeCodeTrustPath | Out-Null
+    }
+
     $cursorWorkspacePath = if ((Get-WtwPropertyNames -Object $wt) -contains 'cursorWorkspacePath' -and $wt.cursorWorkspacePath) {
         $wt.cursorWorkspacePath
     } else {
