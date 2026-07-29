@@ -128,7 +128,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'cgpt';        Tip = 'Open in ChatGPT' }
             @{ Name = 'codex';       Tip = 'Open in ChatGPT' }
             @{ Name = 'claude';      Tip = 'Open Claude.ai app' }
-            @{ Name = 'claudecode';  Tip = 'Open Claude Code desktop' }
+            @{ Name = 'claudecode';  Tip = 'New Claude Code chat in the worktree (alias: ccode)' }
             @{ Name = 't3';          Tip = 'Open T3 Code (Alpha)' }
             @{ Name = 'ss';          Tip = 'Find & open matching Superset workspace' }
             @{ Name = 'help';        Tip = 'Show help' }

@@ -62,6 +62,7 @@ function Initialize-WtwWorktreeMetadata {
         WorkspaceFile       = $null
         SupersetWorkspaceId = $null
         CodexProjectPath    = $null
+        ClaudeCodeTrustPath = $null
         CursorWorkspacePath = $null
         CmuxCommandKey      = $null
         WmuxWorkspaceName   = $null
@@ -148,6 +149,7 @@ function Initialize-WtwWorktreeMetadata {
         prettyName          = $PrettyName
         supersetWorkspaceId = $null
         codexProjectPath    = $null
+        claudeCodeTrustPath = $null
         cursorWorkspacePath = $null
         cmuxCommandKey      = $null
         wmuxWorkspaceName   = $null
@@ -169,6 +171,15 @@ function Initialize-WtwWorktreeMetadata {
         $registry.repos.$RepoName.worktrees.$Task.codexProjectPath = $codexProjectPath
         Save-WtwRegistry $registry
         $result.CodexProjectPath = $codexProjectPath
+    }
+
+    # Pre-accept Claude Code's workspace-trust prompt so `wtw claudecode` opens
+    # straight into the new worktree (no-op when ~/.claude.json is absent).
+    $claudeTrustPath = Register-WtwClaudeCodeProject -ProjectPath $WorktreePath
+    if ($claudeTrustPath) {
+        $registry.repos.$RepoName.worktrees.$Task.claudeCodeTrustPath = $claudeTrustPath
+        Save-WtwRegistry $registry
+        $result.ClaudeCodeTrustPath = $claudeTrustPath
     }
 
     # Register Cursor recent-workspace metadata for the generated workspace

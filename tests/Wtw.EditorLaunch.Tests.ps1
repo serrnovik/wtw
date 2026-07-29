@@ -259,6 +259,59 @@ Describe 'Open-WtwWorkspace editor launchers' {
         Should -Invoke Start-WtwCodexApp -ModuleName wtw -Times 1 -Exactly -ParameterFilter { $ProjectPath -eq $worktreeDir }
     }
 
+    It 'starts a Claude Code chat in the worktree directory instead of the workspace file' {
+        $worktreeDir = Join-Path $script:tmp 'claudecode-worktree'
+        New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
+        $workspaceFile = Join-Path $script:tmp 'claudecode-worktree.code-workspace'
+        Set-Content -Path $workspaceFile -Value '{}'
+
+        Mock Resolve-WtwTarget {
+            [PSCustomObject]@{
+                RepoName      = 'sample'
+                TaskName      = 'claudecode-worktree'
+                WorktreeEntry = [PSCustomObject]@{
+                    path       = $worktreeDir
+                    workspace  = $workspaceFile
+                    prettyName = 'Blue Claude Worktree'
+                }
+                RepoEntry     = [PSCustomObject]@{ mainPath = $script:tmp }
+            }
+        } -ModuleName wtw
+        Mock Start-WtwClaudeCodeSession { [PSCustomObject]@{ Success = $true; Url = 'claude://code/new'; Reason = $null } } -ModuleName wtw
+        Mock Invoke-WtwEditorCli { throw 'generic editor path should not be used for Claude Code' } -ModuleName wtw
+
+        Open-WtwWorkspace -Name 'claudecode-worktree' -Editor @{ type = 'claudecode'; appName = 'Claude Code'; appNameCandidates = @('Claude') } -Prompt 'pick up the review'
+
+        Should -Invoke Start-WtwClaudeCodeSession -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+            $ProjectPath -eq $worktreeDir -and $Prompt -eq 'pick up the review'
+        }
+        Should -Invoke Invoke-WtwEditorCli -ModuleName wtw -Times 0
+    }
+
+    It 'opens a macapp editor that omits macArgsViaCli without tripping strict mode' -Skip:(-not $IsMacOS) {
+        # Regression: `$editorCmd.macArgsViaCli` threw PropertyNotFoundException under
+        # Set-StrictMode -Version Latest for every macapp entry except SourceGit.
+        $worktreeDir = Join-Path $script:tmp 'macapp-worktree'
+        New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null
+
+        Mock Resolve-WtwTarget {
+            [PSCustomObject]@{
+                WorktreeEntry = [PSCustomObject]@{ path = $worktreeDir }
+                RepoEntry     = [PSCustomObject]@{ mainPath = $script:tmp }
+            }
+        } -ModuleName wtw
+        Mock Test-Path { $true } -ModuleName wtw -ParameterFilter { "$Path" -like '/Applications/*.app' }
+        Mock open {} -ModuleName wtw
+        Mock Start-Process { throw 'macArgsViaCli is absent — must not take the direct-binary path' } -ModuleName wtw
+
+        {
+            Open-WtwWorkspace -Name 'macapp-worktree' -Editor @{ type = 'macapp'; appName = 'Claude'; appNameCandidates = @('Claude') }
+        } | Should -Not -Throw
+
+        Should -Invoke open -ModuleName wtw -Times 1 -Exactly
+        Should -Invoke Start-Process -ModuleName wtw -Times 0
+    }
+
     It 'skips the restart prompt when requested' {
         $worktreeDir = Join-Path $script:tmp 'codex-skip-restart-worktree'
         New-Item -ItemType Directory -Path $worktreeDir -Force | Out-Null

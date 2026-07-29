@@ -159,7 +159,7 @@ _wtw_completion() {
         'cmux:Open a target in cmux'
         'wmux:Open a target in wmux'
         'claude:Open a target in Claude'
-        'claudecode:Open a target in Claude Code'
+        'claudecode:Start a new Claude Code chat in a target'
         't3:Open a target in T3 Code'
         'help:Show WTW help'
     )
