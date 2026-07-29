@@ -104,6 +104,9 @@ function Show-WtwCommandHelp {
         'install'     { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }
         'update'      { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }
         'skill'       { @('wtw skill [--agent claude|agents|all]', 'Install the wtw AI skill into the current repo.', '', 'Copies skill definitions so AI agents (Claude, Codex, Cursor, Gemini)', 'can discover and use wtw commands.', '', 'Options:', '  --agent claude    Claude Code only (.claude/skills/)', '  --agent agents    Cross-agent format (.agents/skills/)', '  --agent all       Both (default)') }
+        { $_ -in 'claudecode', 'ccode' } {
+            @('wtw claudecode [name] [--prompt <text>]', 'Start a new Claude Code chat in the Claude desktop app, rooted at the target.', '', 'Arguments:', '  name    Target to open (default: detected from cwd)', '', 'Options:', '  --prompt <text>   Pre-fill the new chat''s composer (not submitted)', '', 'Uses the app''s claude://code/new deep link. The desktop app names sessions', 'itself (auto-titled from the first message, renameable in the UI), so wtw', 'cannot set a chat title the way it labels Cursor/ChatGPT projects.', '', 'Use `wtw claude` to just bring the Claude app forward instead.')
+        }
         default {
             # Check if it's an editor command
             $resolved = Resolve-WtwEditorCommand $Command

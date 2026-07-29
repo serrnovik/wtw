@@ -79,6 +79,16 @@ function Install-Wtw {
     $rootFile = Join-Path $sourceDir 'wtw.psm1'
     Copy-Item -Path $rootFile -Destination (Join-Path $installDir 'wtw.psm1') -Force
 
+    # Ship the manifest alongside it. Every loader imports wtw.psm1 by explicit
+    # path (profile snippet, wtw.zsh, wtw.bash, Restore-WtwInstalledModule), so
+    # this does not change what gets exported — it just stops the installed copy
+    # from being manifest-less, which is why `(Get-Module wtw).Version` reports
+    # 0.0 instead of the ModuleVersion in wtw.psd1.
+    $manifestFile = Join-Path $sourceDir 'wtw.psd1'
+    if (Test-Path $manifestFile) {
+        Copy-Item -Path $manifestFile -Destination (Join-Path $installDir 'wtw.psd1') -Force
+    }
+
     # Also copy shell files to ~/.wtw/shell/ for easy sourcing
     $shellSrc = Join-Path $sourceDir 'shell'
     $shellDest = Join-Path $HOME '.wtw' 'shell'
