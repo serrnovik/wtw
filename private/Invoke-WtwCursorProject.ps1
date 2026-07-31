@@ -94,7 +94,29 @@ function Test-WtwCursorAppRunning {
     [CmdletBinding()]
     param()
 
-    return [bool](Get-Process -Name 'Cursor' -ErrorAction SilentlyContinue)
+    try {
+        return [bool]@(Get-Process -Name 'Cursor' -ErrorAction SilentlyContinue)
+    } catch {
+        # Some macOS pwsh/.NET runtime combinations fail while materializing
+        # Process objects because System.Diagnostics.FileVersionInfo is absent.
+        # Fall back to pgrep so we still avoid editing Cursor state while its
+        # desktop process is running.
+        Write-Verbose "Cursor process probe via Get-Process failed: $($_.Exception.Message)"
+        if ($IsMacOS -or $IsLinux) {
+            $pgrep = Get-Command pgrep -CommandType Application -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if ($pgrep) {
+                try {
+                    & $pgrep.Source -x Cursor 2>$null | Out-Null
+                    return $LASTEXITCODE -eq 0
+                } catch {
+                    Write-Verbose "Cursor process probe via pgrep failed: $($_.Exception.Message)"
+                }
+            }
+        }
+
+        return $false
+    }
 }
 
 function Stop-WtwCursorProcess {
