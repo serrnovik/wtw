@@ -26,6 +26,13 @@ function Invoke-Wtw {
         $rawArgs = $args[1..($args.Count - 1)]
     }
 
+    # Newer-version hint. Emitted up front because the dispatch below returns
+    # from many branches. Cache-only, silent on failure, and skipped for the
+    # internal `__*` commands whose stdout the shell wrappers parse.
+    if ([string]$Command -notlike '__*') {
+        Write-WtwUpdateNotice
+    }
+
     if (-not $Command) {
         Write-Host ''
         Write-Host '  wtw - Git Worktree + Workspace Manager' -ForegroundColor Cyan

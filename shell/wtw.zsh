@@ -4,6 +4,10 @@
 
 _wtw_module="${HOME}/.wtw/module/wtw.psm1"
 
+# Stable per-terminal id. Each wtw command runs a fresh pwsh, so the module
+# cannot use its own PID to show a session-scoped notice only once.
+export WTW_SHELL_SESSION=$$
+
 # Resolve pwsh path at source time — handles cases where pwsh is in a PATH
 # segment that's set up before this file is sourced (e.g. Homebrew paths)
 _wtw_pwsh=$(command -v pwsh 2>/dev/null || echo "pwsh")

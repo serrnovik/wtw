@@ -74,6 +74,24 @@ wtw install
 
 Re-run `wtw install` from source after pulling updates.
 
+### Update notice
+
+wtw tells you when a newer version is published. It prints a two-line hint once
+per shell session:
+
+```text
+  wtw 0.2.0 is available (you have 0.1.46).
+  Update: wtw install     (or: Update-Module wtw -Scope CurrentUser)
+```
+
+The hint reads only `~/.wtw/update-check.json`, so it never waits on the
+network; a stale cache is refreshed by a detached background process and used
+by the next command. Being offline, having no cache yet, or a read-only `HOME`
+are all silent. The hint is skipped when stdout is redirected — which covers CI
+and the subcommands whose output the shell wrappers parse — and when
+`WTW_NO_UPDATE_NOTICE=1` is set. `Get-WtwUpdateStatus` reports the same
+comparison on demand.
+
 ## Quick Start
 
 ### 1. Register your repos
