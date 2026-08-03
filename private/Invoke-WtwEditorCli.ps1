@@ -33,12 +33,11 @@ function Invoke-WtwEditorCli {
         'code'        = @{ candidates = @('code');        macApps = @('Visual Studio Code') }
         'windsurf'    = @{ candidates = @('windsurf');    macApps = @('Windsurf') }
         'codium'      = @{ candidates = @('codium');      macApps = @('VSCodium') }
-        'droid'       = @{ candidates = @('droid') }
     }
 
     $spec       = $launch[$Cmd]
     $candidates = if ($spec) { $spec.candidates } else { @($Cmd) }
-    $macApps    = if ($spec) { $spec.macApps }    else { @() }
+    $macApps    = if ($spec -and $spec.ContainsKey('macApps')) { $spec.macApps } else { @() }
 
     # 1. First CLI candidate that resolves to a real, runnable binary.
     # Cursor otherwise follows its last-window behaviour, which can route a

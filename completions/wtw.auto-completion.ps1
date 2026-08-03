@@ -127,8 +127,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'chatgpt';     Tip = 'Open in ChatGPT (aliases: cgpt, codex)' }
             @{ Name = 'cgpt';        Tip = 'Open in ChatGPT' }
             @{ Name = 'codex';       Tip = 'Open in ChatGPT' }
-            @{ Name = 'droid';       Tip = 'Open in Factory Droid (alias: factory)' }
-            @{ Name = 'factory';     Tip = 'Open in Factory Droid' }
+            @{ Name = 'droid';       Tip = 'Open in Factory desktop app (alias: factory)' }
+            @{ Name = 'factory';     Tip = 'Open in Factory desktop app' }
             @{ Name = 'claude';      Tip = 'Open Claude.ai app' }
             @{ Name = 'claudecode';  Tip = 'New Claude Code chat in the worktree (alias: ccode)' }
             @{ Name = 't3';          Tip = 'Open T3 Code (Alpha)' }

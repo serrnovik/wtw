@@ -56,9 +56,13 @@ Describe 'Resolve-WtwEditorCommand' {
         }
     }
 
-    It 'resolves Droid and Factory shortcut names to the Droid CLI' {
+    It 'resolves Droid and Factory shortcut names to the Factory desktop app' {
         foreach ($name in 'droid', 'factory') {
-            Resolve-WtwEditorCommand $name | Should -Be 'droid'
+            $command = Resolve-WtwEditorCommand $name
+
+            $command.type | Should -Be 'macapp'
+            $command.appName | Should -Be 'Factory'
+            $command.appNameCandidates | Should -Be @('Factory')
         }
     }
 
