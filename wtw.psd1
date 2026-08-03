@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.1.46'
+    ModuleVersion     = '0.1.47'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -12,6 +12,7 @@
         'Copy-WtwWorkspace'
         'Enter-WtwWorktree'
         'Get-WtwList'
+        'Get-WtwUpdateStatus'
         'Get-WtwWindowTitle'
         'Initialize-WtwConfig'
         'Install-Wtw'
@@ -36,7 +37,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'Initial public release.'
+            ReleaseNotes = 'Adds a non-blocking, once-per-shell-session hint when a newer wtw is published on the PowerShell Gallery.'
         }
     }
 }
