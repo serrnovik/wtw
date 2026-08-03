@@ -20,7 +20,7 @@ set "_FIRST=%~1"
 
 REM Known subcommands that don't need cmd-side cd. Pad with spaces so findstr
 REM can match whole tokens.
-set "_NOCD= init add create list ls open cursor cur code co antigravity anti ag windsurf wind ws codium vscodium sourcegit sgit sg codex cmux cm wmux wm claude cowork claudecode ccode t3 t3code remove rm delete del unregister unreg workspace copy color sync clean install update skill sbx help -h --help "
+set "_NOCD= init add create list ls open cursor cur code co antigravity anti ag windsurf wind ws codium vscodium sourcegit sgit sg codex droid factory cmux cm wmux wm claude cowork claudecode ccode t3 t3code remove rm delete del unregister unreg workspace copy color sync clean install update skill sbx help -h --help "
 echo  %_NOCD% | findstr /I /C:" %_FIRST% " >nul
 if not errorlevel 1 goto :passthrough
 

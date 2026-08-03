@@ -56,6 +56,12 @@ Describe 'Resolve-WtwEditorCommand' {
         }
     }
 
+    It 'resolves Droid and Factory shortcut names to the Droid CLI' {
+        foreach ($name in 'droid', 'factory') {
+            Resolve-WtwEditorCommand $name | Should -Be 'droid'
+        }
+    }
+
     It 'resolves "cmux" and "cm" to cmux launcher metadata' {
         $command = Resolve-WtwEditorCommand 'cmux'
         $alias = Resolve-WtwEditorCommand 'cm'

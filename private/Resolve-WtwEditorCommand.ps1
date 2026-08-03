@@ -18,6 +18,8 @@ function Resolve-WtwEditorCommand {
         # macOS open-app style — always opens directory, uses: open -a "AppName" <dir>
         # appNameCandidates: ordered list tried at runtime so name changes (Alpha→Beta→stable) work automatically
         @{ prefixes = @('chatgpt', 'cgpt', 'codex'); type = 'codex'; appName = 'ChatGPT'; cmd = 'codex'; appNameCandidates = @('ChatGPT', 'Codex') }
+        # Factory Droid CLI — `factory` is the long-form alias for the `droid` command.
+        @{ prefixes = @('droid', 'factory'); cmd = 'droid' }
         @{ prefixes = @('cmux', 'cm');          type = 'cmux';   appName = 'cmux';        cmd = 'cmux' }
         @{ prefixes = @('wmux', 'wm');          type = 'wmux';   appName = 'wmux';        cmd = 'wmux' }
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }

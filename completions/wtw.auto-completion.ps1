@@ -96,7 +96,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
         '__resolve', '__aliases',
         'cursor', 'cur', 'code', 'co', 'antigravity', 'anti', 'ag', 'windsurf', 'wind',
         'codium', 'vscodium', 'sourcegit', 'sgit', 'sg',
-        'codex', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
+        'codex', 'droid', 'factory', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
         'ss', 'superset', 'supersetsh'
     )
 
@@ -104,7 +104,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
         'go', 'open', 'remove', 'rm', 'unregister', 'unreg', 'sync', 'color',
         'cursor', 'cur', 'code', 'co', 'antigravity', 'anti', 'ag', 'windsurf', 'wind',
         'codium', 'vscodium', 'sourcegit', 'sgit', 'sg',
-        'codex', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
+        'codex', 'droid', 'factory', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
         'ss', 'superset', 'supersetsh',
         'workspace', 'ws'
     )
@@ -127,6 +127,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'chatgpt';     Tip = 'Open in ChatGPT (aliases: cgpt, codex)' }
             @{ Name = 'cgpt';        Tip = 'Open in ChatGPT' }
             @{ Name = 'codex';       Tip = 'Open in ChatGPT' }
+            @{ Name = 'droid';       Tip = 'Open in Factory Droid (alias: factory)' }
+            @{ Name = 'factory';     Tip = 'Open in Factory Droid' }
             @{ Name = 'claude';      Tip = 'Open Claude.ai app' }
             @{ Name = 'claudecode';  Tip = 'New Claude Code chat in the worktree (alias: ccode)' }
             @{ Name = 't3';          Tip = 'Open T3 Code (Alpha)' }

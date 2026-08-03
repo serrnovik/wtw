@@ -33,6 +33,7 @@ function Invoke-WtwEditorCli {
         'code'        = @{ candidates = @('code');        macApps = @('Visual Studio Code') }
         'windsurf'    = @{ candidates = @('windsurf');    macApps = @('Windsurf') }
         'codium'      = @{ candidates = @('codium');      macApps = @('VSCodium') }
+        'droid'       = @{ candidates = @('droid') }
     }
 
     $spec       = $launch[$Cmd]

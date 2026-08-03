@@ -156,6 +156,8 @@ _wtw_completion() {
         'codium:Open a target in VSCodium'
         'sourcegit:Open a target in SourceGit'
         'codex:Open a target in ChatGPT'
+        'droid:Open a target in Factory Droid (alias: factory)'
+        'factory:Open a target in Factory Droid'
         'cmux:Open a target in cmux'
         'wmux:Open a target in wmux'
         'claude:Open a target in Claude'
@@ -210,7 +212,7 @@ _wtw_completion() {
 
     targets=("${_wtw_registered_aliases[@]}")
     case "$subcommand" in
-        list|ls|go|open|remove|rm|delete|del|unregister|unreg|workspace|ws|copy|sync|color|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
+        list|ls|go|open|remove|rm|delete|del|unregister|unreg|workspace|ws|copy|sync|color|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
             if (( ${#targets[@]} )); then
                 _describe -t targets 'wtw target' targets
             fi
@@ -267,7 +269,7 @@ wtw() {
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Editor shortcuts — delegate to pwsh
-        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
+        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Help

@@ -109,6 +109,7 @@ wtw auth                  # cd to worktree + run session script
 wtw cursor auth           # open in Cursor (or: wtw cur auth)
 wtw code auth             # open in VS Code (or: wtw co auth)
 wtw chatgpt auth          # open in ChatGPT Desktop (aliases: cgpt, codex)
+wtw droid auth            # open in Factory Droid (alias: factory)
 wtw chatgpt auth --skip-restart  # open without closing ChatGPT if the label needs repair
 wtw claudecode auth       # new Claude Code chat rooted at the worktree (or: wtw ccode auth)
 wtw cmux auth             # open the worktree as a cmux workspace (or: wtw cm auth)
@@ -145,6 +146,7 @@ wtw clean                 # interactive selection + removal
 | `wtw windsurf [name]` | Open in Windsurf (aliases: `wind`, `ws`) |
 | `wtw codium [name]` | Open in VSCodium (aliases: `vscodium`) |
 | `wtw chatgpt [name] [--skip-restart]` | Open in ChatGPT Desktop (aliases: `cgpt`, `codex`) |
+| `wtw droid [name]` | Open in Factory Droid (alias: `factory`) |
 | `wtw claude [name]` | Bring the Claude desktop app forward (aliases: `cowork`) |
 | `wtw claudecode [name] [--prompt X]` | Start a new Claude Code chat rooted at the worktree (aliases: `ccode`) |
 | `wtw cmux [name]` | Open the worktree as a cmux workspace (aliases: `cm`) |
