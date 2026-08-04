@@ -136,7 +136,7 @@ wtw() {
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Editor shortcuts — delegate to pwsh
-        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
+        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         *)

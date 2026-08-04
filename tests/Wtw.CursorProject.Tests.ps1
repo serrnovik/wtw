@@ -16,6 +16,14 @@ Describe 'Cursor project integration' {
         Remove-Item -Recurse -Force $script:tempDir -ErrorAction SilentlyContinue
     }
 
+    It 'handles a Get-Process runtime failure without printing an error' {
+        Mock Get-Process { throw 'FileVersionInfo is unavailable' }
+        Mock Get-Command { $null } -ParameterFilter { $Name -eq 'pgrep' }
+
+        { Test-WtwCursorAppRunning } | Should -Not -Throw
+        Test-WtwCursorAppRunning | Should -BeFalse
+    }
+
     It 'creates a deterministic workspace id' {
         $id = ConvertTo-WtwCursorWorkspaceId -WorkspacePath $script:workspacePath
 

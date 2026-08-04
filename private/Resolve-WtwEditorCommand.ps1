@@ -18,6 +18,9 @@ function Resolve-WtwEditorCommand {
         # macOS open-app style — always opens directory, uses: open -a "AppName" <dir>
         # appNameCandidates: ordered list tried at runtime so name changes (Alpha→Beta→stable) work automatically
         @{ prefixes = @('chatgpt', 'cgpt', 'codex'); type = 'codex'; appName = 'ChatGPT'; cmd = 'codex'; appNameCandidates = @('ChatGPT', 'Codex') }
+        # Factory Desktop hosts Droid sessions. Its project labels are managed by
+        # Factory, so open the desktop app rather than starting a terminal CLI.
+        @{ prefixes = @('droid', 'factory'); type = 'macapp'; appName = 'Factory'; appNameCandidates = @('Factory') }
         @{ prefixes = @('cmux', 'cm');          type = 'cmux';   appName = 'cmux';        cmd = 'cmux' }
         @{ prefixes = @('wmux', 'wm');          type = 'wmux';   appName = 'wmux';        cmd = 'wmux' }
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }
