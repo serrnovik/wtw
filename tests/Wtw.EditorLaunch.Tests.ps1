@@ -48,6 +48,34 @@ Describe 'Test-WtwEditorCli' {
 }
 
 Describe 'Invoke-WtwEditorCli' {
+    BeforeAll {
+        # CI agents don't have the Cursor CLI on PATH, and Pester can only
+        # mock resolvable commands — stub it when absent (locally the real
+        # CLI resolves and no stub is created).
+        if (-not (Get-Command cursor -ErrorAction SilentlyContinue)) {
+            $script:cursorStubbed = $true
+            function global:cursor { }
+        }
+    }
+    AfterAll {
+        if ($script:cursorStubbed) {
+            Remove-Item function:global:cursor -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'opens Cursor workspaces in a new IDE window' {
+        $script:cursorArguments = $null
+        Mock Test-WtwEditorCli { $true }
+        Mock cursor {
+            param($first, $second)
+            $script:cursorArguments = @($first, $second)
+        }
+
+        Invoke-WtwEditorCli -Cmd 'cursor' -Path '/tmp/cursor-worktree.code-workspace'
+
+        $script:cursorArguments | Should -Be @('--new-window', '/tmp/cursor-worktree.code-workspace')
+    }
+
     It 'prefers the renamed antigravity-ide CLI over the legacy antigravity stub' {
         $script:queried = [System.Collections.Generic.List[string]]::new()
         Mock Test-WtwEditorCli { $script:queried.Add($Cmd); $false }

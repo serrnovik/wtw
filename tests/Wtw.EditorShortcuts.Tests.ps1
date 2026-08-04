@@ -56,6 +56,16 @@ Describe 'Resolve-WtwEditorCommand' {
         }
     }
 
+    It 'resolves Droid and Factory shortcut names to the Factory desktop app' {
+        foreach ($name in 'droid', 'factory') {
+            $command = Resolve-WtwEditorCommand $name
+
+            $command.type | Should -Be 'macapp'
+            $command.appName | Should -Be 'Factory'
+            $command.appNameCandidates | Should -Be @('Factory')
+        }
+    }
+
     It 'resolves "cmux" and "cm" to cmux launcher metadata' {
         $command = Resolve-WtwEditorCommand 'cmux'
         $alias = Resolve-WtwEditorCommand 'cm'

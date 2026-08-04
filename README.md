@@ -74,6 +74,24 @@ wtw install
 
 Re-run `wtw install` from source after pulling updates.
 
+### Update notice
+
+wtw tells you when a newer version is published. It prints a two-line hint once
+per shell session:
+
+```text
+  wtw 0.2.0 is available (you have 0.1.46).
+  Update: wtw install     (or: Update-Module wtw -Scope CurrentUser)
+```
+
+The hint reads only `~/.wtw/update-check.json`, so it never waits on the
+network; a stale cache is refreshed by a detached background process and used
+by the next command. Being offline, having no cache yet, or a read-only `HOME`
+are all silent. The hint is skipped when stdout is redirected — which covers CI
+and the subcommands whose output the shell wrappers parse — and when
+`WTW_NO_UPDATE_NOTICE=1` is set. `Get-WtwUpdateStatus` reports the same
+comparison on demand.
+
 ## Quick Start
 
 ### 1. Register your repos
@@ -109,6 +127,7 @@ wtw auth                  # cd to worktree + run session script
 wtw cursor auth           # open in Cursor (or: wtw cur auth)
 wtw code auth             # open in VS Code (or: wtw co auth)
 wtw chatgpt auth          # open in ChatGPT Desktop (aliases: cgpt, codex)
+wtw droid auth            # open in Factory desktop app (alias: factory)
 wtw chatgpt auth --skip-restart  # open without closing ChatGPT if the label needs repair
 wtw claudecode auth       # new Claude Code chat rooted at the worktree (or: wtw ccode auth)
 wtw cmux auth             # open the worktree as a cmux workspace (or: wtw cm auth)
@@ -145,6 +164,7 @@ wtw clean                 # interactive selection + removal
 | `wtw windsurf [name]` | Open in Windsurf (aliases: `wind`, `ws`) |
 | `wtw codium [name]` | Open in VSCodium (aliases: `vscodium`) |
 | `wtw chatgpt [name] [--skip-restart]` | Open in ChatGPT Desktop (aliases: `cgpt`, `codex`) |
+| `wtw droid [name]` | Open in Factory desktop app (alias: `factory`) |
 | `wtw claude [name]` | Bring the Claude desktop app forward (aliases: `cowork`) |
 | `wtw claudecode [name] [--prompt X]` | Start a new Claude Code chat rooted at the worktree (aliases: `ccode`) |
 | `wtw cmux [name]` | Open the worktree as a cmux workspace (aliases: `cm`) |

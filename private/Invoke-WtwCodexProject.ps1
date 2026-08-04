@@ -276,7 +276,18 @@ function Remove-WtwCodexArrayValue {
     $State | Add-Member -NotePropertyName $PropertyName -NotePropertyValue @($items) -Force
 }
 
-function Get-WtwCodexLocalProject {
+function Get-WtwCodexNormalizedPath {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string] $Path)
+
+    try {
+        return [System.IO.Path]::GetFullPath($Path).TrimEnd([char]'/', [char]'\')
+    } catch {
+        return $Path.TrimEnd([char]'/', [char]'\')
+    }
+}
+
+function Get-WtwCodexLocalProjectEntries {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][PSObject] $State,
@@ -284,19 +295,26 @@ function Get-WtwCodexLocalProject {
     )
 
     $projectsProp = $State.PSObject.Properties['local-projects']
-    if (-not ($projectsProp -and $projectsProp.Value)) { return $null }
+    if (-not ($projectsProp -and $projectsProp.Value)) { return }
 
-    foreach ($property in @($projectsProp.Value.PSObject.Properties)) {
-        $project = $property.Value
-        if (@($project.rootPaths) -contains $ProjectPath) {
-            return @{ Id = $property.Name; Project = $project; Projects = $projectsProp.Value }
+    $normalizedProjectPath = Get-WtwCodexNormalizedPath -Path $ProjectPath
+    foreach ($entry in $projectsProp.Value.PSObject.Properties) {
+        $rootsProp = $entry.Value.PSObject.Properties['rootPaths']
+        $rootPaths = @(
+            if ($rootsProp -and $rootsProp.Value) { $rootsProp.Value }
+        )
+        foreach ($rootPath in $rootPaths) {
+            if (-not $rootPath) { continue }
+            $normalizedRootPath = Get-WtwCodexNormalizedPath -Path ([string]$rootPath)
+            if ($normalizedRootPath -eq $normalizedProjectPath) {
+                Write-Output $entry
+                break
+            }
         }
     }
-
-    return $null
 }
 
-function Set-WtwCodexLocalProject {
+function Set-WtwCodexLocalProjectName {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][PSObject] $State,
@@ -304,30 +322,29 @@ function Set-WtwCodexLocalProject {
         [Parameter(Mandatory)][string] $PrettyName
     )
 
+    $projectsProp = $State.PSObject.Properties['local-projects']
+    $projects = if ($projectsProp -and $projectsProp.Value) { $projectsProp.Value } else { [PSCustomObject]@{} }
+    $entry = @(Get-WtwCodexLocalProjectEntries -State $State -ProjectPath $ProjectPath | Select-Object -First 1)[0]
     $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-    $existing = Get-WtwCodexLocalProject -State $State -ProjectPath $ProjectPath
-    if ($existing) {
-        $projectId = $existing.Id
-        $project = $existing.Project
-        $projects = $existing.Projects
-        $project | Add-Member -NotePropertyName 'id' -NotePropertyValue $projectId -Force
+
+    if ($entry) {
+        $project = $entry.Value
+        $project | Add-Member -NotePropertyName 'id' -NotePropertyValue ([string]$entry.Name) -Force
         $project | Add-Member -NotePropertyName 'name' -NotePropertyValue $PrettyName -Force
         $project | Add-Member -NotePropertyName 'updatedAt' -NotePropertyValue $now -Force
-    } else {
-        $projectId = [guid]::NewGuid().ToString()
-        $project = [PSCustomObject]@{
-            id = $projectId
-            name = $PrettyName
-            rootPaths = @($ProjectPath)
-            createdAt = $now
-            updatedAt = $now
-        }
-        $projectsProp = $State.PSObject.Properties['local-projects']
-        $projects = if ($projectsProp -and $projectsProp.Value) { $projectsProp.Value } else { [PSCustomObject]@{} }
-        $projects | Add-Member -NotePropertyName $projectId -NotePropertyValue $project -Force
-        $State | Add-Member -NotePropertyName 'local-projects' -NotePropertyValue $projects -Force
+        return [string]$entry.Name
     }
 
+    $projectId = [guid]::NewGuid().ToString()
+    $project = [PSCustomObject]@{
+        id        = $projectId
+        name      = $PrettyName
+        rootPaths = @($ProjectPath)
+        createdAt = $now
+        updatedAt = $now
+    }
+    $projects | Add-Member -NotePropertyName $projectId -NotePropertyValue $project -Force
+    $State | Add-Member -NotePropertyName 'local-projects' -NotePropertyValue $projects -Force
     return $projectId
 }
 
@@ -355,11 +372,14 @@ function Set-WtwCodexProjectLabel {
         $state = [PSCustomObject]@{}
     }
 
-    $projectId = Set-WtwCodexLocalProject -State $state -ProjectPath $ProjectPath -PrettyName $PrettyName
     Add-WtwCodexArrayValue -State $state -PropertyName 'electron-saved-workspace-roots' -Value $ProjectPath -Prepend
-    Add-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $projectId -Prepend
-    # ChatGPT Desktop now orders and renders local projects by ID. Remove the
-    # path entry written by older wtw versions so it does not create a duplicate.
+
+    # Current ChatGPT Desktop renders the UUID-keyed local-projects model.
+    # Keep the old root/label fields for backward compatibility, but make the
+    # modern local-project record authoritative and remove its legacy path
+    # duplicate from project-order.
+    $localProjectId = Set-WtwCodexLocalProjectName -State $state -ProjectPath $ProjectPath -PrettyName $PrettyName
+    Add-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $localProjectId -Prepend
     Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $ProjectPath
 
     $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
@@ -391,8 +411,8 @@ function Get-WtwCodexProjectLabel {
         return $null
     }
 
-    $localProject = Get-WtwCodexLocalProject -State $state -ProjectPath $ProjectPath
-    if ($localProject) { return [string]$localProject.Project.name }
+    $project = @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath | Select-Object -First 1)[0]
+    if ($project) { return [string]$project.Value.name }
 
     $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
     if (-not ($labelsProp -and $labelsProp.Value)) { return $null }
@@ -418,7 +438,16 @@ function Test-WtwCodexProjectLabel {
     )
 
     $label = Get-WtwCodexProjectLabel -ProjectPath $ProjectPath -GlobalStatePath $GlobalStatePath
-    return $label -eq $PrettyName
+    if ($label -ne $PrettyName) { return $false }
+
+    try {
+        $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
+    } catch {
+        return $false
+    }
+
+    $project = @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath | Select-Object -First 1)[0]
+    return $project -and $project.Value.name -eq $PrettyName
 }
 
 function Remove-WtwCodexProjectLabel {
@@ -441,14 +470,17 @@ function Remove-WtwCodexProjectLabel {
     Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $ProjectPath
     Remove-WtwCodexArrayValue -State $state -PropertyName 'active-workspace-roots' -Value $ProjectPath
 
-    $localProject = Get-WtwCodexLocalProject -State $state -ProjectPath $ProjectPath
-    if ($localProject) {
-        $remainingRoots = @($localProject.Project.rootPaths) | Where-Object { $_ -and $_ -ne $ProjectPath }
+    $normalizedProjectPath = Get-WtwCodexNormalizedPath -Path $ProjectPath
+    foreach ($project in @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath)) {
+        $projectId = [string]$project.Name
+        $remainingRoots = @($project.Value.rootPaths) | Where-Object {
+            $_ -and (Get-WtwCodexNormalizedPath -Path ([string]$_)) -ne $normalizedProjectPath
+        }
         if ($remainingRoots.Count -eq 0) {
-            $localProject.Projects.PSObject.Properties.Remove($localProject.Id)
-            Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $localProject.Id
+            $state.'local-projects'.PSObject.Properties.Remove($projectId)
+            Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $projectId
         } else {
-            $localProject.Project | Add-Member -NotePropertyName 'rootPaths' -NotePropertyValue @($remainingRoots) -Force
+            $project.Value | Add-Member -NotePropertyName 'rootPaths' -NotePropertyValue @($remainingRoots) -Force
         }
     }
 

@@ -4,6 +4,10 @@
 
 _wtw_module="${HOME}/.wtw/module/wtw.psm1"
 
+# Stable per-terminal id. Each wtw command runs a fresh pwsh, so the module
+# cannot use its own PID to show a session-scoped notice only once.
+export WTW_SHELL_SESSION=$$
+
 # Resolve pwsh path at source time
 _wtw_pwsh=$(command -v pwsh 2>/dev/null || echo "pwsh")
 if [ ! -x "$_wtw_pwsh" ] && [ "$_wtw_pwsh" = "pwsh" ]; then
@@ -132,7 +136,7 @@ wtw() {
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Editor shortcuts — delegate to pwsh
-        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
+        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         *)

@@ -26,6 +26,13 @@ function Invoke-Wtw {
         $rawArgs = $args[1..($args.Count - 1)]
     }
 
+    # Newer-version hint. Emitted up front because the dispatch below returns
+    # from many branches. Cache-only, silent on failure, and skipped for the
+    # internal `__*` commands whose stdout the shell wrappers parse.
+    if ([string]$Command -notlike '__*') {
+        Write-WtwUpdateNotice
+    }
+
     if (-not $Command) {
         Write-Host ''
         Write-Host '  wtw - Git Worktree + Workspace Manager' -ForegroundColor Cyan
@@ -44,6 +51,7 @@ function Invoke-Wtw {
         Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
         Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
         Write-Host '    chatgpt [name] [--skip-restart]  Open in ChatGPT (aliases: cgpt, codex)'
+        Write-Host '    droid [name]     Open in Factory desktop app (alias: factory)'
         Write-Host '    cmux [name]       Open in cmux terminal workspace (alias: cm)'
         Write-Host '    wmux [name]       Open in wmux terminal workspace (alias: wm)'
         Write-Host '    claude [name]     Open Claude.ai app  (alias: cowork)'
