@@ -131,7 +131,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'factory';     Tip = 'Open in Factory desktop app' }
             @{ Name = 'claude';      Tip = 'Open Claude.ai app' }
             @{ Name = 'claudecode';  Tip = 'New Claude Code chat in the worktree (alias: ccode)' }
-            @{ Name = 't3';          Tip = 'Open T3 Code (Alpha)' }
+            @{ Name = 't3';          Tip = 'Register + open a T3 Code project' }
             @{ Name = 'ss';          Tip = 'Find & open matching Superset workspace' }
             @{ Name = 'help';        Tip = 'Show help' }
         )

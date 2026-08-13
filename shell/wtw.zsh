@@ -166,7 +166,7 @@ _wtw_completion() {
         'wmux:Open a target in wmux'
         'claude:Open a target in Claude'
         'claudecode:Start a new Claude Code chat in a target'
-        't3:Open a target in T3 Code'
+        't3:Register + open a target as a T3 Code project'
         'help:Show WTW help'
     )
 

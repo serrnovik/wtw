@@ -27,7 +27,10 @@ function Resolve-WtwEditorCommand {
         # Claude Code ships inside the Claude desktop app, not as its own bundle —
         # `claude://code/new?folder=<dir>` starts a chat rooted at the worktree.
         @{ prefixes = @('claudecode', 'ccode'); type = 'claudecode'; appName = 'Claude Code'; appNameCandidates = @('Claude') }
-        @{ prefixes = @('t3', 't3code');        type = 'macapp'; appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
+        # T3 Code takes no folder argument at all (no CLI, no open-url handler), so
+        # it gets its own type: wtw registers the worktree as a project in T3's
+        # event store first, then just launches the app.
+        @{ prefixes = @('t3', 't3code');        type = 't3';     appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
         # Superset — find matching workspace and open Superset app, or print hints
         @{ prefixes = @('ss', 'superset', 'supersetsh'); type = 'superset'; appName = 'Superset' }
     )

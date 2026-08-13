@@ -71,6 +71,13 @@ function Open-WtwWorkspace {
         return
     }
 
+    # T3 Code — no CLI and no folder-open deep link, so wtw registers the
+    # worktree as a T3 project (pretty name included) and launches the app.
+    if ($editorType -eq 't3') {
+        Open-WtwT3Workspace -Target $target -Editor $editorCmd
+        return
+    }
+
     # Claude Code — the Claude desktop app hosts it, so open a new chat rooted at
     # the target directory via the app's `claude://code/new` deep link.
     if ($editorType -eq 'claudecode') {

@@ -56,7 +56,7 @@ function Invoke-Wtw {
         Write-Host '    wmux [name]       Open in wmux terminal workspace (alias: wm)'
         Write-Host '    claude [name]     Open Claude.ai app  (alias: cowork)'
         Write-Host '    claudecode [name] [--prompt <text>]  New Claude Code chat in the worktree (alias: ccode)'
-        Write-Host '    t3 [name]         Open T3 Code Alpha  (alias: t3code)'
+        Write-Host '    t3 [name]         Add + open T3 Code project  (alias: t3code)'
         Write-Host '    ss [name]         Find & open matching Superset workspace (alias: superset, supersetsh)'
         Write-Host '    remove <task>     Remove worktree + workspace  (alias: rm, delete, del)'
         Write-Host '    unregister <name> Drop repo or worktree from wtw registry only (alias: unreg)'
