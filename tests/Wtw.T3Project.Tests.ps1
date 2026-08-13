@@ -72,9 +72,10 @@ Describe 'T3 Code project registration' -Skip:(-not (Get-Command sqlite3 -Comman
         $result = Register-WtwT3Project -ProjectPath $script:WorkPath -PrettyName 'PF037 gamification'
         $result.Status | Should -Be 'created'
 
-        $row = & $script:Sqlite -json $script:StorePath `
-            "SELECT event_type, stream_version, actor_kind, payload_json FROM orchestration_events" |
-            ConvertFrom-Json
+        $row = & $script:Sqlite -json $script:StorePath @'
+SELECT event_type, stream_version, actor_kind, payload_json
+FROM orchestration_events WHERE event_type = 'project.created'
+'@ | ConvertFrom-Json
 
         $row.event_type     | Should -Be 'project.created'
         $row.stream_version | Should -Be 0
@@ -87,18 +88,44 @@ Describe 'T3 Code project registration' -Skip:(-not (Get-Command sqlite3 -Comman
         $payload.defaultModelSelection | Should -BeNullOrEmpty
     }
 
-    It 'writes a matching command receipt for the appended event' {
+    # The worktree already exists, so threads must run in this checkout. A global
+    # default of "worktree" would otherwise have T3 cut a nested git worktree from
+    # a wtw worktree — and ProjectCreatedPayload has no slot for the field, so it
+    # takes a second event in the same transaction.
+    It 'pins defaultThreadEnvMode to local on the new project' {
+        Register-WtwT3Project -ProjectPath $script:WorkPath -PrettyName 'Envy' | Out-Null
+
+        $events = ((& $script:Sqlite -json $script:StorePath `
+            'SELECT event_type, stream_version, payload_json FROM orchestration_events ORDER BY sequence') -join "`n") |
+            ConvertFrom-Json
+
+        $events.Count             | Should -Be 2
+        $events[1].event_type     | Should -Be 'project.meta-updated'
+        $events[1].stream_version | Should -Be 1
+        ($events[1].payload_json | ConvertFrom-Json).defaultThreadEnvMode | Should -Be 'local'
+        # Same stream, so T3 applies it to the project it just created.
+        (& $script:Sqlite $script:StorePath 'SELECT COUNT(DISTINCT stream_id) FROM orchestration_events') |
+            Should -Be '1'
+    }
+
+    # Chained inserts make last_insert_rowid() point at the previous receipt, so
+    # each receipt has to resolve its own event by event_id instead.
+    It 'writes a matching command receipt for every appended event' {
         Register-WtwT3Project -ProjectPath $script:WorkPath -PrettyName 'Alpha' | Out-Null
 
-        $receipt = & $script:Sqlite -json $script:StorePath @'
+        $receipts = ((& $script:Sqlite -json $script:StorePath @'
 SELECT r.status, r.aggregate_kind, r.result_sequence, e.sequence AS eventSequence
 FROM orchestration_command_receipts r
 JOIN orchestration_events e ON e.command_id = r.command_id
-'@ | ConvertFrom-Json
+ORDER BY e.sequence
+'@) -join "`n") | ConvertFrom-Json
 
-        $receipt.status          | Should -Be 'accepted'
-        $receipt.aggregate_kind  | Should -Be 'project'
-        $receipt.result_sequence | Should -Be $receipt.eventSequence
+        $receipts.Count | Should -Be 2
+        foreach ($receipt in $receipts) {
+            $receipt.status          | Should -Be 'accepted'
+            $receipt.aggregate_kind  | Should -Be 'project'
+            $receipt.result_sequence | Should -Be $receipt.eventSequence
+        }
     }
 
     It 'renames via project.meta-updated when the projection already has the directory' {
@@ -127,7 +154,8 @@ INSERT INTO projection_projects VALUES ('p1', 'repo_task', '$full', '[]', 'now',
         (Register-WtwT3Project -ProjectPath $script:WorkPath -PrettyName 'Once').Status |
             Should -Be 'unchanged'
 
-        (& $script:Sqlite $script:StorePath 'SELECT COUNT(*) FROM orchestration_events') |
+        # One creation = project.created + the defaultThreadEnvMode meta-update.
+        (& $script:Sqlite $script:StorePath "SELECT COUNT(*) FROM orchestration_events WHERE event_type = 'project.created'") |
             Should -Be '1'
         (& $script:Sqlite $script:StorePath 'SELECT COUNT(*) FROM projection_projects') |
             Should -Be '0' -Because 'wtw must never write the read model itself'
@@ -142,12 +170,13 @@ INSERT INTO projection_projects VALUES ('p1', 'repo_task', '$full', '[]', 'now',
 
         # sqlite3 -json prints the array across several lines; join before parsing.
         $events = ((& $script:Sqlite -json $script:StorePath `
-            'SELECT event_type, stream_version FROM orchestration_events ORDER BY sequence') -join "`n") |
+            'SELECT event_type, stream_version, payload_json FROM orchestration_events ORDER BY sequence') -join "`n") |
             ConvertFrom-Json
-        $events.Count | Should -Be 2
-        # Both events must land on the same stream, versions 0 then 1.
-        $events[1].event_type     | Should -Be 'project.meta-updated'
-        $events[1].stream_version | Should -Be 1
+        # created(0) + env meta-update(1) + rename(2) — one rename, not two.
+        $events.Count | Should -Be 3
+        $events[2].event_type     | Should -Be 'project.meta-updated'
+        $events[2].stream_version | Should -Be 2
+        ($events[2].payload_json | ConvertFrom-Json).title | Should -Be 'Second'
         (& $script:Sqlite $script:StorePath 'SELECT COUNT(DISTINCT stream_id) FROM orchestration_events') |
             Should -Be '1'
     }
@@ -180,8 +209,9 @@ INSERT INTO projection_projects VALUES ('p1', 'Gone', '$full', '[]', 'now', 'now
         (Register-WtwT3Project -ProjectPath $script:WorkPath -PrettyName $name).Status |
             Should -Be 'created'
 
-        $payload = (& $script:Sqlite -json $script:StorePath 'SELECT payload_json FROM orchestration_events' |
-            ConvertFrom-Json).payload_json | ConvertFrom-Json
+        $payload = ((& $script:Sqlite -json $script:StorePath @'
+SELECT payload_json FROM orchestration_events WHERE event_type = 'project.created'
+'@) -join "`n" | ConvertFrom-Json).payload_json | ConvertFrom-Json
         $payload.title | Should -Be $name
     }
 
@@ -309,36 +339,6 @@ Describe 'T3 sidebar grouping' {
         ConvertTo-WtwT3NormalizedPath -Path '/'                 | Should -Be '/'
     }
 
-    It 'splits one worktree out without touching the global mode' {
-        '{"sidebarProjectGroupingMode":"repository","wordWrap":true}' |
-            Set-Content -Path $script:CsPath -NoNewline
-
-        Set-WtwT3ProjectGroupingOverride -WorkspaceRoot '/Users/sno/Repo' | Should -Be 'set'
-
-        $saved = Get-Content -Path $script:CsPath -Raw | ConvertFrom-Json
-        $saved.sidebarProjectGroupingMode | Should -Be 'repository'
-        $saved.wordWrap                   | Should -BeTrue
-        $saved.sidebarProjectGroupingOverrides.'env-1:/Users/sno/Repo' | Should -Be 'separate'
-
-        # Effective mode for that worktree is now 'separate'; others are untouched.
-        Test-WtwT3GroupingHidesTitles -WorkspaceRoot '/Users/sno/Repo'  | Should -BeFalse
-        Test-WtwT3GroupingHidesTitles -WorkspaceRoot '/Users/sno/Other' | Should -BeTrue
-    }
-
-    It 'never overwrites an override the user set themselves' {
-        '{"sidebarProjectGroupingOverrides":{"env-1:/Users/sno/Repo":"repository"}}' |
-            Set-Content -Path $script:CsPath -NoNewline
-
-        Set-WtwT3ProjectGroupingOverride -WorkspaceRoot '/Users/sno/Repo' | Should -Be 'existing'
-
-        $saved = Get-Content -Path $script:CsPath -Raw | ConvertFrom-Json
-        $saved.sidebarProjectGroupingOverrides.'env-1:/Users/sno/Repo' | Should -Be 'repository'
-    }
-
-    It 'does not bootstrap a settings file T3 Code has not created' {
-        Set-WtwT3ProjectGroupingOverride -WorkspaceRoot '/Users/sno/Repo' | Should -Be 'skipped'
-        Test-Path $script:CsPath | Should -BeFalse
-    }
 }
 
 Describe 'Set-WtwT3AddProjectBaseDirectory' {

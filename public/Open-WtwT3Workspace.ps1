@@ -80,38 +80,25 @@ function Open-WtwT3Workspace {
         }
     }
 
-    # A registered project stays invisible while the sidebar groups every worktree
-    # of this repo into one row that renders the repository name. Split just this
-    # worktree out via T3's per-project override, leaving the global preference —
-    # and any override the user set themselves — untouched.
-    if (Test-WtwT3GroupingHidesTitles -WorkspaceRoot $fullDir) {
-        switch (Set-WtwT3ProjectGroupingOverride -WorkspaceRoot $fullDir) {
-            'set' {
-                Write-Host '  T3 Code: gave this worktree its own sidebar row (grouping: separate)' -ForegroundColor Green
-                # The renderer reads client-settings.json at start and rewrites it
-                # whole on any settings change, so a live app neither picks this up
-                # nor is guaranteed to preserve it.
-                if (Test-WtwT3AppRunning -Candidates $candidates) {
-                    Write-Host '           Restart T3 Code for it to take effect.' -ForegroundColor DarkGray
-                }
-            }
-            'existing' {
-                Write-Host "  T3 Code: this worktree is grouped by repository by your own setting," -ForegroundColor Yellow
-                Write-Host "           so the sidebar shows the repo name, not '$prettyName'." -ForegroundColor Yellow
-            }
-            default {
-                Write-Host '  T3 Code: sidebar groups worktrees by repository, so it shows the repo name,' -ForegroundColor Yellow
-                Write-Host "           not '$prettyName'. Settings → Sidebar → group projects: Separate." -ForegroundColor Yellow
-            }
-        }
-    }
-
     # 0.0.33 discards any path handed to the app and restores whatever project it
     # last showed, so this only launches or reveals it. The registration above is
     # what puts the worktree in the sidebar — say so rather than implying wtw
     # navigated there.
+    #
+    # Under T3's default repository grouping the sidebar row is the repo, with the
+    # branch on each thread, so pointing at the pretty name would be misleading.
+    # WorktreeEntry is $null when the target is the repo's main checkout.
+    $branch = Get-WtwPropertyValue -Object $Target.WorktreeEntry -Name 'branch'
+    $where = if (-not (Test-WtwT3GroupingHidesTitles -WorkspaceRoot $fullDir)) {
+        "pick '$prettyName' in the sidebar"
+    } elseif ($branch) {
+        "find it under your repo, on branch '$branch'"
+    } else {
+        'find it under your repo in the sidebar'
+    }
+
     if ($IsMacOS) {
-        Write-Host "  Launching ${appName} — pick '$prettyName' in the sidebar" -ForegroundColor Green
+        Write-Host "  Launching ${appName} — $where" -ForegroundColor Green
         & open -a $appName
         return
     }
@@ -122,7 +109,7 @@ function Open-WtwT3Workspace {
             Write-Error 'T3 Code not found. Install it with: winget install T3Tools.T3Code'
             return
         }
-        Write-Host "  Launching T3 Code — pick '$prettyName' in the sidebar" -ForegroundColor Green
+        Write-Host "  Launching T3 Code — $where" -ForegroundColor Green
         Start-Process -FilePath $exe
         return
     }

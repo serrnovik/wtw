@@ -137,69 +137,6 @@ function Get-WtwT3ProjectKey {
     return "${environmentId}:$(ConvertTo-WtwT3NormalizedPath -Path $full)"
 }
 
-function Set-WtwT3ProjectGroupingOverride {
-    <#
-    .SYNOPSIS
-        Give one worktree its own sidebar row. Returns 'set', 'existing' or 'skipped'.
-    .DESCRIPTION
-        T3's sidebar groups projects by `sidebarProjectGroupingMode`, which
-        defaults to "repository" — keyed on the git remote, so every worktree of
-        a repo collapses into one group that renders the repository name instead
-        of the members' titles. That makes a wtw pretty name invisible.
-
-        `sidebarProjectGroupingOverrides` is a per-project escape hatch keyed by
-        `<environmentId>:<workspaceRoot>`, so wtw sets "separate" for just this
-        worktree and leaves the user's global grouping preference alone.
-
-        An override that already exists is never touched, whatever its value —
-        it is a deliberate choice made through T3's own per-project gear menu.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [string] $WorkspaceRoot
-    )
-
-    $path = Get-WtwT3ClientSettingsPath
-    if (-not (Test-Path $path)) { return 'skipped' }
-
-    $key = Get-WtwT3ProjectKey -WorkspaceRoot $WorkspaceRoot
-    if (-not $key) { return 'skipped' }
-
-    try {
-        $settings = Get-Content -Path $path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-    } catch {
-        Write-Warning "T3 Code: could not read $path — sidebar grouping unchanged. ($($_.Exception.Message))"
-        return 'skipped'
-    }
-
-    if (-not $settings) { $settings = [PSCustomObject]@{} }
-
-    $overrides = Get-WtwPropertyValue -Object $settings -Name 'sidebarProjectGroupingOverrides'
-    if (-not $overrides) {
-        $overrides = [PSCustomObject]@{}
-        $settings | Add-Member -NotePropertyName 'sidebarProjectGroupingOverrides' -NotePropertyValue $overrides -Force
-    }
-
-    if ((Get-WtwPropertyNames -Object $overrides) -contains $key) { return 'existing' }
-
-    $overrides | Add-Member -NotePropertyName $key -NotePropertyValue 'separate' -Force
-
-    # -Depth 100: the default of 2 would flatten nested renderer settings into
-    # type names and corrupt the file.
-    $temp = "$path.wtw-$PID.tmp"
-    try {
-        Set-Content -Path $temp -Value ($settings | ConvertTo-Json -Depth 100) -NoNewline -ErrorAction Stop
-        Move-Item -Path $temp -Destination $path -Force -ErrorAction Stop
-    } catch {
-        Remove-Item -Path $temp -Force -ErrorAction SilentlyContinue
-        Write-Warning "T3 Code: could not write $path — sidebar grouping unchanged. ($($_.Exception.Message))"
-        return 'skipped'
-    }
-
-    return 'set'
-}
-
 function Test-WtwT3GroupingHidesTitles {
     <#
     .SYNOPSIS
@@ -215,9 +152,11 @@ function Test-WtwT3GroupingHidesTitles {
         Under "separate" the key is the workspace root, so each worktree is its
         own single-member group and its wtw pretty name is what shows.
 
-        Reports the *effective* mode for one worktree: a per-project override
-        wins over the global setting, which is what Set-WtwT3ProjectGroupingOverride
-        installs.
+        wtw deliberately does not change this. Grouping sibling worktrees under
+        one repository is T3's model — a worktree is the same project on another
+        branch, and T3 already labels each thread with its branch. wtw only reads
+        the effective mode (a per-project override beats the global setting) so it
+        can word its own output honestly.
     #>
     [CmdletBinding()]
     param(
@@ -687,16 +626,21 @@ LIMIT 1
     }
 }
 
-function New-WtwT3EventScript {
+function New-WtwT3EventStatements {
     <#
     .SYNOPSIS
-        SQL that appends one project event plus its command receipt.
+        SQL appending one project event plus its command receipt (no transaction).
     .DESCRIPTION
         stream_version is derived in SQL exactly the way T3's own event store
         derives it (last version on the stream + 1, or 0 for a new stream), so a
         concurrently-written event cannot leave a gap. The receipt row mirrors
         what T3 writes for its own commands; the projection is built from the
         event, so the receipt is bookkeeping only.
+
+        The receipt's result_sequence looks the event up by event_id rather than
+        using last_insert_rowid(): when several of these are chained, the previous
+        statement is a receipt insert, so last_insert_rowid() would point at that
+        receipt instead of the event.
     .PARAMETER EventType
         'project.created' or 'project.meta-updated'.
     #>
@@ -727,7 +671,6 @@ function New-WtwT3EventScript {
     $payloadLit = ConvertTo-WtwSqlLiteral $Payload
 
     return @"
-BEGIN IMMEDIATE;
 INSERT INTO orchestration_events (
   event_id, aggregate_kind, stream_id, stream_version, event_type, occurred_at,
   command_id, causation_event_id, correlation_id, actor_kind, payload_json, metadata_json
@@ -743,10 +686,29 @@ INSERT INTO orchestration_events (
 INSERT INTO orchestration_command_receipts (
   command_id, aggregate_kind, aggregate_id, accepted_at, result_sequence, status, error
 ) VALUES (
-  $commandLit, 'project', $streamLit, $whenLit, last_insert_rowid(), 'accepted', NULL
+  $commandLit, 'project', $streamLit, $whenLit,
+  (SELECT sequence FROM orchestration_events WHERE event_id = $eventLit),
+  'accepted', NULL
 );
-COMMIT;
 "@
+}
+
+function New-WtwT3EventScript {
+    <#
+    .SYNOPSIS
+        Wrap one or more event statement blocks in a single transaction.
+    .DESCRIPTION
+        Creating a project takes two events — `project.created`, then a
+        `project.meta-updated` carrying the fields the created payload has no
+        room for. One transaction keeps a half-registered project impossible.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string[]] $Statements
+    )
+
+    return "BEGIN IMMEDIATE;`n" + ($Statements -join "`n") + "`nCOMMIT;"
 }
 
 function Get-WtwT3RegistrationPlan {
@@ -859,8 +821,10 @@ function Register-WtwT3Project {
             updatedAt = $now
         } | ConvertTo-Json -Compress -Depth 5
 
-        $script = New-WtwT3EventScript -EventType 'project.meta-updated' `
-            -ProjectId $plan.ProjectId -Payload $payload -OccurredAt $now
+        $script = New-WtwT3EventScript -Statements @(
+            New-WtwT3EventStatements -EventType 'project.meta-updated' `
+                -ProjectId $plan.ProjectId -Payload $payload -OccurredAt $now
+        )
 
         if (-not (Invoke-WtwT3Write -Sqlite $sqlite -DatabasePath $databasePath -Script $script)) {
             return & $skipped 'the rename event could not be written.'
@@ -882,8 +846,23 @@ function Register-WtwT3Project {
         updatedAt             = $now
     } | ConvertTo-Json -Compress -Depth 5
 
-    $script = New-WtwT3EventScript -EventType 'project.created' `
-        -ProjectId $projectId -Payload $payload -OccurredAt $now
+    # `defaultThreadEnvMode` has no slot in ProjectCreatedPayload, and Effect
+    # Schema drops unknown keys, so pinning it takes a follow-up meta-update.
+    # It matters: the worktree already exists, so new threads must run in this
+    # checkout ("local"). Left unset, a global default of "worktree" would have
+    # T3 cut a fresh git worktree *from* a wtw worktree for every thread.
+    $envPayload = [ordered]@{
+        projectId            = $projectId
+        defaultThreadEnvMode = 'local'
+        updatedAt            = $now
+    } | ConvertTo-Json -Compress -Depth 5
+
+    $script = New-WtwT3EventScript -Statements @(
+        (New-WtwT3EventStatements -EventType 'project.created' `
+            -ProjectId $projectId -Payload $payload -OccurredAt $now),
+        (New-WtwT3EventStatements -EventType 'project.meta-updated' `
+            -ProjectId $projectId -Payload $envPayload -OccurredAt $now)
+    )
 
     if (-not (Invoke-WtwT3Write -Sqlite $sqlite -DatabasePath $databasePath -Script $script)) {
         return & $skipped 'the project event could not be written.'
