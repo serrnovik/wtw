@@ -19,11 +19,25 @@ function Invoke-Wtw {
     $Command = $null
     $rawArgs = @()
 
-    if ($args.Count -gt 0) {
-        $Command = $args[0]
+    # Host selector first: dispatch below keys off $args[0], so a leading
+    # `--on <host>` would otherwise be mistaken for the subcommand.
+    #
+    # The host list is only read when it can matter. The `__*` commands are
+    # called by the zsh/bash integration on every directory change and never
+    # take --on, so they skip the extra config parse entirely.
+    $onHosts = @()
+    if ($args.Count -gt 0 -and "$($args[0])" -notlike '__*') {
+        try { $onHosts = Get-WtwHostNames } catch { $onHosts = @() }
     }
-    if ($args.Count -gt 1) {
-        $rawArgs = $args[1..($args.Count - 1)]
+    $split = Split-WtwOnHostArgs -ArgList $args -KnownHosts $onHosts
+    $targetHost = $split.Host
+    $effectiveArgs = @($split.Args)
+
+    if ($effectiveArgs.Count -gt 0) {
+        $Command = $effectiveArgs[0]
+    }
+    if ($effectiveArgs.Count -gt 1) {
+        $rawArgs = $effectiveArgs[1..($effectiveArgs.Count - 1)]
     }
 
     # Newer-version hint. Emitted up front because the dispatch below returns
@@ -70,10 +84,86 @@ function Invoke-Wtw {
         Write-Host '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
         Write-Host '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
         Write-Host '                      Launch AI sandbox (sbx) with workspace folders mounted'
+        Write-Host '    host [list|add|remove|sync|test]  Manage remote machines for --on'
         Write-Host ''
         Write-Host '  Options:' -ForegroundColor Yellow
         Write-Host '    --help, -h        Show this help'
+        Write-Host '    --on <host>       Open a worktree that lives on another machine over Remote-SSH.'
+        Write-Host '                      Shorthand: wtw <host> <editor> <name>'
+        Write-Host '                      Works with open/cursor/code/antigravity/windsurf/codium + list/info.'
+        Write-Host '                      Extra flags: --print-only, --folder, --skip-checks'
         Write-Host ''
+        return
+    }
+
+    # ---- Remote (--on <host>) -------------------------------------------------
+    # Only reads and editor launches cross the network: the remote wtw owns its
+    # own registry, so anything that mutates it must run over there.
+    if ($targetHost) {
+        $hostEntry = Resolve-WtwHost -Name $targetHost
+        if (-not $hostEntry) {
+            Write-Error "Unknown host '$targetHost'. Configured hosts: $((Get-WtwHostNames) -join ', '). Add one with: wtw host add $targetHost --user <u> --address <ip>"
+            return
+        }
+        if (-not (Test-WtwRemoteCapableCommand -Command $Command)) {
+            Write-Error "'$Command' cannot run with --on. Remote support covers open/list/info and the VS Code family editors; run '$Command' on $($hostEntry.Name) itself so its wtw registry stays authoritative."
+            return
+        }
+
+        $remoteParsed = Convert-WtwArgsToSplat $rawArgs
+        $remoteSplat = $remoteParsed.Splat
+        $remotePos = $remoteParsed.Positional
+
+        if ($Command -in @('list', 'ls')) {
+            # Forward the flags verbatim — the remote's own CLI parses them, so
+            # --detailed / --wide / --repo behave exactly as they do locally.
+            Get-WtwRemoteList -HostEntry $hostEntry -Arguments ([string[]]@($rawArgs | ForEach-Object { "$_" }))
+            return
+        }
+        if ($Command -in @('info', 'show')) {
+            $target = if ($remotePos.Count -gt 0) { $remotePos[0] } else { $null }
+            if (-not $target) { Write-Error "Usage: wtw info <name> --on $($hostEntry.Name)"; return }
+            $remote = Get-WtwRemoteTarget -HostEntry $hostEntry -Name $target
+            if (-not $remote) { Write-Error "'$target' did not resolve on $($hostEntry.Name)."; return }
+            Write-Host ''
+            Write-Host "  $($remote.Title ?? $target)  on $($hostEntry.Name)" -ForegroundColor Cyan
+            Write-Host "    path       $($remote.Path)"
+            if ($remote.Workspace) { Write-Host "    workspace  $($remote.Workspace)" }
+            if ($remote.Color)     { Write-Host "    color      $($remote.Color)" }
+            Write-Host "    uri        $(ConvertTo-WtwRemoteUri -Path $remote.Path -HostName $hostEntry.Name -Platform $hostEntry.Platform)" -ForegroundColor DarkGray
+            Write-Host ''
+            return
+        }
+
+        # open / <editor> [name]
+        $editorName = if ($Command -eq 'open') {
+            $config = Get-WtwConfig
+            $preference = if ($config) { Get-WtwPropertyValue -Object $config -Name 'editor' -DefaultValue 'code' } else { 'code' }
+            $resolved = Resolve-WtwEditorPreference -Editor $preference -Require { param($name) [bool](Resolve-WtwEditorFamilyMember -Name $name) }
+            if ($resolved -is [string]) { $resolved } else { $null }
+        } else {
+            $member = Resolve-WtwEditorFamilyMember -Name $Command
+            if ($member) { $member.Id } else { $null }
+        }
+
+        if (-not $editorName) {
+            Write-Error "No VS Code family editor available for a remote open. Set one: wtw open --editor cursor --on $($hostEntry.Name)"
+            return
+        }
+
+        $name = if ($remotePos.Count -gt 0) { $remotePos[0] } else { $null }
+        if (-not $name) {
+            Write-Error "A remote open needs an explicit target name — the local cwd says nothing about $($hostEntry.Name). Try: wtw list --on $($hostEntry.Name)"
+            return
+        }
+
+        Open-WtwRemoteWorkspace `
+            -HostEntry $hostEntry `
+            -Name $name `
+            -Editor $editorName `
+            -Folder:([bool]$remoteSplat.Contains('Folder')) `
+            -PrintOnly:([bool]$remoteSplat.Contains('PrintOnly')) `
+            -SkipChecks:([bool]$remoteSplat.Contains('SkipChecks'))
         return
     }
 
@@ -138,6 +228,11 @@ function Invoke-Wtw {
             Set-WtwColor @splat 
         }
         'clean'     { Invoke-WtwClean @splat }
+        'host'      {
+            if ($pos.Count -gt 0) { $splat['Action'] = $pos[0] }
+            if ($pos.Count -gt 1) { $splat['Name'] = $pos[1] }
+            Invoke-WtwHost @splat
+        }
         'agent'     { Invoke-WtwAgent @rawArgs }
         'install'   { Install-Wtw @splat }
         'update'    { Install-Wtw @splat }
@@ -157,6 +252,40 @@ function Invoke-Wtw {
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             Write-Output $p
+        }
+        '__resolve_json' {
+            # Output: single-line JSON with everything a *remote* caller needs.
+            # `wtw --on <host> …` runs this over ssh, because the machine that
+            # owns the worktree is the only one that knows where it currently is.
+            # Deliberately not an extra field on __resolve: the zsh/bash wrappers
+            # read that one with fixed positional fields.
+            if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve_json <name>"; return }
+            $target = & { Resolve-WtwTarget $pos[0] } 6>$null
+            if (-not $target) { exit 1 }
+            $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+            $ws = if ($target.WorktreeEntry) {
+                Get-WtwPropertyValue -Object $target.WorktreeEntry -Name 'workspace'
+            } else {
+                Get-WtwPropertyValue -Object $target.RepoEntry -Name 'templateWorkspace'
+            }
+            # A workspace path recorded in the registry but since deleted would
+            # produce a --file-uri that opens an empty window; drop it here so the
+            # caller falls back to a folder open.
+            if ($ws -and -not (Test-Path $ws)) { $ws = $null }
+            $c = if ($target.WorktreeEntry) {
+                Get-WtwPropertyValue -Object $target.WorktreeEntry -Name 'color'
+            } else {
+                Get-WtwPropertyValue -Object (Get-WtwColors).assignments -Name "$($target.RepoName)/main"
+            }
+            [PSCustomObject]@{
+                path       = $p
+                workspace  = $ws
+                color      = $c
+                title      = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
+                prettyName = if ($target.WorktreeEntry) { Get-WtwPropertyValue -Object $target.WorktreeEntry -Name 'prettyName' } else { $null }
+                repo       = $target.RepoName
+                task       = $target.TaskName
+            } | ConvertTo-Json -Compress -Depth 5 | Write-Output
         }
         '__resolve' {
             # Output: path\tcolor\ttitle\tstartup_script\tworktree_id\tworktree_index

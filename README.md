@@ -178,6 +178,104 @@ wtw clean                 # interactive selection + removal
 | `wtw clean [--dry-run] [--force]` | Clean stale AI worktrees (codex, cursor, conductor) |
 | `wtw install [--skip-profile]` | Install/update globally to `~/.wtw/module/` |
 | `wtw skill [--agent claude\|agents\|all]` | Install AI skill into current repo for agent support |
+| `wtw host [list\|add\|remove\|sync\|test]` | Manage remote machines for `--on` |
+| `wtw --on <host> <editor> <name>` | Open a worktree that lives on another machine (see [Remote worktrees](#remote-worktrees)) |
+
+## Remote worktrees
+
+When agents work on more than one machine, the worktree you want to look at is
+often not on the machine you are sitting at. `--on` opens it over Remote-SSH:
+the editor window is local, the files and the extension host are on the remote.
+
+```powershell
+wtw host add arctictroll --alias at --user sno `
+    --address arctictroll.local,192.168.3.7 `
+    --identity ~/.ssh/id_ed25519_arctictroll --platform windows
+
+wtw host trust arctictroll  # show host-key fingerprints, then accept
+wtw host test at            # addresses + ssh config + remote wtw
+
+wtw list --on at            # what does that machine have?
+wtw --on at cursor auth     # open its "auth" worktree here, in Cursor
+wtw at cursor auth          # same thing — bare host shorthand
+```
+
+`--address` is an **ordered candidate list**. Put an mDNS name first and a
+last-known IP second: on DHCP — or when a machine moves between wifi and a USB
+adapter — the address changes but the `.local` name does not. `wtw host sync`
+probes the candidates and writes whichever answers on the ssh port, so a moved
+machine is one command away rather than a config edit.
+
+Both platforms advertise mDNS: macOS always, Windows 10/11 natively. Check the
+name with `scutil --get LocalHostName` (macOS) or `hostname` (Windows).
+
+Reaching a machine by a **new name** needs its host key accepted again — ssh
+trusts keys per host pattern, and wtw connects with `BatchMode=yes` so it can
+never hang on the prompt. `wtw host trust <name>` scans every candidate, prints
+the fingerprints, marks any that already match a host you trust (same machine,
+different name) and asks before writing to `known_hosts`.
+
+wtw does **not** mirror the remote's registry. It asks the remote's own wtw
+where the worktree currently is (`wtw __resolve_json` over ssh), because that is
+the only thing that stays correct while agents create and remove worktrees over
+there. Nothing is cached, so nothing goes stale.
+
+### What crosses the network
+
+Only reads and editor launches. `open`, the VS Code family editors, `list` and
+`info` accept `--on`.
+
+`list --on` delegates to the remote's own `wtw list` rather than reimplementing
+it, so every flag behaves exactly as it does locally (`--detailed`, `--wide`,
+`--repo`) and the colour swatches survive the trip.
+
+Everything else is refused with a pointer to run it on the remote instead:
+
+- `create` / `remove` / `color` / `sync` mutate the remote registry — run them
+  there so it stays authoritative.
+- `t3` / `cmux` / `claudecode` / `chatgpt` / `ss` register project state inside
+  an app running on a particular machine; a local launch would point the wrong
+  app at an unreachable path.
+- `go` has nothing to cd to.
+
+### Setup notes
+
+- **ssh config is mandatory.** The Remote-SSH extension resolves
+  `ssh-remote+<host>` through the ssh client, not through wtw. `wtw host add`
+  and `wtw host sync` write `~/.ssh/config.d/wtw` and prepend an `Include` to
+  `~/.ssh/config`. The Include goes first because OpenSSH takes the first
+  obtained value per keyword — appended after a `Host` block it would apply only
+  to that block.
+- **Each fork needs its own Remote-SSH extension**: VS Code
+  `ms-vscode-remote.remote-ssh`, Cursor `anysphere.remote-ssh`, VSCodium
+  `jeanp413.open-remote-ssh` (Microsoft's is proprietary and absent from Open
+  VSX). wtw probes what is installed and offers to add one.
+- **Windows remotes** need `remote.SSH.remotePlatform` pinned or the connection
+  fails with an opaque error. wtw writes it into the editor's `settings.json`
+  for `--platform windows` hosts, backing the file up first (comments do not
+  survive a JSON rewrite).
+- **Both ends want 0.2.0+.** Discovery asks the remote for `__resolve_json`,
+  which older versions do not have. An older remote still works — wtw falls back
+  to the legacy `__resolve` and prints *"Remote wtw predates --on"* — but you get
+  a folder open instead of the `.code-workspace`, so no Peacock colour or
+  multi-root layout.
+- **Nothing depends on the remote's `wtw` command.** The payload is a
+  `pwsh -EncodedCommand` that imports the module and calls `Invoke-Wtw` directly.
+  ssh hands its command string to the remote's *default shell* — cmd.exe on
+  Windows, where `wtw` is the cmd shim that treats unknown subcommands as `go`
+  targets. Base64 also sidesteps every layer of quote reinterpretation between
+  the local shell, ssh, cmd.exe and pwsh.
+
+### Flags
+
+| Flag | Meaning |
+|------|---------|
+| `--print-only` | Print the resolved editor command and exit — no ssh launch |
+| `--folder` | Open the directory even when a `.code-workspace` exists remotely |
+| `--skip-checks` | Skip the ssh-config / extension / settings preflight |
+
+`wtw host test <name>` probes both halves (ssh resolution and remote wtw
+reachability) when something is not working.
 
 ## Importing Existing Worktrees
 
@@ -349,10 +447,23 @@ All config lives in `~/.wtw/`:
 
 | File | Purpose |
 |------|---------|
-| `config.json` | Editor preference, workspaces dir, stale paths to scan |
+| `config.json` | Editor preference, workspaces dir, stale paths to scan, remote hosts |
 | `registry.json` | Registered repos, aliases, template paths, worktrees |
 | `colors.json` | 20-color palette + per-worktree color assignments |
 | `module/` | Globally installed module copy |
+
+### Editor preference
+
+`editor` accepts a single name or an ordered chain:
+
+```jsonc
+"editor": "cursor"
+"editor": ["cursor", "code"]      // first *runnable* one wins
+```
+
+The array is a preference order, not "open in all of them". It exists so one
+config file survives machines with different editors installed — which is the
+normal case once you open worktrees from more than one box.
 
 ### agentctl profile overlays
 

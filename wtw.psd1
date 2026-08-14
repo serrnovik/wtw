@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.1.48'
+    ModuleVersion     = '0.2.0'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -19,6 +19,7 @@
         'Install-WtwSkill'
         'Invoke-Wtw'
         'Invoke-WtwClean'
+        'Invoke-WtwHost'
         'New-WtwWorkspace'
         'New-WtwWorktree'
         'Open-WtwWorkspace'
@@ -34,10 +35,10 @@
     VariablesToExport = @()
     PrivateData       = @{
         PSData = @{
-            Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools')
+            Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'Adds `wtw t3`: registers a worktree as a T3 Code project under its wtw pretty name, and gives it its own sidebar row so repository grouping does not hide that name. Fixes hashtable property lookups, which made editor app-name candidates and SourceGit argv handling silently fall back to defaults.'
+            ReleaseNotes = 'Adds remote worktrees: `wtw --on <host> cursor <name>` opens a worktree that lives on another machine over Remote-SSH, discovering it by asking that machine''s own wtw rather than mirroring its registry. Adds `wtw host` to manage those machines and to keep ~/.ssh/config.d/wtw in sync, since the editor resolves hosts through the ssh client. `editor` in the config now also accepts an ordered chain (["cursor","code"]) — first runnable wins. Internally, the VS Code family (prefixes, CLI candidates, app bundles, Remote-SSH extension ids, settings dirs) now comes from one table instead of four lists that could drift.'
         }
     }
 }

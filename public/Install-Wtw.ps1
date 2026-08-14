@@ -210,17 +210,14 @@ if (Test-Path $_wtwModule) {
     Write-Host ''
     Write-Host '  Checking editors...' -ForegroundColor Cyan
 
-    # Editor candidates. `CmdCandidates` is a fallback chain so a CLI rename
-    # (e.g. Antigravity v1 `antigravity` → v2 `antigravity-ide`) is handled
-    # without separate detection entries. First candidate that resolves AND
-    # runs `--version` cleanly is treated as the editor's CLI.
-    $editorDefs = @(
-        @{ Name = 'VS Code';      CmdCandidates = @('code') }
-        @{ Name = 'Cursor';       CmdCandidates = @('cursor') }
-        @{ Name = 'Antigravity';  CmdCandidates = @('antigravity-ide', 'antigravity') }
-        @{ Name = 'Windsurf';     CmdCandidates = @('windsurf') }
-        @{ Name = 'VSCodium';     CmdCandidates = @('codium') }
-    )
+    # Editor candidates come from the shared family table
+    # (private/Get-WtwEditorFamily.ps1). `CmdCandidates` is a fallback chain so a
+    # CLI rename (e.g. Antigravity v1 `antigravity` → v2 `antigravity-ide`) is
+    # handled without separate detection entries. First candidate that resolves
+    # is treated as the editor's CLI.
+    $editorDefs = @(Get-WtwEditorFamily | ForEach-Object {
+            @{ Name = $_.Name; Id = $_.Id; CmdCandidates = @($_.Cli) }
+        })
 
     # CLI runnability is probed via the shared Test-WtwEditorCli helper
     # (private/Test-WtwEditorCli.ps1), which is dangling-symlink-safe so a
@@ -232,18 +229,16 @@ if (Test-Path $_wtwModule) {
 
     # macOS app-bundle probes: if the CLI isn't on PATH but the app is
     # installed, point the user at the "Shell Command: Install … in PATH"
-    # palette entry rather than silently skipping.
-    $macAppHints = @{
-        'Antigravity' = @(
-            @{ App = '/Applications/Antigravity IDE.app'; Bin = '/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide'; Name = 'antigravity-ide' }
-            @{ App = '/Applications/Antigravity.app';     Bin = '/Applications/Antigravity.app/Contents/Resources/app/bin/antigravity';        Name = 'antigravity' }
-        )
-        'VS Code' = @(
-            @{ App = '/Applications/Visual Studio Code.app'; Bin = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'; Name = 'code' }
-        )
-        'Cursor' = @(
-            @{ App = '/Applications/Cursor.app'; Bin = '/Applications/Cursor.app/Contents/Resources/app/bin/cursor'; Name = 'cursor' }
-        )
+    # palette entry rather than silently skipping. Derived from the family
+    # table's MacApps × Cli rather than a second hand-maintained mapping.
+    # No @() wrapper: Get-WtwEditorMacCliHints already returns `,@(...)`, so it
+    # emits the array as a single object. Re-wrapping nests it, and then
+    # `Where-Object` sees one item (the inner array) whose .App is *every* path
+    # at once — which is how Antigravity reported both bundles and both CLI
+    # names in one sentence.
+    $macAppHints = @{}
+    foreach ($member in Get-WtwEditorFamily) {
+        $macAppHints[$member.Name] = Get-WtwEditorMacCliHints -Member $member
     }
 
     foreach ($ed in $editorDefs) {
@@ -283,7 +278,7 @@ if (Test-Path $_wtwModule) {
     }
 
     if ($installedEditors.Count -eq 0) {
-        Write-Host '    No supported editors found (code, cursor, antigravity, windsurf, codium).' -ForegroundColor Yellow
+        Write-Host "    No supported editors found ($((Get-WtwEditorFamily | ForEach-Object { $_.Id }) -join ', '))." -ForegroundColor Yellow
         Write-Host '    wtw works best with the Peacock extension for workspace colors.' -ForegroundColor DarkGray
     } else {
         # Check if any editors are missing Peacock

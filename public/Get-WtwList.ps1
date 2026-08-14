@@ -43,6 +43,23 @@ function Get-WtwList {
         return
     }
 
+    # A --repo filter that matches nothing is almost always a typo or a flag
+    # written without dashes (`wtw list detailed`). Say so instead of printing an
+    # empty table.
+    if ($Repo) {
+        $known = @($repoNames | Where-Object {
+                $_ -eq $Repo -or ($Repo -in (Get-WtwRepoAliases $registry.repos.$_))
+            })
+        if ($known.Count -eq 0) {
+            Write-Host ''
+            Write-Host "  No repo matches '$Repo'." -ForegroundColor Yellow
+            Write-Host "  Registered: $(($repoNames | Sort-Object) -join ', ')" -ForegroundColor DarkGray
+            Write-Host "  Did you mean a flag? Use --detailed / --wide (with dashes)." -ForegroundColor DarkGray
+            Write-Host ''
+            return
+        }
+    }
+
     $items = @()
 
     foreach ($name in $repoNames) {

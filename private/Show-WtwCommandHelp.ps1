@@ -100,6 +100,37 @@ function Show-WtwCommandHelp {
         'sync'        { @('wtw sync [name] [--all]', 'Re-apply template settings to managed workspaces.', '', 'Arguments:', '  name    Target workspace (alias, task, or file path; default: detected from cwd)', '', 'Options:', '  --all               Sync all managed workspaces', '  --repo <name>       Limit --all to a specific repo', '  --template <path>   Override template source', '  --dry-run           Show what would be synced without writing', '  --color-source      json | workspace (single-file sync; skips interactive prompt)', '                      Default when omitted: prompt if interactive, else json-first', '', 'Examples:', '  wtw sync                  Sync current workspace', '  wtw sync proj-fix         Sync a specific workspace by name', '  wtw sync --all            Sync all registered workspaces', '  wtw sync --all --repo proj Sync all workspaces for one repo') }
         'color'       { @('wtw color [name] [hex|random]', 'Set or show the Peacock color for a workspace.', '', 'Arguments:', '  name     Target workspace (default: detected from cwd)', '  color    A hex color (rrggbb) or "random" for max contrast', '', 'Options:', '  --no-sync   Skip syncing the workspace file after color change', '', 'Examples:', '  wtw color                  Show color for current workspace', '  wtw color proj random      Pick a maximally contrasting color', '  wtw color my-task e05d44   Set a specific color', '', 'Note: # starts a comment in PowerShell. Either omit it', '  or quote it: ''#e05d44''') }
         'clean'       { @('wtw clean', 'Remove stale AI-created worktrees that no longer have active branches.') }
+        'host'        { @(
+            'wtw host [list|add|remove|sync|test] [name] [options]',
+            'Manage the remote machines `wtw --on <host>` can open worktrees on.',
+            '',
+            'Hosts live in ~/.wtw/config.json and are mirrored into ~/.ssh/config.d/wtw,',
+            'because the editor''s Remote-SSH extension resolves hosts through the ssh',
+            'client rather than through wtw.',
+            '',
+            'Subcommands:',
+            '  list              Show configured hosts and whether ssh resolves them',
+            '  add <name>        Add or update a host, then sync ssh config',
+            '  remove <name>     Drop a host, then sync ssh config',
+            '  sync              Rewrite ~/.ssh/config.d/wtw from config',
+            '  test <name>       Probe ssh and the remote wtw',
+            '',
+            'Options for add:',
+            '  --alias a,b            Short names (wtw --on at ...)',
+            '  --user <u>             SSH user',
+            '  --address <ip|dns>     HostName for ssh',
+            '  --identity <path>      IdentityFile (also sets IdentitiesOnly)',
+            '  --port <n>             SSH port',
+            '  --platform <p>         windows | linux | macos  (drives remote path translation)',
+            '  --wtw <cmd>            Command used to invoke wtw remotely (default: wtw)',
+            '',
+            'Only the options you pass are written, so `wtw host add x --platform windows`',
+            'is a targeted edit rather than a reset of the other fields.',
+            '',
+            'Example:',
+            '  wtw host add arctictroll --alias at --user sno --address 192.168.3.7 \',
+            '      --identity ~/.ssh/id_ed25519_arctictroll --platform windows'
+        ) }
         'agent'       { @('wtw agent profile set <repo> <profile>', 'Configure which agentctl profile wtw create applies for a repo.', '', 'Examples:', '  wtw agent profile set snowmain1 solo', '  wtw agent profile default team', '  wtw agent profile get snowmain1', '  wtw agent profile list') }
         'install'     { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }
         'update'      { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }

@@ -18,6 +18,12 @@ if "%~1"=="" goto :passthrough
 
 set "_FIRST=%~1"
 
+REM Internal __* commands emit machine-readable output for shell integration
+REM and for `wtw --on <host>` over ssh. They are never a cd target, and routing
+REM them through the resolve branch turned `wtw __aliases` into
+REM 'could not resolve "__aliases"'.
+if "%_FIRST:~0,2%"=="__" goto :passthrough
+
 REM Known subcommands that don't need cmd-side cd. Pad with spaces so findstr
 REM can match whole tokens.
 set "_NOCD= init add create list ls open cursor cur code co antigravity anti ag windsurf wind ws codium vscodium sourcegit sgit sg codex droid factory cmux cm wmux wm claude cowork claudecode ccode t3 t3code remove rm delete del unregister unreg workspace copy color sync clean install update skill sbx help -h --help "

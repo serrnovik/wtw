@@ -3,12 +3,13 @@ function Resolve-WtwEditorCommand {
 
     if (-not $Name) { return $null }
 
-    $editors = @(
-        @{ prefixes = @('cursor', 'cur'); cmd = 'cursor' }
-        @{ prefixes = @('code', 'co'); cmd = 'code' }
-        @{ prefixes = @('antigravity', 'anti', 'ag'); cmd = 'antigravity' }
-        @{ prefixes = @('windsurf', 'wind', 'ws'); cmd = 'windsurf' }
-        @{ prefixes = @('codium', 'vscodium'); cmd = 'codium' }
+    # VS Code family — projected from the shared table so prefixes, CLI
+    # candidates, app bundles, remote-SSH extension ids and settings dirs cannot
+    # drift apart again (private/Get-WtwEditorFamily.ps1). Family members resolve
+    # to a plain string command; only the non-family editors below carry a `type`.
+    $editors = @(Get-WtwEditorFamily | ForEach-Object { @{ prefixes = $_.Prefixes; cmd = $_.Id } })
+
+    $editors += @(
         # SourceGit — cross-platform. Pass repo dir as positional argv; SourceGit's IPC channel
         # routes a second-instance launch to the running one (see src/App.axaml.cs TryLaunchAsNormal).
         # macArgsViaCli=true → uses `open -n -a App --args <dir>` so argv actually carries the path.

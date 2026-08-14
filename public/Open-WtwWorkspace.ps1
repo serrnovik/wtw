@@ -38,7 +38,12 @@ function Open-WtwWorkspace {
     }
 
     $config = Get-WtwConfig
-    $editorCmd = if ($Editor) { $Editor } elseif ($config.editor) { $config.editor } else { 'code' }
+    $editorPreference = if ($Editor) { $Editor } elseif ($config.editor) { $config.editor } else { 'code' }
+    # `editor` may be a single name or an ordered chain (["cursor","code"]);
+    # first runnable wins, so one config file survives machines with different
+    # editors installed.
+    $editorCmd = Resolve-WtwEditorPreference -Editor $editorPreference
+    if (-not $editorCmd) { $editorCmd = $editorPreference }
 
     $target = Resolve-WtwTarget $Name
     if (-not $target) { return }
