@@ -41,6 +41,18 @@ function Format-WtwSshError {
         return "ssh cannot resolve '$($HostEntry.HostName)'. Candidates: $((@($HostEntry.HostNames)) -join ', '). Re-probe with: wtw host sync"
     }
 
+    if ($text -match 'wtw-pwsh-not-found' -or $text -match 'command not found: pwsh' -or $text -match 'pwsh: command not found' -or $text -match "'pwsh' is not recognized") {
+        return @(
+            "PowerShell (pwsh) was not found on '$($HostEntry.Name)'."
+            "wtw drives the remote through pwsh, and an ssh command runs a non-login shell —"
+            "so a PATH set up in ~/.zprofile or ~/.bashrc does not apply."
+            "  Install it:   brew install powershell   |   winget install Microsoft.PowerShell"
+            "  Already installed? Point wtw at it directly:"
+            "    wtw host add $($HostEntry.Name) --pwsh /full/path/to/pwsh"
+            "  Find the path on that machine with:  which pwsh"
+        ) -join "`n"
+    }
+
     if ($text -match 'Connection refused') {
         return @(
             "'$($HostEntry.HostName)' is reachable but nothing is listening on ssh."
@@ -56,6 +68,69 @@ function Format-WtwSshError {
     }
 
     return "ssh to '$($HostEntry.Name)' failed: $text"
+}
+
+function New-WtwRemotePwshCommand {
+    <#
+    .SYNOPSIS
+        Build the remote-side command that runs pwsh with an encoded payload.
+    .DESCRIPTION
+        `ssh host <command>` runs a NON-login, NON-interactive shell. zsh reads
+        only ~/.zshenv then, and Homebrew puts its PATH export in ~/.zprofile —
+        so on an Apple-Silicon Mac `pwsh` lives at /opt/homebrew/bin/pwsh and is
+        simply not on PATH, giving "command not found: pwsh" even though an
+        interactive ssh session finds it fine. /etc/paths does not list Homebrew
+        either, so a login shell is not a reliable fix.
+
+        POSIX remotes therefore get a tiny sh loop that tries the known install
+        locations and execs the first hit. It is written without a single quote
+        character: the whole thing crosses PowerShell argument binding, ssh's
+        argv concatenation and the remote shell's parser, and every quote is one
+        more thing to be mangled on the way. Base64 is likewise quote-free.
+
+        Windows remotes keep the plain form — cmd.exe cannot run the sh loop, and
+        PowerShell there is always on PATH.
+    .PARAMETER Encoded
+        Base64 (UTF-16LE) payload for -EncodedCommand.
+    .PARAMETER HostEntry
+        Host entry; supplies Platform and an optional explicit Pwsh path.
+    .OUTPUTS
+        String[] to append to the ssh argument list.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Encoded,
+        [Parameter(Mandatory)] $HostEntry
+    )
+
+    $explicit = Get-WtwPropertyValue -Object $HostEntry -Name 'Pwsh'
+
+    if ($HostEntry.Platform -ieq 'windows') {
+        $exe = if ($explicit) { $explicit } else { 'pwsh' }
+        return @($exe, '-NoLogo', '-NoProfile', '-EncodedCommand', $Encoded)
+    }
+
+    $candidates = @()
+    if ($explicit) { $candidates += $explicit }
+    $candidates += @(
+        'pwsh'
+        '/opt/homebrew/bin/pwsh'          # Apple Silicon Homebrew
+        '/usr/local/bin/pwsh'             # Intel Homebrew, manual installs
+        '/usr/bin/pwsh'                   # distro packages
+        '/snap/bin/pwsh'
+        '$HOME/.dotnet/tools/pwsh'        # dotnet global tool
+    )
+
+    # Assembled from single-quoted pieces on purpose: `$c` and `$HOME` belong to
+    # the REMOTE shell, and a double-quoted PowerShell string would expand them
+    # here (to nothing) before ssh ever saw them.
+    $loop = 'for c in ' + ($candidates -join ' ') +
+    '; do command -v $c >/dev/null 2>&1 && exec $c -NoLogo -NoProfile -EncodedCommand ' + $Encoded +
+    '; done; echo wtw-pwsh-not-found >&2; exit 127'
+
+    # Comma operator: a bare `return @(...)` unrolls this single-element array to
+    # the string itself, and the caller's `+` would then splat it per character.
+    return , @($loop)
 }
 
 function Write-WtwSshFailure {
@@ -173,7 +248,8 @@ function Invoke-WtwRemoteCommand {
     # -EncodedCommand wants UTF-16LE, which is what [Text.Encoding]::Unicode is.
     $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($remoteScript))
 
-    $sshArgs = @('-o', 'BatchMode=yes', $HostEntry.Name, 'pwsh', '-NoLogo', '-NoProfile', '-EncodedCommand', $encoded)
+    $sshArgs = @('-o', 'BatchMode=yes', $HostEntry.Name) +
+    (New-WtwRemotePwshCommand -Encoded $encoded -HostEntry $HostEntry)
 
     # `6>$null` is load-bearing. A remote pwsh with redirected streams serialises
     # its *information* stream — everything wtw prints with Write-Host — as a

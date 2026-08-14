@@ -162,6 +162,15 @@ Describe 'Format-WtwSshError' {
         $msg | Should -Match '192\.168\.3\.7'
     }
 
+    It 'explains a missing remote pwsh and offers the --pwsh escape hatch' {
+        foreach ($raw in 'zsh:1: command not found: pwsh', 'wtw-pwsh-not-found', "'pwsh' is not recognized") {
+            $msg = Format-WtwSshError -HostEntry $script:entry -ErrorText $raw
+            $msg | Should -Match 'non-login shell'
+            $msg | Should -Match '--pwsh'
+            $msg | Should -Match 'brew install powershell'
+        }
+    }
+
     It 'tells you the ssh server is off when the connection is refused' {
         # "Connection refused" means the host answered — it is the sshd that is
         # missing, which is a different fix from an unreachable machine.

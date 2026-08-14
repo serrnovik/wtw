@@ -254,6 +254,11 @@ Everything else is refused with a pointer to run it on the remote instead:
   fails with an opaque error. wtw writes it into the editor's `settings.json`
   for `--platform windows` hosts, backing the file up first (comments do not
   survive a JSON rewrite).
+- **The remote needs pwsh, found without a login shell.** `ssh host <command>`
+  runs a non-login, non-interactive shell, so a PATH exported from `~/.zprofile`
+  or `~/.bashrc` does not apply — on an Apple-Silicon Mac that hides
+  `/opt/homebrew/bin/pwsh` completely. wtw probes the usual install locations;
+  `wtw host add <name> --pwsh <path>` covers anything unusual.
 - **Both ends want 0.2.0+.** Discovery asks the remote for `__resolve_json`,
   which older versions do not have. An older remote still works — wtw falls back
   to the legacy `__resolve` and prints *"Remote wtw predates --on"* — but you get

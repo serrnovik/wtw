@@ -145,6 +145,51 @@ Describe 'New-WtwRemoteScript' {
     }
 }
 
+Describe 'New-WtwRemotePwshCommand' {
+    It 'calls pwsh plainly on a Windows remote' {
+        # cmd.exe cannot run the POSIX probe loop, and pwsh is on PATH there.
+        $cmd = New-WtwRemotePwshCommand -Encoded 'QUJD' -HostEntry @{ Name = 'w'; Platform = 'windows'; Pwsh = $null }
+        $cmd -join ' ' | Should -Be 'pwsh -NoLogo -NoProfile -EncodedCommand QUJD'
+    }
+
+    It 'probes known install paths on a POSIX remote' {
+        # `ssh host <cmd>` is a non-login, non-interactive shell: zsh reads only
+        # ~/.zshenv, so Homebrew's PATH export in ~/.zprofile never runs and
+        # /opt/homebrew/bin/pwsh is invisible.
+        $cmd = New-WtwRemotePwshCommand -Encoded 'QUJD' -HostEntry @{ Name = 'm'; Platform = 'macos'; Pwsh = $null }
+
+        $cmd.Count | Should -Be 1
+        $cmd[0] | Should -Match '/opt/homebrew/bin/pwsh'
+        $cmd[0] | Should -Match '/usr/local/bin/pwsh'
+        $cmd[0] | Should -Match 'wtw-pwsh-not-found'
+    }
+
+    It 'leaves remote shell variables unexpanded' {
+        # $c and $HOME belong to the remote shell; a double-quoted PowerShell
+        # string would expand them to nothing before ssh saw them.
+        $cmd = New-WtwRemotePwshCommand -Encoded 'QUJD' -HostEntry @{ Name = 'm'; Platform = 'macos'; Pwsh = $null }
+        $cmd[0] | Should -Match 'command -v \$c'
+        $cmd[0] | Should -Match '\$HOME/\.dotnet/tools/pwsh'
+    }
+
+    It 'contains no quote characters to be mangled in transit' {
+        # The string crosses PowerShell binding, ssh argv joining and the remote
+        # shell parser; every quote is another chance to be re-interpreted.
+        $cmd = New-WtwRemotePwshCommand -Encoded 'QUJD' -HostEntry @{ Name = 'm'; Platform = 'macos'; Pwsh = $null }
+        $cmd[0] | Should -Not -Match "['`"]"
+    }
+
+    It 'puts an explicit --pwsh path first' {
+        $cmd = New-WtwRemotePwshCommand -Encoded 'QUJD' -HostEntry @{ Name = 'm'; Platform = 'macos'; Pwsh = '/custom/pwsh' }
+        $cmd[0] | Should -Match 'for c in /custom/pwsh pwsh '
+    }
+
+    It 'honours an explicit path on Windows too' {
+        $cmd = New-WtwRemotePwshCommand -Encoded 'QUJD' -HostEntry @{ Name = 'w'; Platform = 'windows'; Pwsh = 'C:\ps\pwsh.exe' }
+        $cmd[0] | Should -Be 'C:\ps\pwsh.exe'
+    }
+}
+
 Describe 'Get-WtwRemoteList' {
     BeforeEach {
         $script:sentArgs = $null

@@ -51,7 +51,8 @@ function Invoke-WtwHost {
         [string] $Identity,
         [string] $Port,
         [ValidateSet('windows', 'linux', 'macos')] [string] $Platform = 'linux',
-        [string] $Wtw
+        [string] $Wtw,
+        [string] $Pwsh
     )
 
     switch ($Action.ToLowerInvariant()) {
@@ -108,6 +109,7 @@ function Invoke-WtwHost {
             if ($Identity) { $entry | Add-Member -NotePropertyName 'identityFile' -NotePropertyValue $Identity -Force; $entry | Add-Member -NotePropertyName 'identitiesOnly' -NotePropertyValue $true -Force }
             if ($Port)     { $entry | Add-Member -NotePropertyName 'port' -NotePropertyValue $Port -Force }
             if ($Wtw)      { $entry | Add-Member -NotePropertyName 'wtw' -NotePropertyValue $Wtw -Force }
+            if ($Pwsh)     { $entry | Add-Member -NotePropertyName 'pwsh' -NotePropertyValue $Pwsh -Force }
             if ($PSBoundParameters.ContainsKey('Platform') -or -not (Get-WtwPropertyValue -Object $entry -Name 'platform')) {
                 $entry | Add-Member -NotePropertyName 'platform' -NotePropertyValue $Platform -Force
             }

@@ -69,6 +69,8 @@ function Get-WtwHosts {
             # remote.SSH.remotePlatform needs pinning in the editor's settings.
             Platform       = (Get-WtwPropertyValue -Object $entry -Name 'platform' -DefaultValue 'linux')
             Wtw            = (Get-WtwPropertyValue -Object $entry -Name 'wtw' -DefaultValue 'wtw')
+            # Explicit pwsh path, for installs the standard probe list misses.
+            Pwsh           = (Get-WtwPropertyValue -Object $entry -Name 'pwsh')
         }
     }
     # Comma operator: without it a single configured host unrolls to a bare
