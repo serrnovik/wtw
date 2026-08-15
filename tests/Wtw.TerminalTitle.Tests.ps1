@@ -123,12 +123,12 @@ Describe 'Register-WtwTerminalTitle' {
         }
     }
 
-    It 'builds the reported Kulissa worktree title under strict mode' {
+    It 'builds the reported Demo worktree title under strict mode' {
         InModuleScope wtw {
             {
                 Get-WtwWindowTitle `
-                    -RepoRoot '/Users/sno/Data/git/tn1/kulissa-landing_KLVH001-voice-harness-implementation' `
-                    -FolderName 'kulissa-landing_KLVH001-voice-harness-implementation'
+                    -RepoRoot '/Users/dev/Data/git/tn1/demo-app_KLVH001-voice-harness-implementation' `
+                    -FolderName 'demo-app_KLVH001-voice-harness-implementation'
             } | Should -Not -Throw
         }
     }

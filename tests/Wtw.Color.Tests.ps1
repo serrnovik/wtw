@@ -37,6 +37,80 @@ Describe 'ConvertTo-PeacockColorBlock' {
     }
 }
 
+Describe 'Get-ContrastForeground' {
+    It 'keeps every palette color readable at WCAG AA' {
+        # The old YIQ-threshold picked a bucket without checking the result was
+        # legible: mid-tone reds, teals and blues landed around 3:1, which is the
+        # washed-out chrome text this replaced.
+        $palette = @(
+            '#e05d44', '#ffa500', '#ffff00', '#008000', '#1a1ad5',
+            '#c72391', '#ff0000', '#689b59', '#2285a6', '#007ec6',
+            '#b300b3', '#336699', '#000000', '#ffffff'
+        )
+        foreach ($color in $palette) {
+            $fg = Get-ContrastForeground $color
+            $ratio = Get-WtwContrastRatio -Foreground $fg -Background $color
+            $ratio | Should -BeGreaterThan 4.5 -Because "$color chrome text must stay readable (got $([Math]::Round($ratio,2)):1)"
+        }
+    }
+
+    It 'escalates to pure black or white when the softened values are not enough' {
+        # Pure red reads at only 3.2:1 against #e7e7e7.
+        Get-ContrastForeground '#ff0000' | Should -Be '#000000'
+        Get-ContrastForeground '#2285a6' | Should -Be '#000000'
+    }
+
+    It 'prefers the softened values when they are readable' {
+        Get-ContrastForeground '#ffff00' | Should -Be '#15202b'
+        Get-ContrastForeground '#1a1ad5' | Should -Be '#e7e7e7'
+    }
+
+    It 'accepts a hex value with or without the leading hash' {
+        Get-ContrastForeground '#ffff00' | Should -Be (Get-ContrastForeground 'ffff00')
+    }
+}
+
+Describe 'Get-WtwContrastRatio' {
+    It 'matches the WCAG reference values at the extremes' {
+        [Math]::Round((Get-WtwContrastRatio -Foreground '#ffffff' -Background '#000000'), 1) | Should -Be 21.0
+        [Math]::Round((Get-WtwContrastRatio -Foreground '#ffffff' -Background '#ffffff'), 1) | Should -Be 1.0
+    }
+
+    It 'is symmetric' {
+        $a = Get-WtwContrastRatio -Foreground '#ff0000' -Background '#ffffff'
+        $b = Get-WtwContrastRatio -Foreground '#ffffff' -Background '#ff0000'
+        [Math]::Round($a, 4) | Should -Be ([Math]::Round($b, 4))
+    }
+}
+
+Describe 'Peacock block readability' {
+    It 'keeps the active tab distinguishable by more than its fill' {
+        # The active tab shares the title bar's hue, so fill alone is a
+        # low-contrast cue for "which file am I in".
+        $result = ConvertTo-PeacockColorBlock '#2285a6'
+        $result.Keys | Should -Contain 'tab.activeBorder'
+        $result['tab.activeBorder'] | Should -Be $result['tab.activeForeground']
+    }
+
+    It 'keeps the current file visible when the editor loses focus' {
+        $result = ConvertTo-PeacockColorBlock '#2285a6'
+        $result['tab.unfocusedActiveBackground'] | Should -Be '#2285a6'
+        $result['tab.unfocusedActiveForeground'] | Should -Match 'cc$'
+    }
+
+    It 'dims chrome text to 80% rather than 60%' {
+        $result = ConvertTo-PeacockColorBlock '#e05d44'
+        $result['activityBar.inactiveForeground'] | Should -Match 'cc$'
+        $result['titleBar.inactiveForeground']    | Should -Match 'cc$'
+    }
+
+    It 'contrasts the badge text against the badge, not the base color' {
+        $result = ConvertTo-PeacockColorBlock '#ffff00'
+        $badgeRatio = Get-WtwContrastRatio -Foreground $result['activityBarBadge.foreground'] -Background $result['activityBarBadge.background']
+        $badgeRatio | Should -BeGreaterThan 4.5
+    }
+}
+
 Describe 'Lighten-HexColor' {
     It 'lightens a color' {
         $result = Lighten-HexColor '#000000' -Factor 0.5

@@ -7,8 +7,8 @@ Describe 'ConvertTo-WtwRemotePath' {
     # Each of these three transforms, done wrong, yields a URI VS Code accepts
     # and then opens as a blank window — no error to diagnose from.
     It 'flips backslashes, lower-cases the drive, and adds the leading slash' {
-        ConvertTo-WtwRemotePath -Path 'C:\Users\sno\Data\repo_auth' -Platform 'windows' |
-            Should -Be '/c:/Users/sno/Data/repo_auth'
+        ConvertTo-WtwRemotePath -Path 'C:\Users\dev\Data\repo_auth' -Platform 'windows' |
+            Should -Be '/c:/Users/dev/Data/repo_auth'
     }
 
     It 'handles a bare drive root' {
@@ -17,7 +17,7 @@ Describe 'ConvertTo-WtwRemotePath' {
     }
 
     It 'accepts a Windows path that already uses forward slashes' {
-        ConvertTo-WtwRemotePath -Path 'C:/Users/sno/x' -Platform 'windows' | Should -Be '/c:/Users/sno/x'
+        ConvertTo-WtwRemotePath -Path 'C:/Users/dev/x' -Platform 'windows' | Should -Be '/c:/Users/dev/x'
     }
 
     It 'leaves UNC paths in their URI-shaped form' {
@@ -25,8 +25,8 @@ Describe 'ConvertTo-WtwRemotePath' {
     }
 
     It 'passes POSIX paths through unchanged' {
-        ConvertTo-WtwRemotePath -Path '/home/sno/data/repo' -Platform 'linux' | Should -Be '/home/sno/data/repo'
-        ConvertTo-WtwRemotePath -Path '/Users/sno/Data/repo' -Platform 'macos' | Should -Be '/Users/sno/Data/repo'
+        ConvertTo-WtwRemotePath -Path '/home/dev/data/repo' -Platform 'linux' | Should -Be '/home/dev/data/repo'
+        ConvertTo-WtwRemotePath -Path '/Users/dev/Data/repo' -Platform 'macos' | Should -Be '/Users/dev/Data/repo'
     }
 
     It 'does not mangle a POSIX path that looks drive-ish on a POSIX host' {
@@ -36,18 +36,18 @@ Describe 'ConvertTo-WtwRemotePath' {
 
 Describe 'ConvertTo-WtwRemoteUri' {
     It 'builds the ssh-remote authority for a Windows worktree' {
-        ConvertTo-WtwRemoteUri -Path 'C:\Users\sno\Data\snogit\repo_auth' -HostName 'arctictroll' -Platform 'windows' |
-            Should -Be 'vscode-remote://ssh-remote+arctictroll/c:/Users/sno/Data/snogit/repo_auth'
+        ConvertTo-WtwRemoteUri -Path 'C:\Users\dev\Data\snogit\repo_auth' -HostName 'workstation' -Platform 'windows' |
+            Should -Be 'vscode-remote://ssh-remote+workstation/c:/Users/dev/Data/snogit/repo_auth'
     }
 
     It 'builds the ssh-remote authority for a POSIX worktree' {
-        ConvertTo-WtwRemoteUri -Path '/home/sno/repo_auth' -HostName 'snowpomme' -Platform 'linux' |
-            Should -Be 'vscode-remote://ssh-remote+snowpomme/home/sno/repo_auth'
+        ConvertTo-WtwRemoteUri -Path '/home/dev/repo_auth' -HostName 'laptop' -Platform 'linux' |
+            Should -Be 'vscode-remote://ssh-remote+laptop/home/dev/repo_auth'
     }
 
     It 'escapes spaces in path segments' {
-        ConvertTo-WtwRemoteUri -Path '/home/sno/my repo' -HostName 'box' -Platform 'linux' |
-            Should -Be 'vscode-remote://ssh-remote+box/home/sno/my%20repo'
+        ConvertTo-WtwRemoteUri -Path '/home/dev/my repo' -HostName 'box' -Platform 'linux' |
+            Should -Be 'vscode-remote://ssh-remote+box/home/dev/my%20repo'
     }
 
     It 'leaves the Windows drive colon unescaped' {

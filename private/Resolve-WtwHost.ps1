@@ -71,6 +71,8 @@ function Get-WtwHosts {
             Wtw            = (Get-WtwPropertyValue -Object $entry -Name 'wtw' -DefaultValue 'wtw')
             # Explicit pwsh path, for installs the standard probe list misses.
             Pwsh           = (Get-WtwPropertyValue -Object $entry -Name 'pwsh')
+            # Preferred transport: tailscale | zerotier | mdns | lan | any.
+            Via            = (Get-WtwPropertyValue -Object $entry -Name 'via')
         }
     }
     # Comma operator: without it a single configured host unrolls to a bare
@@ -88,7 +90,7 @@ function Resolve-WtwHost {
         rather than guessing, because guessing wrong here opens an editor
         against the wrong machine's filesystem.
     .PARAMETER Name
-        Host name or alias ('arctictroll', 'at').
+        Host name or alias ('workstation', 'at').
     .PARAMETER Hosts
         Pre-read host list. Defaults to the configured hosts.
     #>
@@ -114,6 +116,49 @@ function Resolve-WtwHost {
     if ($prefixed.Count -eq 1) { return $prefixed[0] }
 
     return $null
+}
+
+function Resolve-WtwHostVia {
+    <#
+    .SYNOPSIS
+        Retarget a host at one transport, for a single command.
+    .DESCRIPTION
+        `wtw --on at list --via tailscale` is a one-off override — it must not
+        touch the stored config the way `wtw host add --via` does.
+
+        The trick is to return a host entry whose Name IS the chosen address.
+        Everything downstream already keys off Name: ssh connects to it, and the
+        editor authority becomes `ssh-remote+<address>`. Both work because
+        Sync-WtwSshConfig also emits every candidate address as a Host pattern
+        carrying the same User and IdentityFile.
+    .PARAMETER HostEntry
+        Entry from Resolve-WtwHost.
+    .PARAMETER Via
+        tailscale | zerotier | mdns | lan | any. Empty or 'any' returns the entry
+        unchanged, so callers can pass through unconditionally.
+    .OUTPUTS
+        The retargeted entry, or $null when the host has no address of that kind.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $HostEntry,
+        [AllowNull()] [string] $Via
+    )
+
+    if (-not $Via -or $Via -eq 'any') { return $HostEntry }
+
+    $prefixes = Get-WtwZeroTierPrefixes
+    $match = @(@($HostEntry.HostNames) |
+            Where-Object { (Get-WtwAddressKind -Address $_ -ZeroTierPrefixes $prefixes) -eq $Via }) |
+        Select-Object -First 1
+    if (-not $match) { return $null }
+
+    $clone = @{}
+    foreach ($key in $HostEntry.Keys) { $clone[$key] = $HostEntry[$key] }
+    $clone['Name'] = $match
+    $clone['HostNames'] = @($match)
+    $clone['ViaOverride'] = $Via
+    return $clone
 }
 
 function Get-WtwHostNames {

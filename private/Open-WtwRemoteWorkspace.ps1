@@ -85,7 +85,11 @@ function Open-WtwRemoteWorkspace {
         return
     }
 
-    if (-not $SkipChecks -and -not (Test-WtwSshHostKnown -Name $HostEntry.Name)) {
+    # A --via override targets a raw address on purpose, and `ssh -G 1.2.3.4`
+    # echoing the address back is correct, not a missing config — so the
+    # "not resolvable" warning would be pure noise there.
+    $viaOverride = Get-WtwPropertyValue -Object $HostEntry -Name 'ViaOverride'
+    if (-not $SkipChecks -and -not $viaOverride -and -not (Test-WtwSshHostKnown -Name $HostEntry.Name)) {
         Write-Host "  '$($HostEntry.Name)' is not resolvable by the ssh client — the editor resolves the host itself, not through wtw." -ForegroundColor Yellow
         Write-Host "  Fix: wtw host sync" -ForegroundColor DarkGray
     }
@@ -122,6 +126,59 @@ function Open-WtwRemoteWorkspace {
     $label = if ($remote.Title) { $remote.Title } else { $Name }
     Write-Host "  Opening $label on $($HostEntry.Name) in ${Editor}: $($remote.Path)" -ForegroundColor Green
     Invoke-WtwEditorCli -Cmd $Editor -PreArgs $launch.PreArgs
+}
+
+function Invoke-WtwRemoteWtw {
+    <#
+    .SYNOPSIS
+        Run a wtw command on the remote and print its output verbatim.
+    .DESCRIPTION
+        The escape hatch for everything wtw cannot meaningfully do from here.
+        `wtw --on <host> create x` or `wtw --on <host> run <anything>` executes on
+        the machine that owns the worktrees, so its registry stays authoritative —
+        which was the original reason those commands were refused. Refusing them
+        outright was too strict: running them *there* is exactly right, it just
+        has to actually happen there.
+
+        Output is printed rather than parsed, and arrives with its ANSI colour
+        intact because the remote script forces OutputRendering=Ansi.
+    .PARAMETER HostEntry
+        Host entry from Resolve-WtwHost.
+    .PARAMETER Arguments
+        Full wtw argument list, e.g. @('create','auth').
+    .PARAMETER WorkingDirectory
+        Remote directory to run in. Repo-scoped commands (init, add, create) need
+        this — an ssh command starts in the remote home directory.
+    .PARAMETER Title
+        Header shown above the output.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $HostEntry,
+        [Parameter(Mandatory)] [string[]] $Arguments,
+        [string] $WorkingDirectory,
+        [string] $Title
+    )
+
+    $result = Invoke-WtwRemoteCommand -HostEntry $HostEntry -Arguments $Arguments -WorkingDirectory $WorkingDirectory
+
+    Write-Host ''
+    if ($Title) { Write-Host "  $Title" -ForegroundColor Cyan }
+
+    foreach ($line in $result.Output) {
+        # Strip CR so a Windows remote leaves no stray carriage returns; write
+        # raw so embedded ANSI colour survives.
+        Write-Host ($line -replace "`r", '')
+    }
+
+    if (-not $result.Success) {
+        if ($result.Error) {
+            Write-WtwSshFailure -HostEntry $HostEntry -ErrorText $result.Error
+        }
+        Write-Error "Command failed on $($HostEntry.Name)."
+        return
+    }
+    Write-Host ''
 }
 
 function Get-WtwRemoteList {

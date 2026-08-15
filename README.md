@@ -178,7 +178,7 @@ wtw clean                 # interactive selection + removal
 | `wtw clean [--dry-run] [--force]` | Clean stale AI worktrees (codex, cursor, conductor) |
 | `wtw install [--skip-profile]` | Install/update globally to `~/.wtw/module/` |
 | `wtw skill [--agent claude\|agents\|all]` | Install AI skill into current repo for agent support |
-| `wtw host [list\|add\|remove\|sync\|test]` | Manage remote machines for `--on` |
+| `wtw host [list\|discover\|add\|remove\|sync\|trust\|test]` | Manage remote machines for `--on` |
 | `wtw --on <host> <editor> <name>` | Open a worktree that lives on another machine (see [Remote worktrees](#remote-worktrees)) |
 
 ## Remote worktrees
@@ -188,11 +188,11 @@ often not on the machine you are sitting at. `--on` opens it over Remote-SSH:
 the editor window is local, the files and the extension host are on the remote.
 
 ```powershell
-wtw host add arctictroll --alias at --user sno `
-    --address arctictroll.local,192.168.3.7 `
-    --identity ~/.ssh/id_ed25519_arctictroll --platform windows
+wtw host add workstation --alias at --user dev `
+    --address workstation.local,192.168.1.10 `
+    --identity ~/.ssh/id_ed25519_workstation --platform windows
 
-wtw host trust arctictroll  # show host-key fingerprints, then accept
+wtw host trust workstation  # show host-key fingerprints, then accept
 wtw host test at            # addresses + ssh config + remote wtw
 
 wtw list --on at            # what does that machine have?
@@ -200,11 +200,103 @@ wtw --on at cursor auth     # open its "auth" worktree here, in Cursor
 wtw at cursor auth          # same thing — bare host shorthand
 ```
 
-`--address` is an **ordered candidate list**. Put an mDNS name first and a
+### Tailscale
+
+If your machines are on a tailnet, skip the manual address wrangling:
+
+```powershell
+wtw host discover        # shows a plan, asks before writing
+wtw host discover --yes  # non-interactive
+```
+
+It reads `tailscale status --json` and registers every machine that can actually
+host a worktree. Phones and tablets are recognised and skipped — they are real
+tailnet members but cannot run pwsh. The **platform is taken from Tailscale**,
+which is exactly what `--platform` needs for remote path translation.
+
+An already-known machine is **updated, not duplicated**: its tailnet addresses
+are added in front of the ones you already had. Matching is by exact name or
+alias, never by prefix — merging into the wrong machine's entry is worse than a
+visible duplicate.
+
+```
+    skip     laptop            macos    online   this machine
+    add      nas       linux    online   new host
+             + nas.tailnet-example.ts.net, 100.64.0.11
+    skip     iphone181            -        online   iOS cannot host a worktree
+    update   workstation          windows  online   add tailnet addresses
+             + workstation.tailnet-example.ts.net, 100.64.0.10
+```
+
+Tailnet addresses go **first** in the candidate list on purpose: a tailnet name
+resolves on the LAN and away from it, so the ssh config stays valid when you
+change networks instead of needing a re-sync. LAN names stay behind it as a
+fallback for when Tailscale is down.
+
+Tailscale supplies the machine, not the login — new hosts get your current
+username unless you pass `--user`. Aliases are not invented for you.
+
+Not every tailnet member is a dev box. `--exclude a,b` is remembered, so a NAS or
+a router is declined once rather than on every run.
+
+**ssh names and Tailscale names do not clash** — they compose. `~/.ssh/config`
+maps a *pattern* to a HostName; MagicDNS resolves that HostName. The collision to
+watch for is *within* ssh config: wtw's `Include` is first, and OpenSSH takes the
+first obtained value per keyword, so any other `Host <name>` block further down
+keeps parsing but has its HostName/User/IdentityFile overridden by wtw's.
+`wtw host test <name>` reports those blocks with file and line, since the
+shadowing is otherwise invisible.
+
+### ZeroTier
+
+Supported as an ordinary address, not auto-discovered. The local ZeroTier client
+exposes only *your own* managed address and peer *node IDs* — never member names
+or their managed IPs — so there is nothing to enumerate without the ZeroTier
+Central API and an account token. `wtw host discover` prints your networks and
+your address on each, so you can read a peer's IP off ZeroTier Central and:
+
+```powershell
+wtw host add winbox --user dev --address 10.147.20.42 --platform windows
+```
+
+### Inspecting and changing hosts
+
+`wtw host list` is one line per host — active address, transport, ssh status.
+`wtw host show [name]` is the full picture: every candidate with its transport
+and whether it is up, which one is in use, and any other `Host` blocks that match.
+
+There is no separate "edit": `wtw host add` on an existing name writes only the
+fields you pass.
+
+Each candidate is classified from the address itself — `tailscale` (`*.ts.net`
+or `100.64.0.0/10`), `zerotier` (a subnet this machine joined), `mdns`
+(`*.local`), `lan` (RFC1918). The first two work anywhere; the last two only on
+the same LAN. `--via` picks one, at either level:
+
+```powershell
+wtw --on at list --via tailscale        # one command only, nothing written
+wtw at cursor auth --via lan            # the editor opens over the LAN too
+wtw host add workstation --via lan      # stored default
+wtw host add workstation --via any      # back to first-reachable
+```
+
+The stored preference **reorders** the candidate list rather than filtering it —
+pinning `lan` and then leaving the LAN falls back to the tailnet instead of
+stranding the host, and `host show` says when that happened. The per-command form
+is strict: asking for a transport the host does not have is an error.
+
+Per-command `--via` works because `host sync` also emits every candidate address
+as its own `Host` pattern — same User and IdentityFile, no `HostName` — so both
+ssh and the editor's `ssh-remote+<address>` authority can target an address
+directly and still use the right credentials.
+
+### Address candidates
+
+`--address` is an **ordered candidate list**. Put a stable name first and a
 last-known IP second: on DHCP — or when a machine moves between wifi and a USB
-adapter — the address changes but the `.local` name does not. `wtw host sync`
-probes the candidates and writes whichever answers on the ssh port, so a moved
-machine is one command away rather than a config edit.
+adapter — the address changes but the name does not. `wtw host sync` probes the
+candidates and writes whichever answers on the ssh port, so a moved machine is
+one command away rather than a config edit.
 
 Both platforms advertise mDNS: macOS always, Windows 10/11 natively. Check the
 name with `scutil --get LocalHostName` (macOS) or `hostname` (Windows).
@@ -229,14 +321,27 @@ Only reads and editor launches. `open`, the VS Code family editors, `list` and
 it, so every flag behaves exactly as it does locally (`--detailed`, `--wide`,
 `--repo`) and the colour swatches survive the trip.
 
-Everything else is refused with a pointer to run it on the remote instead:
+Commands that change the remote's own registry — `create`, `add`, `remove`,
+`sync`, `color`, `clean`, `init`, `copy` — are **executed on the remote**. Running
+them there is exactly what keeps its registry authoritative:
 
-- `create` / `remove` / `color` / `sync` mutate the remote registry — run them
-  there so it stays authoritative.
-- `t3` / `cmux` / `claudecode` / `chatgpt` / `ss` register project state inside
-  an app running on a particular machine; a local launch would point the wrong
-  app at an unreachable path.
-- `go` has nothing to cd to.
+```powershell
+wtw --on box sync --all
+wtw --on box create auth
+wtw --on box run init "app,my-app" --cwd /srv/repos/my-app
+```
+
+`run` is the explicit escape hatch: it forwards any wtw command verbatim.
+`--cwd` sets the remote working directory, which repo-scoped commands need — an
+ssh command starts in the remote home directory, not in a repo.
+
+Only two things are refused outright:
+
+- `go` — there is no cd to another machine.
+- `t3` / `cmux` / `wmux` / `claudecode` / `chatgpt` / `ss` — ambiguous rather
+  than impossible. "Open T3 here pointing at a remote path" cannot work, while
+  "register that project over there" is perfectly meaningful, so the intent has
+  to be stated: `wtw --on box run t3 auth`.
 
 ### Setup notes
 
@@ -507,7 +612,7 @@ Example `~/.wtw/config.json` fragment:
     "defaultProfile": "team",
     "repoProfiles": {
       "snowmain1": "solo",
-      "everix1": "team"
+      "sample1": "team"
     }
   }
 }
@@ -619,6 +724,21 @@ them and `wtw remove` cleans that registration up:
 - **agentctl** — when installed, attaches ignored local AI-agent overlay files
   to the new worktree using the configured profile. Defaults to `team` for
   safety unless a repo/global override selects another profile.
+
+## Colors — readability
+
+Foreground colors for the colored chrome are chosen by **WCAG contrast ratio**,
+not by a brightness threshold. Both a softened near-black and a softened
+near-white are scored against the workspace color and the better one wins; if
+neither reaches 4.5:1 — which happens on mid-tone reds, teals and blues — it
+escalates to pure black or white for maximum contrast.
+
+The active tab also gets `tab.activeBorder` in that foreground color, and keeps
+its background when the editor loses focus. Fill alone was a weak cue for "which
+file am I in", since the tab shares the title bar's hue.
+
+Re-run `wtw sync --all` after upgrading to re-apply the improved colors to
+existing workspaces.
 
 ## Colors
 

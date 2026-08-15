@@ -3,7 +3,7 @@ BeforeAll {
     Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
 
     $script:winHost = @{
-        Name = 'arctictroll'; Aliases = @('at'); User = 'sno'; HostName = '192.168.3.7'
+        Name = 'workstation'; Aliases = @('at'); User = 'dev'; HostName = '192.168.1.10'
         Port = $null; IdentityFile = $null; IdentitiesOnly = $false; Platform = 'windows'; Wtw = 'wtw'
     }
 }
@@ -33,7 +33,7 @@ Describe 'Split-WtwOnHostArgs' {
     }
 
     It 'accepts a leading bare host when it is an exact known name' {
-        $result = Split-WtwOnHostArgs -ArgList @('at', 'cursor', 'auth') -KnownHosts @('at', 'arctictroll')
+        $result = Split-WtwOnHostArgs -ArgList @('at', 'cursor', 'auth') -KnownHosts @('at', 'workstation')
         $result.Host | Should -Be 'at'
         $result.Args | Should -Be @('cursor', 'auth')
     }
@@ -41,7 +41,7 @@ Describe 'Split-WtwOnHostArgs' {
     It 'does not treat a leading bare token as a host on a prefix match' {
         # A prefix could shadow a repo alias and silently open the wrong machine,
         # so the shorthand demands an exact host name.
-        $result = Split-WtwOnHostArgs -ArgList @('arc', 'cursor') -KnownHosts @('arctictroll')
+        $result = Split-WtwOnHostArgs -ArgList @('arc', 'cursor') -KnownHosts @('workstation')
         $result.Host | Should -BeNullOrEmpty
         $result.Args | Should -Be @('arc', 'cursor')
     }
@@ -220,29 +220,118 @@ Describe 'Get-WtwRemoteList' {
     }
 }
 
-Describe 'Test-WtwRemoteCapableCommand' {
-    It 'allows reads and VS Code family launches' {
+Describe 'Remove-WtwFlagWithValue' {
+    It 'drops a local-only flag and its value before forwarding' {
+        # The remote `wtw list` has no --via; leaving it in fails on the far side.
+        $kept = Remove-WtwFlagWithValue -ArgList @('--detailed', '--via', 'lan', '--wide') -Flag 'via'
+        $kept | Should -Be @('--detailed', '--wide')
+    }
+
+    It 'drops a trailing flag with no value' {
+        Remove-WtwFlagWithValue -ArgList @('--wide', '--via') -Flag 'via' | Should -Be @('--wide')
+    }
+
+    It 'does not eat the next flag when the value is missing' {
+        $kept = Remove-WtwFlagWithValue -ArgList @('--via', '--detailed') -Flag 'via'
+        $kept | Should -Be @('--detailed')
+    }
+
+    It 'leaves unrelated arguments alone' {
+        $kept = Remove-WtwFlagWithValue -ArgList @('--repo', 'sn', '--wide') -Flag 'via'
+        $kept | Should -Be @('--repo', 'sn', '--wide')
+    }
+}
+
+Describe 'Resolve-WtwHostVia' {
+    BeforeAll {
+        $script:multiHost = @{
+            Name = 'workstation'; User = 'dev'; Platform = 'windows'
+            HostNames = @('workstation.tailnet-example.ts.net', 'workstation.local', '192.168.1.10')
+        }
+    }
+
+    It 'retargets Name at the chosen transport address' {
+        # Everything downstream keys off Name — ssh connects to it and the editor
+        # authority becomes ssh-remote+<address>.
+        $lan = Resolve-WtwHostVia -HostEntry $script:multiHost -Via 'lan'
+        $lan.Name        | Should -Be '192.168.1.10'
+        $lan.HostNames   | Should -Be @('192.168.1.10')
+        $lan.ViaOverride | Should -Be 'lan'
+    }
+
+    It 'keeps the credentials from the original entry' {
+        $lan = Resolve-WtwHostVia -HostEntry $script:multiHost -Via 'mdns'
+        $lan.User     | Should -Be 'dev'
+        $lan.Platform | Should -Be 'windows'
+        $lan.Name     | Should -Be 'workstation.local'
+    }
+
+    It 'passes the entry through untouched for no preference' {
+        (Resolve-WtwHostVia -HostEntry $script:multiHost -Via 'any').Name | Should -Be 'workstation'
+        (Resolve-WtwHostVia -HostEntry $script:multiHost -Via $null).Name | Should -Be 'workstation'
+    }
+
+    It 'does not mutate the original entry' {
+        Resolve-WtwHostVia -HostEntry $script:multiHost -Via 'lan' | Out-Null
+        $script:multiHost.Name | Should -Be 'workstation'
+        $script:multiHost.HostNames.Count | Should -Be 3
+    }
+
+    It 'returns null when the host has no address of that kind' {
+        Resolve-WtwHostVia -HostEntry $script:multiHost -Via 'zerotier' | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Get-WtwRemoteCommandMode' {
+    It 'interprets reads and VS Code family launches locally' {
+        # The window is local, the files are remote.
         foreach ($cmd in 'open', 'list', 'ls', 'info', 'cursor', 'cur', 'code', 'co', 'windsurf', 'codium') {
-            Test-WtwRemoteCapableCommand -Command $cmd | Should -BeTrue -Because "$cmd should work with --on"
+            Get-WtwRemoteCommandMode -Command $cmd | Should -Be 'local' -Because "$cmd renders here"
         }
     }
 
-    It 'rejects commands that mutate the remote registry' {
-        # These must run on the machine that owns the worktree so its registry
-        # stays authoritative.
-        foreach ($cmd in 'create', 'remove', 'rm', 'color', 'sync', 'init', 'clean') {
-            Test-WtwRemoteCapableCommand -Command $cmd | Should -BeFalse -Because "$cmd must run on the remote itself"
+    It 'executes registry-mutating commands on the remote' {
+        # Running them THERE is what keeps the remote registry authoritative —
+        # refusing them outright was too strict.
+        foreach ($cmd in 'create', 'remove', 'rm', 'color', 'sync', 'init', 'clean', 'add', 'copy') {
+            Get-WtwRemoteCommandMode -Command $cmd | Should -Be 'exec' -Because "$cmd should run on the remote"
         }
     }
 
-    It 'rejects launchers that register state in a locally running app' {
+    It 'treats run as an explicit passthrough' {
+        Get-WtwRemoteCommandMode -Command 'run' | Should -Be 'exec'
+    }
+
+    It 'refuses go — there is no cd to another machine' {
+        Get-WtwRemoteCommandMode -Command 'go' | Should -Be 'none'
+    }
+
+    It 'refuses the ambiguous app launchers, leaving them to run' {
+        # "open T3 here pointing at a remote path" is impossible; "register the
+        # project over there" is meaningful — so the intent has to be stated via
+        # `run` rather than guessed.
         foreach ($cmd in 'cmux', 'wmux', 't3', 'claudecode', 'ss', 'droid') {
-            Test-WtwRemoteCapableCommand -Command $cmd | Should -BeFalse -Because "$cmd registers project state on the machine it runs on"
+            Get-WtwRemoteCommandMode -Command $cmd | Should -Be 'none' -Because "$cmd is ambiguous under --on"
         }
     }
+}
 
-    It 'rejects go — there is no cd to another machine' {
-        Test-WtwRemoteCapableCommand -Command 'go' | Should -BeFalse
+Describe 'New-WtwRemoteScript working directory' {
+    It 'changes directory before invoking wtw' {
+        # `ssh host <cmd>` starts in the remote home directory, but init/add/create
+        # only mean anything inside the repo.
+        $script = New-WtwRemoteScript -Arguments @('init', 'app') -WorkingDirectory 'E:\repos\app'
+        $script | Should -Match "Set-Location -LiteralPath 'E:\\repos\\app'"
+        $script | Should -Match "Invoke-Wtw 'init' 'app'"
+    }
+
+    It 'escapes a quote in the path' {
+        $script = New-WtwRemoteScript -Arguments @('list') -WorkingDirectory "E:\it's"
+        $script | Should -Match "Set-Location -LiteralPath 'E:\\it''s'"
+    }
+
+    It 'omits the cd entirely when no directory is given' {
+        New-WtwRemoteScript -Arguments @('list') | Should -Not -Match 'Set-Location'
     }
 }
 
@@ -253,7 +342,7 @@ Describe 'Resolve-WtwRemoteLaunch' {
 
         $launch.Kind | Should -Be 'workspace'
         $launch.PreArgs[0] | Should -Be '--file-uri'
-        $launch.PreArgs[1] | Should -Be 'vscode-remote://ssh-remote+arctictroll/c:/ws/auth.code-workspace'
+        $launch.PreArgs[1] | Should -Be 'vscode-remote://ssh-remote+workstation/c:/ws/auth.code-workspace'
     }
 
     It 'falls back to --folder-uri when the remote has no workspace file' {
@@ -262,7 +351,7 @@ Describe 'Resolve-WtwRemoteLaunch' {
 
         $launch.Kind | Should -Be 'folder'
         $launch.PreArgs[0] | Should -Be '--folder-uri'
-        $launch.PreArgs[1] | Should -Be 'vscode-remote://ssh-remote+arctictroll/c:/repo_auth'
+        $launch.PreArgs[1] | Should -Be 'vscode-remote://ssh-remote+workstation/c:/repo_auth'
     }
 
     It 'honours -Folder over an existing workspace file' {
@@ -321,7 +410,7 @@ Describe 'Open-WtwRemoteWorkspace' {
         Should -Invoke Invoke-WtwEditorCli -Times 1 -Exactly -ParameterFilter {
             $Cmd -eq 'cursor' -and
             $PreArgs[0] -eq '--folder-uri' -and
-            $PreArgs[1] -eq 'vscode-remote://ssh-remote+arctictroll/c:/repo_auth'
+            $PreArgs[1] -eq 'vscode-remote://ssh-remote+workstation/c:/repo_auth'
         }
     }
 
@@ -335,7 +424,7 @@ Describe 'Open-WtwRemoteWorkspace' {
 
         Should -Invoke Invoke-WtwEditorCli -Times 1 -Exactly -ParameterFilter {
             $PreArgs[0] -eq '--file-uri' -and
-            $PreArgs[1] -eq 'vscode-remote://ssh-remote+arctictroll/c:/ws/auth.code-workspace'
+            $PreArgs[1] -eq 'vscode-remote://ssh-remote+workstation/c:/ws/auth.code-workspace'
         }
     }
 
@@ -350,7 +439,7 @@ Describe 'Open-WtwRemoteWorkspace' {
 
     It 'does not launch anything under -PrintOnly' {
         Mock Get-WtwRemoteTarget {
-            @{ Path = '/home/sno/repo'; Workspace = $null; Color = $null; Title = 'r/x'; PrettyName = $null }
+            @{ Path = '/home/dev/repo'; Workspace = $null; Color = $null; Title = 'r/x'; PrettyName = $null }
         }
         Mock Invoke-WtwEditorCli { @{ Exe = 'cursor'; Arguments = $PreArgs } }
 

@@ -180,13 +180,20 @@ function New-WtwRemoteScript {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [string[]] $Arguments,
-        [string] $WtwCommand
+        [string] $WtwCommand,
+        [string] $WorkingDirectory
     )
 
     $quoted = @($Arguments | ForEach-Object { "'" + ([string]$_).Replace("'", "''") + "'" }) -join ' '
 
+    # `ssh host <cmd>` starts in the remote home directory, but repo-scoped
+    # commands (init, create, add) only mean anything inside the repo.
+    $cd = if ($WorkingDirectory) {
+        "Set-Location -LiteralPath '" + $WorkingDirectory.Replace("'", "''") + "'`n"
+    } else { '' }
+
     if ($WtwCommand -and $WtwCommand -ne 'wtw') {
-        return "$WtwCommand $quoted"
+        return "$cd$WtwCommand $quoted"
     }
 
     # OutputRendering=Ansi: without it PowerShell strips colour the moment stdout
@@ -206,7 +213,7 @@ if (Test-Path $wtwModule) {
     Import-Module wtw -DisableNameChecking
 }
 '@
-    return "$prelude`nInvoke-Wtw $quoted"
+    return "$prelude`n$cd" + "Invoke-Wtw $quoted"
 }
 
 function Invoke-WtwRemoteCommand {
@@ -237,14 +244,15 @@ function Invoke-WtwRemoteCommand {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] $HostEntry,
-        [Parameter(Mandatory)] [string[]] $Arguments
+        [Parameter(Mandatory)] [string[]] $Arguments,
+        [string] $WorkingDirectory
     )
 
     if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
         return @{ Success = $false; Output = @(); Error = 'ssh is not on PATH.' }
     }
 
-    $remoteScript = New-WtwRemoteScript -Arguments $Arguments -WtwCommand $HostEntry.Wtw
+    $remoteScript = New-WtwRemoteScript -Arguments $Arguments -WtwCommand $HostEntry.Wtw -WorkingDirectory $WorkingDirectory
     # -EncodedCommand wants UTF-16LE, which is what [Text.Encoding]::Unicode is.
     $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($remoteScript))
 

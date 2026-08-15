@@ -3,8 +3,8 @@ function ConvertTo-WtwRemotePath {
     .SYNOPSIS
         Normalise a remote filesystem path to its URI path form.
     .DESCRIPTION
-        Windows paths need real work: `C:\Users\sno\repo` becomes
-        `/c:/Users/sno/repo` — backslashes flipped, drive letter lower-cased, and
+        Windows paths need real work: `C:\Users\dev\repo` becomes
+        `/c:/Users/dev/repo` — backslashes flipped, drive letter lower-cased, and
         a leading slash added. Getting any of those three wrong produces a URI
         VS Code accepts and then silently opens as an empty window, which is why
         this is its own function with its own tests rather than an inline replace.

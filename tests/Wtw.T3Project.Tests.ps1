@@ -332,9 +332,9 @@ Describe 'T3 sidebar grouping' {
     # nothing: POSIX paths keep their case, Windows paths fold to lowercase
     # backslashes, and trailing separators are stripped on both.
     It 'builds the project key the way T3 does' {
-        Get-WtwT3ProjectKey -WorkspaceRoot '/Users/sno/Repo' | Should -Be 'env-1:/Users/sno/Repo'
-        ConvertTo-WtwT3NormalizedPath -Path '/Users/sno/Repo/'  | Should -Be '/Users/sno/Repo'
-        ConvertTo-WtwT3NormalizedPath -Path 'C:/Users/Sno/Repo' | Should -Be 'c:\users\sno\repo'
+        Get-WtwT3ProjectKey -WorkspaceRoot '/Users/dev/Repo' | Should -Be 'env-1:/Users/dev/Repo'
+        ConvertTo-WtwT3NormalizedPath -Path '/Users/dev/Repo/'  | Should -Be '/Users/dev/Repo'
+        ConvertTo-WtwT3NormalizedPath -Path 'C:/Users/Dev/Repo' | Should -Be 'c:\users\dev\repo'
         ConvertTo-WtwT3NormalizedPath -Path '\\srv\share\Repo\' | Should -Be '\\srv\share\repo'
         ConvertTo-WtwT3NormalizedPath -Path '/'                 | Should -Be '/'
     }

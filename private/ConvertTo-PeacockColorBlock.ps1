@@ -33,11 +33,23 @@ function ConvertTo-PeacockColorBlock {
         'tab.activeBackground'            = $base
         'tab.activeForeground'            = $fg
         'tab.activeBorderTop'             = $lighter
+        # A hard underline in the foreground color. The active tab used to be
+        # identifiable only by its fill, which is the same hue as the title bar
+        # above it — so "which file am I in" was a low-contrast judgement in both
+        # light and dark themes. The border reads regardless of theme.
+        'tab.activeBorder'                = $fg
+        # Keep the current file identifiable when focus moves to a terminal or
+        # the sidebar; VS Code otherwise dims the active tab to near-invisible.
+        'tab.unfocusedActiveBackground'   = $base
+        'tab.unfocusedActiveForeground'   = (Add-HexAlpha $fg 'cc')
+        'tab.unfocusedActiveBorderTop'    = $lighter
         'activityBar.activeBackground'    = $lighter
-        'activityBar.inactiveForeground'  = "${fg}99"
+        # 'cc' (80%) rather than '99' (60%): these sit on the colored chrome, and
+        # 60% of an already-mid-contrast foreground is what made them fade out.
+        'activityBar.inactiveForeground'  = (Add-HexAlpha $fg 'cc')
         'activityBarBadge.background'     = $complementHue
-        'activityBarBadge.foreground'     = $fg
-        'commandCenter.border'            = "${fg}99"
+        'activityBarBadge.foreground'     = (Get-ContrastForeground $complementHue)
+        'commandCenter.border'            = (Add-HexAlpha $fg 'cc')
         'commandCenter.activeForeground'  = $fg
         'commandCenter.inactiveForeground' = $fg
         'sash.hoverBorder'                = $lighter
@@ -47,6 +59,9 @@ function ConvertTo-PeacockColorBlock {
         'titleBar.activeBackground'       = $base
         'titleBar.activeForeground'       = $fg
         'titleBar.inactiveBackground'     = (Add-HexAlpha $base)
-        'titleBar.inactiveForeground'     = (Add-HexAlpha $fg)
+        # The window title over the colored bar: 60% alpha put it below the
+        # readability line on mid-tone colors, which is the "titles over main
+        # color panels" complaint.
+        'titleBar.inactiveForeground'     = (Add-HexAlpha $fg 'cc')
     }
 }

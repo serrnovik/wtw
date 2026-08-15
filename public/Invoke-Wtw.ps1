@@ -92,6 +92,10 @@ function Invoke-Wtw {
         Write-Host '                      Shorthand: wtw <host> <editor> <name>'
         Write-Host '                      Works with open/cursor/code/antigravity/windsurf/codium + list/info.'
         Write-Host '                      Extra flags: --print-only, --folder, --skip-checks'
+        Write-Host '    --via <transport> One-off: force this command over tailscale|zerotier|'
+        Write-Host '                      mdns|lan. Changes nothing on disk.'
+        Write-Host '    run <cmd> [--cwd <remote path>]   With --on: run any wtw command ON the'
+        Write-Host '                      remote (create/init/sync/... already route there).'
         Write-Host ''
         return
     }
@@ -105,14 +109,51 @@ function Invoke-Wtw {
             Write-Error "Unknown host '$targetHost'. Configured hosts: $((Get-WtwHostNames) -join ', '). Add one with: wtw host add $targetHost --user <u> --address <ip>"
             return
         }
-        if (-not (Test-WtwRemoteCapableCommand -Command $Command)) {
-            Write-Error "'$Command' cannot run with --on. Remote support covers open/list/info and the VS Code family editors; run '$Command' on $($hostEntry.Name) itself so its wtw registry stays authoritative."
+        $remoteMode = Get-WtwRemoteCommandMode -Command $Command
+        if ($remoteMode -eq 'none') {
+            Write-Error "'$Command' cannot run with --on — there is no local meaning for it and no unambiguous remote one. To run it on $($hostEntry.Name) verbatim: wtw --on $($hostEntry.Name) run $Command ..."
             return
         }
 
         $remoteParsed = Convert-WtwArgsToSplat $rawArgs
         $remoteSplat = $remoteParsed.Splat
         $remotePos = $remoteParsed.Positional
+
+        # Per-invocation transport override. Unlike `wtw host add --via`, this
+        # changes nothing on disk — it retargets this one command at a specific
+        # address, which also becomes the editor's ssh-remote authority.
+        if ($remoteSplat.Contains('Via')) {
+            $requestedVia = [string]$remoteSplat['Via']
+            $retargeted = Resolve-WtwHostVia -HostEntry $hostEntry -Via $requestedVia
+            if (-not $retargeted) {
+                $kinds = @(@($hostEntry.HostNames) | ForEach-Object { Get-WtwAddressKind -Address $_ }) | Select-Object -Unique
+                Write-Error "'$($hostEntry.Name)' has no '$requestedVia' address. It has: $($kinds -join ', '). Add one with: wtw host add $($hostEntry.Name) --address <addr>"
+                return
+            }
+            $hostEntry = $retargeted
+            Write-Host "  via $requestedVia → $($hostEntry.Name)" -ForegroundColor DarkGray
+            # Consumed locally — the remote CLI has no --via.
+            $rawArgs = Remove-WtwFlagWithValue -ArgList $rawArgs -Flag 'via'
+        }
+
+        # Forwarded verbatim and executed on the remote. `run` drops its own name
+        # so `wtw --on at run create x` becomes `create x` over there.
+        if ($remoteMode -eq 'exec') {
+            $remoteCwd = if ($remoteSplat.Contains('Cwd')) { [string]$remoteSplat['Cwd'] } else { $null }
+            $execArgs = [string[]]@($rawArgs | ForEach-Object { "$_" })
+            if ($remoteCwd) { $execArgs = Remove-WtwFlagWithValue -ArgList $execArgs -Flag 'cwd' }
+            if ($Command -ne 'run') { $execArgs = @($Command) + @($execArgs) }
+
+            if (@($execArgs).Count -eq 0) {
+                Write-Error "Usage: wtw --on $($hostEntry.Name) run <wtw command> [--cwd <remote path>]"
+                return
+            }
+
+            $where = if ($remoteCwd) { " in $remoteCwd" } else { '' }
+            Invoke-WtwRemoteWtw -HostEntry $hostEntry -Arguments $execArgs -WorkingDirectory $remoteCwd `
+                -Title "wtw $($execArgs -join ' ')  on $($hostEntry.Name)$where"
+            return
+        }
 
         if ($Command -in @('list', 'ls')) {
             # Forward the flags verbatim — the remote's own CLI parses them, so

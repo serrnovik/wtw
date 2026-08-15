@@ -101,7 +101,7 @@ function Show-WtwCommandHelp {
         'color'       { @('wtw color [name] [hex|random]', 'Set or show the Peacock color for a workspace.', '', 'Arguments:', '  name     Target workspace (default: detected from cwd)', '  color    A hex color (rrggbb) or "random" for max contrast', '', 'Options:', '  --no-sync   Skip syncing the workspace file after color change', '', 'Examples:', '  wtw color                  Show color for current workspace', '  wtw color proj random      Pick a maximally contrasting color', '  wtw color my-task e05d44   Set a specific color', '', 'Note: # starts a comment in PowerShell. Either omit it', '  or quote it: ''#e05d44''') }
         'clean'       { @('wtw clean', 'Remove stale AI-created worktrees that no longer have active branches.') }
         'host'        { @(
-            'wtw host [list|add|remove|sync|test] [name] [options]',
+            'wtw host [list|show|discover|add|remove|sync|trust|test] [name] [options]',
             'Manage the remote machines `wtw --on <host>` can open worktrees on.',
             '',
             'Hosts live in ~/.wtw/config.json and are mirrored into ~/.ssh/config.d/wtw,',
@@ -109,12 +109,20 @@ function Show-WtwCommandHelp {
             'client rather than through wtw.',
             '',
             'Subcommands:',
-            '  list              Show configured hosts and whether ssh resolves them',
+            '  list              One line per host: active address, transport, ssh status',
+            '  show [name]       Full config: every candidate, its transport and whether',
+            '                    it is up, which one is active, and ssh-config conflicts',
+            '  discover          Register machines found on your tailnet (Tailscale)',
+            '                    --yes to skip the prompt, --exclude a,b to ignore for good',
             '  add <name>        Add or update a host, then sync ssh config',
             '  remove <name>     Drop a host, then sync ssh config',
             '  sync              Re-probe addresses, rewrite ~/.ssh/config.d/wtw',
             '  trust <name>      Show host-key fingerprints, then add to known_hosts',
             '  test <name>       Probe addresses, ssh config, and the remote wtw',
+            '',
+            'Transports are detected from the address itself:',
+            '  tailscale  *.ts.net or 100.64.0.0/10      mdns   *.local',
+            '  zerotier   a subnet this machine joined   lan    RFC1918 address',
             '',
             'Options for add:',
             '  --alias a,b            Short names (wtw --on at ...)',
@@ -125,13 +133,16 @@ function Show-WtwCommandHelp {
             '  --platform <p>         windows | linux | macos  (drives remote path translation)',
             '  --wtw <cmd>            Command used to invoke wtw remotely (default: wtw)',
             '  --pwsh <path>          Explicit pwsh path, when the probe list misses it',
+            '  --via <transport>      Prefer tailscale|zerotier|mdns|lan (default: any).',
+            '                         A preference reorders the candidates; it never makes',
+            '                         the host unreachable when that transport is down.',
             '',
             'Only the options you pass are written, so `wtw host add x --platform windows`',
             'is a targeted edit rather than a reset of the other fields.',
             '',
             'Example:',
-            '  wtw host add arctictroll --alias at --user sno --address 192.168.3.7 \',
-            '      --identity ~/.ssh/id_ed25519_arctictroll --platform windows'
+            '  wtw host add workstation --alias at --user dev --address 192.168.1.10 \',
+            '      --identity ~/.ssh/id_ed25519_workstation --platform windows'
         ) }
         'agent'       { @('wtw agent profile set <repo> <profile>', 'Configure which agentctl profile wtw create applies for a repo.', '', 'Examples:', '  wtw agent profile set snowmain1 solo', '  wtw agent profile default team', '  wtw agent profile get snowmain1', '  wtw agent profile list') }
         'install'     { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }

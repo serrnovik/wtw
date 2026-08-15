@@ -176,18 +176,21 @@ function Sync-WtwWorkspace {
             if (-not $tpl) {
                 $tpl = Get-WtwPropertyValue -Object $repoEntry -Name 'templateWorkspace'
             }
-            $repoDir = Split-Path $repoEntry.mainPath -Leaf
+            $repoMainPath = Get-WtwPropertyValue -Object $repoEntry -Name 'mainPath'
+            if (-not $repoMainPath) { continue }
+            $repoDir = Split-Path $repoMainPath -Leaf
 
             # Main workspace
-            if ($repoEntry.templateWorkspace -and (Test-Path $repoEntry.templateWorkspace)) {
+            $repoTemplateWorkspace = Get-WtwPropertyValue -Object $repoEntry -Name 'templateWorkspace'
+            if ($repoTemplateWorkspace -and (Test-Path $repoTemplateWorkspace)) {
                 $colors = Get-WtwColors
                 $mainColor = Get-WtwPropertyValue -Object $colors.assignments -Name "$repoName/main"
                 $syncTargets += [PSCustomObject]@{
-                    wsFile         = $repoEntry.templateWorkspace
+                    wsFile         = $repoTemplateWorkspace
                     repoName       = $repoName
                     wsName         = $repoDir
                     displayName    = $repoDir
-                    codeFolderPath = $repoEntry.mainPath
+                    codeFolderPath = $repoMainPath
                     color          = $mainColor
                     branch         = $null
                     worktreePath   = $null
@@ -197,19 +200,24 @@ function Sync-WtwWorkspace {
             }
 
             # Worktree workspaces
-            if ($repoEntry.worktrees) {
+            if (Get-WtwPropertyValue -Object $repoEntry -Name 'worktrees') {
                 foreach ($taskName in (Get-WtwPropertyNames -Object $repoEntry.worktrees)) {
                     $wt = $repoEntry.worktrees.$taskName
-                    if ($wt.workspace -and (Test-Path $wt.workspace)) {
+                    if ((Get-WtwPropertyValue -Object $wt -Name 'workspace') -and (Test-Path $wt.workspace)) {
+                        # Registry entries predating a given field simply lack it,
+                        # and under the module's Set-StrictMode a missing property
+                        # throws before `??` can supply the fallback — so every
+                        # optional field is read through the helper.
+                        $wtPretty = Get-WtwPropertyValue -Object $wt -Name 'prettyName'
                         $syncTargets += [PSCustomObject]@{
                             wsFile         = $wt.workspace
                             repoName       = $repoName
                             wsName         = $taskName
-                            displayName    = $wt.prettyName ?? "${repoName}_${taskName}"
-                            codeFolderPath = $wt.path
-                            color          = $wt.color
-                            branch         = $wt.branch
-                            worktreePath   = $wt.path
+                            displayName    = if ($wtPretty) { $wtPretty } else { "${repoName}_${taskName}" }
+                            codeFolderPath = (Get-WtwPropertyValue -Object $wt -Name 'path')
+                            color          = (Get-WtwPropertyValue -Object $wt -Name 'color')
+                            branch         = (Get-WtwPropertyValue -Object $wt -Name 'branch')
+                            worktreePath   = (Get-WtwPropertyValue -Object $wt -Name 'path')
                             templatePath   = $tpl
                             isManaged      = $true
                         }

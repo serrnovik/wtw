@@ -74,24 +74,88 @@ function Split-WtwOnHostArgs {
     return @{ Host = $targetHost; Args = @($remaining) }
 }
 
-function Test-WtwRemoteCapableCommand {
+function Remove-WtwFlagWithValue {
     <#
     .SYNOPSIS
-        Can this subcommand run against a remote host?
+        Drop a `--flag value` pair from a raw argument list.
     .DESCRIPTION
-        Only reads and editor launches cross the network. `go` cannot cd to
-        another machine; `create` / `remove` / `color` / `sync` mutate state that
-        belongs to the remote wtw and should be run there (over ssh, by you) so
-        its registry stays authoritative; `cmux` / `t3` / `claudecode` register
-        project state in an app running on that machine, so a local launch would
-        point the wrong app at an unreachable path.
+        Local-only flags must not reach the remote CLI. `wtw --on at list --via lan`
+        forwards its flags verbatim so the remote's own parser handles
+        `--detailed` and friends — but `--via` is consumed here, and the remote
+        `wtw list` has no such parameter, so leaving it in makes the whole command
+        fail on the far side.
+    .PARAMETER ArgList
+        Raw tokens.
+    .PARAMETER Flag
+        Flag name without dashes, matched case-insensitively.
+    #>
+    [CmdletBinding()]
+    param(
+        [AllowNull()] [object[]] $ArgList,
+        [Parameter(Mandatory)] [string] $Flag
+    )
+
+    $items = @($ArgList)
+    $kept = @()
+    $i = 0
+    while ($i -lt $items.Count) {
+        $token = "$($items[$i])"
+        if ($token -ieq "--$Flag" -or $token -ieq "-$Flag") {
+            # Skip the flag and its value, if the next token is not another flag.
+            $i++
+            if ($i -lt $items.Count -and "$($items[$i])" -notmatch '^-') { $i++ }
+            continue
+        }
+        $kept += , $items[$i]
+        $i++
+    }
+    return , @($kept)
+}
+
+# Commands that mutate the remote's own registry. They are not refused — they
+# are executed ON the remote, which is what keeps its registry authoritative.
+$script:WtwRemoteExecCommands = @(
+    'run', 'create', 'add', 'remove', 'rm', 'delete', 'del', 'sync', 'color',
+    'clean', 'init', 'workspace', 'ws', 'copy', 'unregister', 'unreg', 'install', 'update'
+)
+
+function Get-WtwRemoteCommandMode {
+    <#
+    .SYNOPSIS
+        How a subcommand should be handled when `--on` is present.
+    .DESCRIPTION
+        Three outcomes:
+
+          local   interpreted here — a read whose result we render, or a VS Code
+                  editor launch where the window is local and the files remote.
+          exec    forwarded verbatim and executed on the remote machine.
+          none    refused, because neither reading makes sense.
+
+        `go` is the only hard refusal: there is no cd to another machine. The
+        app-launchers (t3, cmux, claudecode, chatgpt…) are ambiguous rather than
+        impossible — "register that project over there" is meaningful — so they
+        are reachable through the explicit `run`, where the intent is stated
+        rather than guessed.
+    .OUTPUTS
+        'local' | 'exec' | 'none'
     #>
     [CmdletBinding()]
     param([AllowNull()] [string] $Command)
 
-    if (-not $Command) { return $false }
-    if ($Command -in @('open', 'list', 'ls', 'info', 'show')) { return $true }
+    if (-not $Command) { return 'none' }
+    if ($Command -in @('open', 'list', 'ls', 'info', 'show')) { return 'local' }
+    if (Resolve-WtwEditorFamilyMember -Name $Command) { return 'local' }
+    if ($Command -in $script:WtwRemoteExecCommands) { return 'exec' }
+    return 'none'
+}
 
-    $member = Resolve-WtwEditorFamilyMember -Name $Command
-    return [bool]$member
+function Test-WtwRemoteCapableCommand {
+    <#
+    .SYNOPSIS
+        Can this subcommand be used with --on at all?
+    #>
+    [CmdletBinding()]
+    param([AllowNull()] [string] $Command)
+
+    return ((Get-WtwRemoteCommandMode -Command $Command) -ne 'none')
 }
