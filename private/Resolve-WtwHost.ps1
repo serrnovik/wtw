@@ -73,6 +73,10 @@ function Get-WtwHosts {
             Pwsh           = (Get-WtwPropertyValue -Object $entry -Name 'pwsh')
             # Preferred transport: tailscale | zerotier | mdns | lan | any.
             Via            = (Get-WtwPropertyValue -Object $entry -Name 'via')
+            # Identity in terminal titles: a per-machine emoji and a short label,
+            # so a remote tab is recognisable as "that machine" at a glance.
+            Emoji          = (Get-WtwPropertyValue -Object $entry -Name 'emoji')
+            Label          = (Get-WtwPropertyValue -Object $entry -Name 'label')
         }
     }
     # Comma operator: without it a single configured host unrolls to a bare
@@ -116,6 +120,92 @@ function Resolve-WtwHost {
     if ($prefixed.Count -eq 1) { return $prefixed[0] }
 
     return $null
+}
+
+function Get-WtwLocalMachineName {
+    <#
+    .SYNOPSIS
+        This machine's own names, for spotting a --on that points at itself.
+    .DESCRIPTION
+        Returns the OS hostname, its first DNS label, and the tailnet name when
+        Tailscale is present — the same forms a host entry is likely to use.
+    #>
+    [CmdletBinding()]
+    param()
+
+    $names = @()
+    try { $names += [System.Net.Dns]::GetHostName() } catch { Write-Verbose "hostname: $_" }
+    if ($env:COMPUTERNAME) { $names += $env:COMPUTERNAME }
+
+    try {
+        # Assign before piping: the function returns `,@(...)`, so piping it
+        # directly hands Where-Object the whole array as ONE item, `$_.IsSelf`
+        # evaluates to an array of booleans, and every peer "matches".
+        $peers = Get-WtwTailscalePeers
+        $self = $peers | Where-Object { $_.IsSelf } | Select-Object -First 1
+        if ($self) {
+            $names += $self.Name
+            if ($self.DnsName) { $names += $self.DnsName }
+        }
+    } catch { Write-Verbose "tailscale self: $_" }
+
+    # First label too: 'box.tailnet.ts.net' should also answer to 'box'.
+    $expanded = @($names | Where-Object { $_ } | ForEach-Object { $_; ($_ -split '\.')[0] })
+    return , @($expanded | ForEach-Object { $_.ToLowerInvariant() } | Select-Object -Unique)
+}
+
+function Test-WtwIsLocalMachine {
+    <#
+    .SYNOPSIS
+        Does this name refer to the machine we are already on?
+    .DESCRIPTION
+        `--on` names the OTHER machine. Pointing it at this one is a common
+        direction mix-up when the same aliases exist on both sides, and without
+        this check it surfaces as a bare "unknown host", which does not hint at
+        the actual mistake.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Name)
+
+    return ((Get-WtwLocalMachineName) -contains $Name.ToLowerInvariant())
+}
+
+function Get-WtwHostTitlePrefix {
+    <#
+    .SYNOPSIS
+        The "which machine am I on" prefix for a terminal title.
+    .DESCRIPTION
+        Produces `🧊AT.` for a host configured with emoji 🧊 and label AT, so a
+        remote tab reads `🧊AT.🟢 PF037 …` — machine first, then the worktree's
+        own title. With a dozen tabs open, the machine is the thing you need to
+        recognise before anything else.
+
+        The label defaults to the shortest alias upper-cased, then to the first
+        two letters of the host name, so this is useful without configuring
+        anything. An emoji is only shown when set; there is no default, because
+        an arbitrary auto-assigned emoji per machine would be noise rather than
+        identity.
+    .PARAMETER HostEntry
+        Host entry from Resolve-WtwHost.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $HostEntry)
+
+    $emoji = Get-WtwPropertyValue -Object $HostEntry -Name 'Emoji'
+    $label = Get-WtwPropertyValue -Object $HostEntry -Name 'Label'
+
+    if (-not $label) {
+        $aliases = @(Get-WtwPropertyValue -Object $HostEntry -Name 'Aliases' -DefaultValue @()) |
+            Where-Object { $_ }
+        $label = if ($aliases.Count -gt 0) {
+            (@($aliases | Sort-Object { $_.Length }) | Select-Object -First 1).ToUpperInvariant()
+        } else {
+            $name = [string](Get-WtwPropertyValue -Object $HostEntry -Name 'Name')
+            if ($name.Length -ge 2) { $name.Substring(0, 2).ToUpperInvariant() } else { $name.ToUpperInvariant() }
+        }
+    }
+
+    return "$emoji$label."
 }
 
 function Resolve-WtwHostVia {

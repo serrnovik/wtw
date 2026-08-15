@@ -133,6 +133,8 @@ function Show-WtwCommandHelp {
             '  --platform <p>         windows | linux | macos  (drives remote path translation)',
             '  --wtw <cmd>            Command used to invoke wtw remotely (default: wtw)',
             '  --pwsh <path>          Explicit pwsh path, when the probe list misses it',
+            '  --emoji <char>         Per-machine emoji for terminal titles (e.g. a snowflake)',
+            '  --label <short>        Short machine label (default: shortest alias, upper-cased)',
             '  --via <transport>      Prefer tailscale|zerotier|mdns|lan (default: any).',
             '                         A preference reorders the candidates; it never makes',
             '                         the host unreachable when that transport is down.',

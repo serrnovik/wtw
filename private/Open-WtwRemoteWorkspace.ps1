@@ -97,10 +97,13 @@ function Open-WtwRemoteWorkspace {
     Write-Host "  Resolving '$Name' on $($HostEntry.Name)..." -ForegroundColor DarkGray
     $remote = Get-WtwRemoteTarget -HostEntry $HostEntry -Name $Name
     if (-not $remote -or -not $remote.Path) {
+        $numericHint = Get-WtwNumericNameHint -Name $Name
+        if ($numericHint) { Write-Host "  $numericHint" -ForegroundColor Yellow }
+        Show-WtwRemoteTargetSuggestions -HostEntry $HostEntry -Name $Name
         # Deliberately does not assert the target is missing — a connection
         # failure lands here too, and Get-WtwRemoteTarget has already warned with
         # the ssh reason when that is what happened.
-        Write-Error "Could not resolve '$Name' on $($HostEntry.Name). If the warning above names an ssh problem, fix that first; otherwise check the name exists there: wtw list --on $($HostEntry.Name)"
+        Write-Error "Could not resolve '$Name' on $($HostEntry.Name)."
         return
     }
 
@@ -126,6 +129,79 @@ function Open-WtwRemoteWorkspace {
     $label = if ($remote.Title) { $remote.Title } else { $Name }
     Write-Host "  Opening $label on $($HostEntry.Name) in ${Editor}: $($remote.Path)" -ForegroundColor Green
     Invoke-WtwEditorCli -Cmd $Editor -PreArgs $launch.PreArgs
+}
+
+function Show-WtwRemoteTargetSuggestions {
+    <#
+    .SYNOPSIS
+        After a failed remote resolve, show what that machine actually has.
+    .DESCRIPTION
+        The remote's own "could not resolve" message ends with "run wtw list",
+        which is fine locally and unhelpful across a network — you cannot glance
+        at the other machine's registry. One extra round trip on a failure path
+        turns a dead end into an answer.
+
+        Prefers targets that contain the searched text, or its digits when the
+        name is something like PF033: a wrong issue number is the common case,
+        and "here are the ones with 03 in them" is the useful reply. Falls back
+        to the full list when nothing is close.
+    .PARAMETER HostEntry
+        Host entry from Resolve-WtwHost.
+    .PARAMETER Name
+        The name that failed to resolve.
+    .PARAMETER Max
+        Cap on how many names to print.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $HostEntry,
+        [Parameter(Mandatory)] [string] $Name,
+        [int] $Max = 15
+    )
+
+    $result = Invoke-WtwRemoteCommand -HostEntry $HostEntry -Arguments @('__aliases')
+    if (-not $result.Success) { return }
+
+    $aliases = @($result.Output |
+            Where-Object { $_ } |
+            ForEach-Object { ($_ -split "`t")[0] } |
+            Where-Object { $_ } |
+            Sort-Object -Unique)
+    if ($aliases.Count -eq 0) { return }
+
+    $close = @($aliases | Where-Object { $_ -like "*$Name*" })
+
+    # Token-level near match. Whole-string edit distance is useless here:
+    # 'PF033' is ~30 edits from 'sn-PF037_gamification_and_virality', so the
+    # normal fuzzy pass cannot see it — but it is ONE edit from that name's
+    # 'PF037' token, which is exactly the mistake being made (wrong issue
+    # number). Suggest it; never auto-resolve it, because silently opening a
+    # different issue's worktree is worse than saying nothing.
+    if ($close.Count -eq 0) {
+        $close = @($aliases | Where-Object {
+                $tokens = @($_ -split '[^A-Za-z0-9]+' | Where-Object { $_ })
+                @($tokens | Where-Object {
+                        $budget = [Math]::Max(1, [Math]::Floor($Name.Length / 4))
+                        (Get-WtwEditDistance $Name $_) -le $budget
+                    }).Count -gt 0
+            })
+    }
+
+    if ($close.Count -eq 0) {
+        $digits = ([regex]::Match($Name, '\d+')).Value
+        if ($digits) { $close = @($aliases | Where-Object { $_ -match $digits }) }
+    }
+
+    Write-Host ''
+    if ($close.Count -gt 0) {
+        Write-Host "  Closest on $($HostEntry.Name):" -ForegroundColor Cyan
+        foreach ($a in ($close | Select-Object -First $Max)) { Write-Host "    $a" -ForegroundColor White }
+    } else {
+        Write-Host "  Nothing on $($HostEntry.Name) matches '$Name'. It has:" -ForegroundColor Yellow
+        foreach ($a in ($aliases | Select-Object -First $Max)) { Write-Host "    $a" -ForegroundColor DarkGray }
+        if ($aliases.Count -gt $Max) { Write-Host "    … and $($aliases.Count - $Max) more (wtw list --on $($HostEntry.Name))" -ForegroundColor DarkGray }
+    }
+    Write-Host ''
 }
 
 function Invoke-WtwRemoteWtw {

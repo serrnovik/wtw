@@ -1,3 +1,30 @@
+function Test-WtwIsSshTransportError {
+    <#
+    .SYNOPSIS
+        Did ssh itself fail, or did the remote command run and report an error?
+    .DESCRIPTION
+        Both arrive on stderr, and conflating them is actively misleading: a
+        remote `wtw` saying "could not resolve X" was printed by a session that
+        connected perfectly, so labelling it "ssh to host failed" sends you off
+        debugging the network instead of the name you typed.
+
+        Only the transport failures Format-WtwSshError knows how to advise on
+        count as ssh problems; anything else is the remote command talking.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()] [string] $ErrorText)
+
+    if (-not $ErrorText) { return $false }
+    return ($ErrorText -match 'Host key verification failed' -or
+        $ErrorText -match 'Permission denied' -or
+        $ErrorText -match 'Could not resolve hostname|Name or service not known' -or
+        $ErrorText -match 'Connection refused' -or
+        $ErrorText -match 'Connection timed out|No route to host' -or
+        $ErrorText -match 'wtw-pwsh-not-found' -or
+        $ErrorText -match 'command not found: pwsh|pwsh: command not found' -or
+        $ErrorText -match "'pwsh' is not recognized")
+}
+
 function Format-WtwSshError {
     <#
     .SYNOPSIS
@@ -100,14 +127,20 @@ function New-WtwRemotePwshCommand {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [string] $Encoded,
-        [Parameter(Mandatory)] $HostEntry
+        [Parameter(Mandatory)] $HostEntry,
+        [switch] $Interactive
     )
 
     $explicit = Get-WtwPropertyValue -Object $HostEntry -Name 'Pwsh'
 
+    # Interactive sessions keep the remote profile — the point is to land in a
+    # normal shell with the prompt and aliases you would get by hand — and add
+    # -NoExit so pwsh stays after running the Set-Location payload.
+    $flags = if ($Interactive) { @('-NoLogo', '-NoExit') } else { @('-NoLogo', '-NoProfile') }
+
     if ($HostEntry.Platform -ieq 'windows') {
         $exe = if ($explicit) { $explicit } else { 'pwsh' }
-        return @($exe, '-NoLogo', '-NoProfile', '-EncodedCommand', $Encoded)
+        return @($exe) + $flags + @('-EncodedCommand', $Encoded)
     }
 
     $candidates = @()
@@ -125,7 +158,7 @@ function New-WtwRemotePwshCommand {
     # the REMOTE shell, and a double-quoted PowerShell string would expand them
     # here (to nothing) before ssh ever saw them.
     $loop = 'for c in ' + ($candidates -join ' ') +
-    '; do command -v $c >/dev/null 2>&1 && exec $c -NoLogo -NoProfile -EncodedCommand ' + $Encoded +
+    '; do command -v $c >/dev/null 2>&1 && exec $c ' + ($flags -join ' ') + ' -EncodedCommand ' + $Encoded +
     '; done; echo wtw-pwsh-not-found >&2; exit 127'
 
     # Comma operator: a bare `return @(...)` unrolls this single-element array to
@@ -329,8 +362,16 @@ function Get-WtwRemoteTarget {
     if (-not $legacy.Success -or $legacy.Output.Count -eq 0) {
         # Surface the ssh failure. Without this, a connection problem was
         # indistinguishable from "that worktree does not exist over there".
+        # Only shout about the transport when the transport is what broke. A
+        # remote "could not resolve" means the session worked and the name did
+        # not — the caller shows the available targets instead, which is a far
+        # better answer than a wall of remote stack trace.
         $sshError = if ($legacy.Error) { $legacy.Error } else { $result.Error }
-        if ($sshError) { Write-WtwSshFailure -HostEntry $HostEntry -ErrorText $sshError }
+        if (Test-WtwIsSshTransportError -ErrorText $sshError) {
+            Write-WtwSshFailure -HostEntry $HostEntry -ErrorText $sshError
+        } elseif ($sshError) {
+            Write-Verbose "Remote reported: $sshError"
+        }
         return $null
     }
     $fields = ($legacy.Output | Select-Object -First 1) -split "`t"

@@ -56,7 +56,9 @@ function Invoke-WtwHost {
         [string] $Pwsh,
         [switch] $Yes,
         [string[]] $Exclude,
-        [ValidateSet('tailscale', 'zerotier', 'mdns', 'lan', 'any')] [string] $Via
+        [ValidateSet('tailscale', 'zerotier', 'mdns', 'lan', 'any')] [string] $Via,
+        [string] $Emoji,
+        [string] $Label
     )
 
     switch ($Action.ToLowerInvariant()) {
@@ -85,7 +87,8 @@ function Invoke-WtwHost {
                 $active = if ($effective) { $effective } else { ($h.HostNames | Select-Object -First 1) }
                 $kind = if ($active) { Get-WtwAddressKind -Address $active -ZeroTierPrefixes $ztPrefixes } else { '-' }
 
-                Write-Host "  $($h.Name)$aliases" -ForegroundColor Cyan -NoNewline
+                Write-Host "  $(Get-WtwHostTitlePrefix -HostEntry $h) " -ForegroundColor Green -NoNewline
+                Write-Host "$($h.Name)$aliases" -ForegroundColor Cyan -NoNewline
                 Write-Host "  $($h.User)@$active  [$($h.Platform)]" -ForegroundColor White -NoNewline
                 Write-Host "  via $kind" -ForegroundColor Green -NoNewline
                 Write-Host "  $known" -ForegroundColor $knownColor
@@ -132,6 +135,8 @@ function Invoke-WtwHost {
             if ($Wtw)      { $entry | Add-Member -NotePropertyName 'wtw' -NotePropertyValue $Wtw -Force }
             if ($Pwsh)     { $entry | Add-Member -NotePropertyName 'pwsh' -NotePropertyValue $Pwsh -Force }
             if ($Via)      { $entry | Add-Member -NotePropertyName 'via' -NotePropertyValue $Via -Force }
+            if ($Emoji)    { $entry | Add-Member -NotePropertyName 'emoji' -NotePropertyValue $Emoji -Force }
+            if ($Label)    { $entry | Add-Member -NotePropertyName 'label' -NotePropertyValue $Label -Force }
             if ($PSBoundParameters.ContainsKey('Platform') -or -not (Get-WtwPropertyValue -Object $entry -Name 'platform')) {
                 $entry | Add-Member -NotePropertyName 'platform' -NotePropertyValue $Platform -Force
             }
@@ -294,6 +299,7 @@ function Invoke-WtwHost {
 
                 Write-Host "    ssh          $($h.User)@$($resolved.Address)  port $port" -ForegroundColor White
                 Write-Host "    platform     $($h.Platform)" -ForegroundColor White
+                Write-Host "    title as     $(Get-WtwHostTitlePrefix -HostEntry $h)<worktree>" -ForegroundColor White
                 if ($h.IdentityFile) { Write-Host "    identity     $($h.IdentityFile)" -ForegroundColor White }
                 if ($h.Pwsh)         { Write-Host "    pwsh         $($h.Pwsh)" -ForegroundColor White }
                 if ($h.Wtw -and $h.Wtw -ne 'wtw') { Write-Host "    wtw command  $($h.Wtw)" -ForegroundColor White }

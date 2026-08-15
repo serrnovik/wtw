@@ -1,3 +1,22 @@
+function Get-WtwNumericNameHint {
+    <#
+    .SYNOPSIS
+        Explain a target name that arrived as a bare number, or return ''.
+    .DESCRIPTION
+        PowerShell's argument mode parses an unquoted `033` as the integer 33, so
+        the leading zero is gone before wtw is called — it cannot be recovered,
+        only explained. Worth saying out loud because worktree names like
+        PF033/PF037 are exactly the shape that trips it.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()] [string] $Name)
+
+    if ($Name -match '^\d+$') {
+        return "PowerShell reads a bare number as a number, so a leading zero is lost before wtw sees it — quote it: '0$Name'."
+    }
+    return ''
+}
+
 function Resolve-WtwTarget {
     <#
     .SYNOPSIS
@@ -245,6 +264,23 @@ function Resolve-WtwTarget {
     if ($fuzzy.Match) {
         return (Resolve-WtwTarget $fuzzy.Match)
     }
+    # An all-digit name almost always means PowerShell ate a leading zero:
+    # argument mode parses a bare `033` as the NUMBER 33, so wtw never sees the
+    # original text. Suggest the targets that actually contain those digits,
+    # which is far more useful here than edit-distance neighbours — '33' is one
+    # character from a dozen unrelated aliases and close to none of them in
+    # meaning.
+    if ($Name -match '^\d+$') {
+        $containing = @(Get-WtwAllTargetNames $registry | Where-Object { $_ -match $Name })
+        $hint = Get-WtwNumericNameHint -Name $Name
+        if ($containing.Count -gt 0) {
+            Write-Error "Could not resolve '$Name'. $hint Targets containing '$Name': $($containing -join ', ')"
+        } else {
+            Write-Error "Could not resolve '$Name'. $hint Run 'wtw list' to see available targets."
+        }
+        return $null
+    }
+
     if ($fuzzy.Suggestions.Count -gt 0) {
         $suggestions = $fuzzy.Suggestions -join ', '
         Write-Error "Could not resolve '$Name'. Did you mean: ${suggestions}?"

@@ -213,6 +213,33 @@ Describe 'Resolve-WtwHostAddress transport preference' {
     }
 }
 
+Describe 'Test-WtwIsSshTransportError' {
+    It 'recognises the failures that are genuinely the transport' {
+        foreach ($text in
+            'Host key verification failed.',
+            'dev@x: Permission denied (publickey).',
+            'ssh: Could not resolve hostname foo',
+            'ssh: connect to host x port 22: Connection refused',
+            'ssh: connect to host x port 22: Connection timed out',
+            'wtw-pwsh-not-found') {
+            Test-WtwIsSshTransportError -ErrorText $text | Should -BeTrue -Because "'$text' is an ssh problem"
+        }
+    }
+
+    It 'does not mistake a remote application error for an ssh failure' {
+        # This arrives on stderr from a session that connected perfectly.
+        # Labelling it "ssh to host failed" sends you debugging the network
+        # instead of the name you typed.
+        $remoteError = "Write-Error: C:\Users\dev\.wtw\module\public\Invoke-Wtw.ps1:337`nCould not resolve 'PF033'. Run 'wtw list' to see available targets."
+        Test-WtwIsSshTransportError -ErrorText $remoteError | Should -BeFalse
+    }
+
+    It 'treats no error text as no transport error' {
+        Test-WtwIsSshTransportError -ErrorText '' | Should -BeFalse
+        Test-WtwIsSshTransportError -ErrorText $null | Should -BeFalse
+    }
+}
+
 Describe 'Format-WtwSshError' {
     BeforeAll {
         $script:entry = @{ Name = 'workstation'; User = 'dev'; HostName = 'workstation.local'

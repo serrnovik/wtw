@@ -302,8 +302,11 @@ Describe 'Get-WtwRemoteCommandMode' {
         Get-WtwRemoteCommandMode -Command 'run' | Should -Be 'exec'
     }
 
-    It 'refuses go — there is no cd to another machine' {
-        Get-WtwRemoteCommandMode -Command 'go' | Should -Be 'none'
+    It 'sends go to an interactive session rather than refusing it' {
+        # It used to be refused on the grounds that there is no cd to another
+        # machine — but "be in that worktree" is achievable over ssh, which is
+        # what `connect` does.
+        Get-WtwRemoteCommandMode -Command 'go' | Should -Be 'connect'
     }
 
     It 'refuses the ambiguous app launchers, leaving them to run' {

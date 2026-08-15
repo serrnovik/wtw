@@ -124,25 +124,28 @@ function Get-WtwRemoteCommandMode {
     .SYNOPSIS
         How a subcommand should be handled when `--on` is present.
     .DESCRIPTION
-        Three outcomes:
+        Four outcomes:
 
-          local   interpreted here — a read whose result we render, or a VS Code
-                  editor launch where the window is local and the files remote.
-          exec    forwarded verbatim and executed on the remote machine.
-          none    refused, because neither reading makes sense.
+          local    interpreted here — a read whose result we render, or a VS Code
+                   editor launch where the window is local and the files remote.
+          exec     forwarded verbatim and executed on the remote machine.
+          connect  an interactive ssh session inside the remote worktree.
+          none     refused, because no reading of it makes sense.
 
-        `go` is the only hard refusal: there is no cd to another machine. The
-        app-launchers (t3, cmux, claudecode, chatgpt…) are ambiguous rather than
-        impossible — "register that project over there" is meaningful — so they
-        are reachable through the explicit `run`, where the intent is stated
-        rather than guessed.
+        `go` maps to connect rather than being refused: the verb means "be in
+        that worktree", and over ssh that is exactly what it can do. The
+        app-launchers (t3, cmux, claudecode, chatgpt…) stay refused because they
+        are ambiguous rather than impossible — "register that project over there"
+        is meaningful — so they are reachable through the explicit `run`, where
+        the intent is stated rather than guessed.
     .OUTPUTS
-        'local' | 'exec' | 'none'
+        'local' | 'exec' | 'connect' | 'none'
     #>
     [CmdletBinding()]
     param([AllowNull()] [string] $Command)
 
     if (-not $Command) { return 'none' }
+    if ($Command -in @('go', 'connect', 'conn', 'ssh')) { return 'connect' }
     if ($Command -in @('open', 'list', 'ls', 'info', 'show')) { return 'local' }
     if (Resolve-WtwEditorFamilyMember -Name $Command) { return 'local' }
     if ($Command -in $script:WtwRemoteExecCommands) { return 'exec' }

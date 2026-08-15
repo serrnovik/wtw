@@ -198,7 +198,47 @@ wtw host test at            # addresses + ssh config + remote wtw
 wtw list --on at            # what does that machine have?
 wtw --on at cursor auth     # open its "auth" worktree here, in Cursor
 wtw at cursor auth          # same thing — bare host shorthand
+wtw --on at go auth         # ssh into that worktree: pwsh, right directory
 ```
+
+### `go` — a shell in the remote worktree
+
+`wtw go auth` locally means "be in that worktree". With `--on` it means the same
+thing over ssh: an interactive pwsh, already in the directory, with your remote
+profile loaded. Aliases: `connect`, `conn`, `ssh`.
+
+```powershell
+wtw --on at go auth      # a worktree
+wtw --on at go           # just the machine, in its home directory
+```
+
+The **local** tab is titled and tinted with that worktree's colour from the
+remote registry, and both are restored when you exit, including on Ctrl-C.
+
+Give each machine an identity for those titles:
+
+```powershell
+wtw host add workstation --emoji 🧊 --label WS
+```
+
+Titles then read `{emoji}{label}.{worktree}` — e.g. `🧊WS.🟢 PF037 gamification`,
+where the worktree half is its own pretty name from the remote registry, so a
+remote tab looks like the local tab for the same worktree with the machine in
+front. The label defaults to the shortest alias upper-cased, so this works before
+you configure anything; there is no default emoji, because an auto-assigned one
+would be noise rather than identity.
+
+Three details that a plain `ssh host` does not give you:
+
+- `-t` forces a TTY; without it pwsh exits immediately.
+- The `Set-Location` travels as `-EncodedCommand`, so paths with spaces or quotes
+  survive the local shell, ssh's argv joining and cmd.exe on a Windows remote.
+- The title is set **again from inside the session**. A Windows remote runs pwsh
+  under ConPTY, which clears the screen and emits its own OSC title the moment it
+  starts — clobbering whatever the local terminal was told a moment earlier.
+
+A worktree that is registered but no longer on disk is reported in-session rather
+than dumping you in the home directory behind a scrolled-off error.
 
 ### Tailscale
 
@@ -335,13 +375,11 @@ wtw --on box run init "app,my-app" --cwd /srv/repos/my-app
 `--cwd` sets the remote working directory, which repo-scoped commands need — an
 ssh command starts in the remote home directory, not in a repo.
 
-Only two things are refused outright:
-
-- `go` — there is no cd to another machine.
-- `t3` / `cmux` / `wmux` / `claudecode` / `chatgpt` / `ss` — ambiguous rather
-  than impossible. "Open T3 here pointing at a remote path" cannot work, while
-  "register that project over there" is perfectly meaningful, so the intent has
-  to be stated: `wtw --on box run t3 auth`.
+One category is refused outright: `t3` / `cmux` / `wmux` / `claudecode` /
+`chatgpt` / `ss`. These are ambiguous rather than impossible — "open T3 here
+pointing at a remote path" cannot work, while "register that project over there"
+is perfectly meaningful — so the intent has to be stated:
+`wtw --on box run t3 auth`.
 
 ### Setup notes
 

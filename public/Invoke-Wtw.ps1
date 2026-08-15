@@ -96,6 +96,9 @@ function Invoke-Wtw {
         Write-Host '                      mdns|lan. Changes nothing on disk.'
         Write-Host '    run <cmd> [--cwd <remote path>]   With --on: run any wtw command ON the'
         Write-Host '                      remote (create/init/sync/... already route there).'
+        Write-Host '    go <name>         With --on: ssh into that worktree — pwsh in the right'
+        Write-Host '                      directory, local tab titled and coloured. (aliases:'
+        Write-Host '                      connect, conn, ssh)'
         Write-Host ''
         return
     }
@@ -106,7 +109,18 @@ function Invoke-Wtw {
     if ($targetHost) {
         $hostEntry = Resolve-WtwHost -Name $targetHost
         if (-not $hostEntry) {
-            Write-Error "Unknown host '$targetHost'. Configured hosts: $((Get-WtwHostNames) -join ', '). Add one with: wtw host add $targetHost --user <u> --address <ip>"
+            # The direction mix-up: `--on` names the OTHER machine, and the same
+            # aliases usually exist on both sides, so pointing it at this one is
+            # easy to do and reads as a bare "unknown host" without this.
+            if (Test-WtwIsLocalMachine -Name $targetHost) {
+                Write-Error "'$targetHost' is this machine — --on names the machine you want to reach. Drop it: wtw $Command $($rawArgs -join ' ')"
+                return
+            }
+            # No @() wrapper: the function returns `,@(...)` already, and
+            # re-wrapping nests it so [0] is the whole array.
+            $localNames = Get-WtwLocalMachineName
+            $whoAmI = if ($localNames.Count -gt 0) { " This machine is '$($localNames[0])'; hosts are the other machines you connect to." } else { '' }
+            Write-Error "Unknown host '$targetHost'. Configured hosts: $((Get-WtwHostNames) -join ', ').$whoAmI Add one with: wtw host add $targetHost --user <u> --address <ip>"
             return
         }
         $remoteMode = Get-WtwRemoteCommandMode -Command $Command
@@ -134,6 +148,16 @@ function Invoke-Wtw {
             Write-Host "  via $requestedVia → $($hostEntry.Name)" -ForegroundColor DarkGray
             # Consumed locally — the remote CLI has no --via.
             $rawArgs = Remove-WtwFlagWithValue -ArgList $rawArgs -Flag 'via'
+        }
+
+        # Interactive ssh into the worktree — the remote sibling of `wtw go`.
+        if ($remoteMode -eq 'connect') {
+            $connectName = if ($remotePos.Count -gt 0) { [string]$remotePos[0] } else { '' }
+            Connect-WtwRemoteWorktree `
+                -HostEntry $hostEntry `
+                -Name $connectName `
+                -PrintOnly:([bool]$remoteSplat.Contains('PrintOnly'))
+            return
         }
 
         # Forwarded verbatim and executed on the remote. `run` drops its own name
