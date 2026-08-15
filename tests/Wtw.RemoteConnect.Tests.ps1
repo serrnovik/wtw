@@ -266,3 +266,22 @@ Describe 'Connect-WtwRemoteWorktree' {
             Should -Throw -ExpectedMessage "*Could not resolve 'ghost'*"
     }
 }
+
+Describe 'Host title separator' {
+    It 'defaults to a dot' {
+        $h = @{ Name = 'workstation'; Aliases = @('at'); Emoji = $null; Label = 'AT' }
+        Get-WtwHostTitlePrefix -HostEntry $h | Should -Be 'AT.'
+    }
+
+    It 'honours a custom separator' {
+        # The worktree half usually starts with its own emoji, and '.' right
+        # before an emoji reads cramped — so this is a knob, not a constant.
+        $h = @{ Name = 'workstation'; Aliases = @('at'); Emoji = $null; Label = 'AT'; Separator = ' ' }
+        Get-WtwHostTitlePrefix -HostEntry $h | Should -Be 'AT '
+    }
+
+    It 'accepts an empty separator' {
+        $h = @{ Name = 'workstation'; Aliases = @('at'); Emoji = $null; Label = 'AT'; Separator = '' }
+        Get-WtwHostTitlePrefix -HostEntry $h | Should -Be 'AT'
+    }
+}

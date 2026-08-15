@@ -135,6 +135,7 @@ function Show-WtwCommandHelp {
             '  --pwsh <path>          Explicit pwsh path, when the probe list misses it',
             '  --emoji <char>         Per-machine emoji for terminal titles (e.g. a snowflake)',
             '  --label <short>        Short machine label (default: shortest alias, upper-cased)',
+            '  --separator <s>        Between label and worktree (default: "."; try " " or "")',
             '  --via <transport>      Prefer tailscale|zerotier|mdns|lan (default: any).',
             '                         A preference reorders the candidates; it never makes',
             '                         the host unreachable when that transport is down.',

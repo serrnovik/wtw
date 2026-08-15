@@ -221,12 +221,20 @@ Give each machine an identity for those titles:
 wtw host add workstation --emoji 🧊 --label WS
 ```
 
-Titles then read `{emoji}{label}.{worktree}` — e.g. `🧊WS.🟢 PF037 gamification`,
+Titles then read `{emoji}{label}{separator}{worktree}` — e.g. `🧊WS.🟢 PF037 gamification`,
 where the worktree half is its own pretty name from the remote registry, so a
 remote tab looks like the local tab for the same worktree with the machine in
 front. The label defaults to the shortest alias upper-cased, so this works before
 you configure anything; there is no default emoji, because an auto-assigned one
 would be noise rather than identity.
+
+The separator defaults to `.` and is configurable — the worktree half usually
+starts with its own emoji, and a dot immediately before one reads cramped:
+
+```powershell
+wtw host add workstation --separator " "    # 🧊WS 🟢 PF037 gamification
+wtw host add workstation --separator ""     # 🧊WS🟢 PF037 gamification
+```
 
 Three details that a plain `ssh host` does not give you:
 

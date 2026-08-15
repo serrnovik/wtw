@@ -58,7 +58,8 @@ function Invoke-WtwHost {
         [string[]] $Exclude,
         [ValidateSet('tailscale', 'zerotier', 'mdns', 'lan', 'any')] [string] $Via,
         [string] $Emoji,
-        [string] $Label
+        [string] $Label,
+        [string] $Separator
     )
 
     switch ($Action.ToLowerInvariant()) {
@@ -137,6 +138,9 @@ function Invoke-WtwHost {
             if ($Via)      { $entry | Add-Member -NotePropertyName 'via' -NotePropertyValue $Via -Force }
             if ($Emoji)    { $entry | Add-Member -NotePropertyName 'emoji' -NotePropertyValue $Emoji -Force }
             if ($Label)    { $entry | Add-Member -NotePropertyName 'label' -NotePropertyValue $Label -Force }
+            # ContainsKey, not truthiness: '' is a legitimate value meaning
+            # "no separator at all".
+            if ($PSBoundParameters.ContainsKey('Separator')) { $entry | Add-Member -NotePropertyName 'separator' -NotePropertyValue $Separator -Force }
             if ($PSBoundParameters.ContainsKey('Platform') -or -not (Get-WtwPropertyValue -Object $entry -Name 'platform')) {
                 $entry | Add-Member -NotePropertyName 'platform' -NotePropertyValue $Platform -Force
             }

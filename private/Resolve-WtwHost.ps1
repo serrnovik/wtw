@@ -77,6 +77,10 @@ function Get-WtwHosts {
             # so a remote tab is recognisable as "that machine" at a glance.
             Emoji          = (Get-WtwPropertyValue -Object $entry -Name 'emoji')
             Label          = (Get-WtwPropertyValue -Object $entry -Name 'label')
+            # What goes between the machine label and the worktree title. '.' by
+            # default; a space or '' reads better when the worktree name starts
+            # with its own emoji.
+            Separator      = (Get-WtwPropertyValue -Object $entry -Name 'separator' -DefaultValue '.')
         }
     }
     # Comma operator: without it a single configured host unrolls to a bare
@@ -180,6 +184,10 @@ function Get-WtwHostTitlePrefix {
         own title. With a dozen tabs open, the machine is the thing you need to
         recognise before anything else.
 
+        The separator is configurable because the worktree half usually starts
+        with its own emoji, and a '.' immediately before an emoji reads cramped.
+        A space, or nothing at all, often looks better.
+
         The label defaults to the shortest alias upper-cased, then to the first
         two letters of the host name, so this is useful without configuring
         anything. An emoji is only shown when set; there is no default, because
@@ -205,7 +213,8 @@ function Get-WtwHostTitlePrefix {
         }
     }
 
-    return "$emoji$label."
+    $separator = Get-WtwPropertyValue -Object $HostEntry -Name 'Separator' -DefaultValue '.'
+    return "$emoji$label$separator"
 }
 
 function Resolve-WtwHostVia {
