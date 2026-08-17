@@ -90,24 +90,40 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     $elems = @($commandAst.CommandElements)
     $registryPath = Join-Path $HOME '.wtw' 'registry.json'
 
+    # VS Code family shortcuts come from the shared table so this list cannot
+    # drift from what Resolve-WtwEditorCommand actually accepts.
+    $familyNames = @(Get-WtwEditorFamily | ForEach-Object { $_.Prefixes } | ForEach-Object { $_ })
+
     $knownSubcommands = @(
         'init', 'add', 'create', 'list', 'ls', 'go', 'open', 'remove', 'rm', 'unregister', 'unreg',
         'workspace', 'ws', 'copy', 'sync', 'color', 'clean', 'agent', 'install', 'update', 'skill', 'help',
-        '__resolve', '__aliases',
-        'cursor', 'cur', 'code', 'co', 'antigravity', 'anti', 'ag', 'windsurf', 'wind',
-        'codium', 'vscodium', 'sourcegit', 'sgit', 'sg',
+        'host',
+        '__resolve', '__resolve_json', '__aliases'
+    ) + $familyNames + @(
+        'sourcegit', 'sgit', 'sg',
         'codex', 'droid', 'factory', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
         'ss', 'superset', 'supersetsh'
     )
 
     $targetSubcommands = @(
-        'go', 'open', 'remove', 'rm', 'unregister', 'unreg', 'sync', 'color',
-        'cursor', 'cur', 'code', 'co', 'antigravity', 'anti', 'ag', 'windsurf', 'wind',
-        'codium', 'vscodium', 'sourcegit', 'sgit', 'sg',
+        'go', 'open', 'remove', 'rm', 'unregister', 'unreg', 'sync', 'color'
+    ) + $familyNames + @(
+        'sourcegit', 'sgit', 'sg',
         'codex', 'droid', 'factory', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
         'ss', 'superset', 'supersetsh',
         'workspace', 'ws'
     )
+
+    # `--on <host>` value completion.
+    if ($elems.Count -ge 2) {
+        $prevToken = $elems[$elems.Count - 2].Extent.Text
+        if ($prevToken -ieq '--on') {
+            Get-WtwHostNames | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+                [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', "remote host $_")
+            }
+            return
+        }
+    }
 
     # First token after wtw: subcommand (or refine partial)
     if ($elems.Count -lt 2) {
@@ -131,8 +147,9 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'factory';     Tip = 'Open in Factory desktop app' }
             @{ Name = 'claude';      Tip = 'Open Claude.ai app' }
             @{ Name = 'claudecode';  Tip = 'New Claude Code chat in the worktree (alias: ccode)' }
-            @{ Name = 't3';          Tip = 'Open T3 Code (Alpha)' }
+            @{ Name = 't3';          Tip = 'Register + open a T3 Code project' }
             @{ Name = 'ss';          Tip = 'Find & open matching Superset workspace' }
+            @{ Name = 'host';        Tip = 'Manage remote machines for --on' }
             @{ Name = 'help';        Tip = 'Show help' }
         )
         $prefix = $wordToComplete

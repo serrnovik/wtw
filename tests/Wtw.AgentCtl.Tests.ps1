@@ -5,7 +5,7 @@ BeforeAll {
 Describe 'agentctl integration' {
     It 'defaults unknown repos to the team profile' {
         $profile = InModuleScope wtw {
-            Get-WtwAgentCtlProfile -RepoName 'everix1' -RepoEntry ([PSCustomObject]@{}) -Config ([PSCustomObject]@{})
+            Get-WtwAgentCtlProfile -RepoName 'sample1' -RepoEntry ([PSCustomObject]@{}) -Config ([PSCustomObject]@{})
         }
 
         $profile | Should -Be 'team'
@@ -94,7 +94,7 @@ Describe 'agentctl integration' {
 
                 [PSCustomObject]@{
                     repos = [PSCustomObject]@{
-                        everix1 = [PSCustomObject]@{
+                        sample1 = [PSCustomObject]@{
                             aliases = @('e1', 'evx1')
                         }
                     }
@@ -104,7 +104,7 @@ Describe 'agentctl integration' {
                 Get-Content -Path $script:WtwConfigPath -Raw | ConvertFrom-Json
             }
 
-            $saved.agentctl.repoProfiles.everix1 | Should -Be 'team'
+            $saved.agentctl.repoProfiles.sample1 | Should -Be 'team'
             $saved.agentctl.repoProfiles.PSObject.Properties.Name | Should -Not -Contain 'e1'
         } finally {
             Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue

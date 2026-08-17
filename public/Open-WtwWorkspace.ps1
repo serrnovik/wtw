@@ -38,7 +38,12 @@ function Open-WtwWorkspace {
     }
 
     $config = Get-WtwConfig
-    $editorCmd = if ($Editor) { $Editor } elseif ($config.editor) { $config.editor } else { 'code' }
+    $editorPreference = if ($Editor) { $Editor } elseif ($config.editor) { $config.editor } else { 'code' }
+    # `editor` may be a single name or an ordered chain (["cursor","code"]);
+    # first runnable wins, so one config file survives machines with different
+    # editors installed.
+    $editorCmd = Resolve-WtwEditorPreference -Editor $editorPreference
+    if (-not $editorCmd) { $editorCmd = $editorPreference }
 
     $target = Resolve-WtwTarget $Name
     if (-not $target) { return }
@@ -68,6 +73,13 @@ function Open-WtwWorkspace {
     # CLI supports creating a named workspace at a cwd.
     if ($editorType -eq 'wmux') {
         Open-WtwWmuxWorkspace -Target $target
+        return
+    }
+
+    # T3 Code — no CLI and no folder-open deep link, so wtw registers the
+    # worktree as a T3 project (pretty name included) and launches the app.
+    if ($editorType -eq 't3') {
+        Open-WtwT3Workspace -Target $target -Editor $editorCmd
         return
     }
 

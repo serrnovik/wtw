@@ -19,7 +19,12 @@ function Resolve-WtwFuzzyMatch {
             $fuzzyMatches += [PSCustomObject]@{ Target = $candidate; Dist = $dist }
         }
     }
-    $fuzzyMatches = $fuzzyMatches | Sort-Object Dist
+    # Re-wrap: Sort-Object on an empty array emits nothing, leaving $null behind,
+    # and `.Count` on $null throws under the module's Set-StrictMode -Version
+    # Latest. The caller still saw "no match" because the errors went to the
+    # error stream and the function returned nothing — which is why an assertion
+    # of "returns null for an unknown editor" never caught it.
+    $fuzzyMatches = @($fuzzyMatches | Sort-Object Dist)
 
     if ($fuzzyMatches.Count -eq 0) {
         return [PSCustomObject]@{ Match = $null; Suggestions = @() }

@@ -103,7 +103,12 @@ function ConvertTo-WtwTableCellLineArray {
 function Format-WtwTable {
     [CmdletBinding()]
     param(
+        # AllowEmptyCollection: a Mandatory [array] rejects @() at bind time
+        # ("cannot bind argument ... empty array"), so filtering down to nothing
+        # — e.g. `wtw list detailed`, where 'detailed' binds as a repo name —
+        # crashed here instead of printing the "(none)" line below.
         [Parameter(Mandatory, Position = 0)]
+        [AllowEmptyCollection()]
         [array] $Items,
 
         [Parameter(Position = 1)]

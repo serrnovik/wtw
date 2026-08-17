@@ -38,4 +38,22 @@ Describe 'wtw module loading' {
                 Should -Be 'fallback'
         }
     }
+
+    # Editor descriptors from Resolve-WtwEditorCommand are hashtables, and
+    # PSObject.Properties on a hashtable exposes Count/Keys/Values instead of the
+    # keys. Without the IDictionary branch every lookup silently returned the
+    # default, which is what made `wtw t3` miss "T3 Code (Alpha).app".
+    It 'reads hashtable keys rather than the .NET surface' {
+        InModuleScope wtw {
+            $editor = @{ type = 'macapp'; appName = 'T3 Code'; appNameCandidates = @('T3 Code', 'T3 Code (Alpha)') }
+
+            $names = Get-WtwPropertyNames -Object $editor
+            ($names | Sort-Object) | Should -Be @('appName', 'appNameCandidates', 'type')
+            Get-WtwPropertyValue -Object $editor -Name 'appNameCandidates' -DefaultValue @('T3 Code') |
+                Should -Be @('T3 Code', 'T3 Code (Alpha)')
+            Get-WtwPropertyValue -Object $editor -Name 'macArgsViaCli' -DefaultValue $false |
+                Should -BeFalse
+            (Get-WtwPropertyNames -Object @{}).Count | Should -Be 0
+        }
+    }
 }

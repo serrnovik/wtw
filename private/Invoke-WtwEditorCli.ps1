@@ -13,51 +13,51 @@ function Invoke-WtwEditorCli {
         This helper resolves the logical editor name to the first CLI
         candidate that actually runs (via Test-WtwEditorCli), and on macOS
         falls back to launching the installed .app bundle by name. The
-        candidate chains live here so install-time detection and launch-time
-        invocation can't drift apart again.
+        candidate chains come from the shared family table
+        (private/Get-WtwEditorFamily.ps1), so install-time detection and
+        launch-time invocation can't drift apart again.
     .PARAMETER Cmd
         Logical editor command (e.g. 'antigravity', 'cursor', 'code').
     .PARAMETER Path
-        File or directory to open.
+        File or directory to open. Omitted for remote launches, where the
+        target travels in -PreArgs as a `--folder-uri` / `--file-uri` value.
+    .PARAMETER PreArgs
+        Extra arguments inserted before Path. Used by the remote opener to pass
+        `--remote ssh-remote+<host>` / `--folder-uri vscode-remote://…`.
+    .PARAMETER PassThru
+        Return the resolved invocation as @{ Exe; Arguments } instead of running
+        it. Lets `--print-only` and the tests inspect the exact command line.
     #>
     param(
         [Parameter(Mandatory)] [string] $Cmd,
-        [Parameter(Mandatory)] [string] $Path
+        [string] $Path,
+        [string[]] $PreArgs = @(),
+        [switch] $PassThru
     )
 
-    # Known CLI renames: logical name -> ordered CLI candidates (newest first).
-    # macApps -> ordered macOS .app bundle names for the open-bundle fallback.
-    $launch = @{
-        'antigravity' = @{ candidates = @('antigravity-ide', 'antigravity'); macApps = @('Antigravity IDE', 'Antigravity') }
-        'cursor'      = @{ candidates = @('cursor');      macApps = @('Cursor') }
-        'code'        = @{ candidates = @('code');        macApps = @('Visual Studio Code') }
-        'windsurf'    = @{ candidates = @('windsurf');    macApps = @('Windsurf') }
-        'codium'      = @{ candidates = @('codium');      macApps = @('VSCodium') }
-    }
+    $member     = Get-WtwEditorFamilyMember -Id $Cmd
+    $candidates = if ($member) { @($member.Cli) } else { @($Cmd) }
+    $macApps    = if ($member) { @($member.MacApps) } else { @() }
+    $flags      = if ($member) { @($member.LaunchFlags) } else { @() }
 
-    $spec       = $launch[$Cmd]
-    $candidates = if ($spec) { $spec.candidates } else { @($Cmd) }
-    $macApps    = if ($spec -and $spec.ContainsKey('macApps')) { $spec.macApps } else { @() }
+    $arguments = @($flags) + @($PreArgs)
+    if ($Path) { $arguments += $Path }
 
     # 1. First CLI candidate that resolves to a real, runnable binary.
-    # Cursor otherwise follows its last-window behaviour, which can route a
-    # workspace into a standalone Agent window rather than a project IDE.
-    # wtw worktrees need their own IDE window so the project context remains
-    # unambiguous.
     $runnable = $candidates | Where-Object { Test-WtwEditorCli -Cmd $_ } | Select-Object -First 1
     if ($runnable) {
-        if ($Cmd -eq 'cursor') {
-            & $runnable --new-window $Path
-        } else {
-            & $runnable $Path
-        }
+        if ($PassThru) { return @{ Exe = $runnable; Arguments = $arguments } }
+        & $runnable @arguments
         return
     }
 
     # 2. macOS: CLI missing/broken but the app bundle is installed — open it.
-    if ($IsMacOS -and $macApps.Count -gt 0) {
+    #    `open -a` can only carry a filesystem path, so a remote launch (which
+    #    needs --folder-uri) has no bundle fallback and must report the missing CLI.
+    if ($IsMacOS -and $macApps.Count -gt 0 -and $PreArgs.Count -eq 0 -and $Path) {
         $app = $macApps | Where-Object { Test-Path "/Applications/$_.app" } | Select-Object -First 1
         if ($app) {
+            if ($PassThru) { return @{ Exe = 'open'; Arguments = @('-a', $app, $Path) } }
             Write-Host "  '$Cmd' CLI not on PATH — opening /Applications/$app.app instead." -ForegroundColor DarkGray
             Write-Host "  Tip: in $app, run Cmd-Shift-P → 'Shell Command: Install ... command in PATH' to enable the CLI." -ForegroundColor DarkGray
             & open -a $app $Path
@@ -67,5 +67,26 @@ function Invoke-WtwEditorCli {
 
     # 3. Nothing usable found.
     $tried = $candidates -join ', '
+    if ($PreArgs.Count -gt 0) {
+        Write-Error "Editor '$Cmd' is not runnable (tried CLI: $tried). A remote open needs the editor CLI on PATH — the .app bundle fallback cannot pass a remote URI."
+        return
+    }
     Write-Error "Editor '$Cmd' is not runnable (tried CLI: $tried). Install it or set a different 'editor' in your wtw config."
+}
+
+function Get-WtwEditorCliName {
+    <#
+    .SYNOPSIS
+        The runnable CLI name for a logical editor, or $null.
+    .DESCRIPTION
+        Same candidate chain Invoke-WtwEditorCli launches through, exposed for
+        callers that need to run the CLI for something other than opening a
+        path — `--list-extensions`, `--install-extension`.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Cmd)
+
+    $member = Get-WtwEditorFamilyMember -Id $Cmd
+    $candidates = if ($member) { @($member.Cli) } else { @($Cmd) }
+    return ($candidates | Where-Object { Test-WtwEditorCli -Cmd $_ } | Select-Object -First 1)
 }

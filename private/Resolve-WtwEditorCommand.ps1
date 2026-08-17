@@ -3,12 +3,13 @@ function Resolve-WtwEditorCommand {
 
     if (-not $Name) { return $null }
 
-    $editors = @(
-        @{ prefixes = @('cursor', 'cur'); cmd = 'cursor' }
-        @{ prefixes = @('code', 'co'); cmd = 'code' }
-        @{ prefixes = @('antigravity', 'anti', 'ag'); cmd = 'antigravity' }
-        @{ prefixes = @('windsurf', 'wind', 'ws'); cmd = 'windsurf' }
-        @{ prefixes = @('codium', 'vscodium'); cmd = 'codium' }
+    # VS Code family — projected from the shared table so prefixes, CLI
+    # candidates, app bundles, remote-SSH extension ids and settings dirs cannot
+    # drift apart again (private/Get-WtwEditorFamily.ps1). Family members resolve
+    # to a plain string command; only the non-family editors below carry a `type`.
+    $editors = @(Get-WtwEditorFamily | ForEach-Object { @{ prefixes = $_.Prefixes; cmd = $_.Id } })
+
+    $editors += @(
         # SourceGit — cross-platform. Pass repo dir as positional argv; SourceGit's IPC channel
         # routes a second-instance launch to the running one (see src/App.axaml.cs TryLaunchAsNormal).
         # macArgsViaCli=true → uses `open -n -a App --args <dir>` so argv actually carries the path.
@@ -27,7 +28,10 @@ function Resolve-WtwEditorCommand {
         # Claude Code ships inside the Claude desktop app, not as its own bundle —
         # `claude://code/new?folder=<dir>` starts a chat rooted at the worktree.
         @{ prefixes = @('claudecode', 'ccode'); type = 'claudecode'; appName = 'Claude Code'; appNameCandidates = @('Claude') }
-        @{ prefixes = @('t3', 't3code');        type = 'macapp'; appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
+        # T3 Code takes no folder argument at all (no CLI, no open-url handler), so
+        # it gets its own type: wtw registers the worktree as a project in T3's
+        # event store first, then just launches the app.
+        @{ prefixes = @('t3', 't3code');        type = 't3';     appName = 'T3 Code';     appNameCandidates = @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)') }
         # Superset — find matching workspace and open Superset app, or print hints
         @{ prefixes = @('ss', 'superset', 'supersetsh'); type = 'superset'; appName = 'Superset' }
     )

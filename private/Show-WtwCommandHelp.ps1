@@ -100,12 +100,62 @@ function Show-WtwCommandHelp {
         'sync'        { @('wtw sync [name] [--all]', 'Re-apply template settings to managed workspaces.', '', 'Arguments:', '  name    Target workspace (alias, task, or file path; default: detected from cwd)', '', 'Options:', '  --all               Sync all managed workspaces', '  --repo <name>       Limit --all to a specific repo', '  --template <path>   Override template source', '  --dry-run           Show what would be synced without writing', '  --color-source      json | workspace (single-file sync; skips interactive prompt)', '                      Default when omitted: prompt if interactive, else json-first', '', 'Examples:', '  wtw sync                  Sync current workspace', '  wtw sync proj-fix         Sync a specific workspace by name', '  wtw sync --all            Sync all registered workspaces', '  wtw sync --all --repo proj Sync all workspaces for one repo') }
         'color'       { @('wtw color [name] [hex|random]', 'Set or show the Peacock color for a workspace.', '', 'Arguments:', '  name     Target workspace (default: detected from cwd)', '  color    A hex color (rrggbb) or "random" for max contrast', '', 'Options:', '  --no-sync   Skip syncing the workspace file after color change', '', 'Examples:', '  wtw color                  Show color for current workspace', '  wtw color proj random      Pick a maximally contrasting color', '  wtw color my-task e05d44   Set a specific color', '', 'Note: # starts a comment in PowerShell. Either omit it', '  or quote it: ''#e05d44''') }
         'clean'       { @('wtw clean', 'Remove stale AI-created worktrees that no longer have active branches.') }
+        'host'        { @(
+            'wtw host [list|show|discover|add|remove|sync|trust|test] [name] [options]',
+            'Manage the remote machines `wtw --on <host>` can open worktrees on.',
+            '',
+            'Hosts live in ~/.wtw/config.json and are mirrored into ~/.ssh/config.d/wtw,',
+            'because the editor''s Remote-SSH extension resolves hosts through the ssh',
+            'client rather than through wtw.',
+            '',
+            'Subcommands:',
+            '  list              One line per host: active address, transport, ssh status',
+            '  show [name]       Full config: every candidate, its transport and whether',
+            '                    it is up, which one is active, and ssh-config conflicts',
+            '  discover          Register machines found on your tailnet (Tailscale)',
+            '                    --yes to skip the prompt, --exclude a,b to ignore for good',
+            '  add <name>        Add or update a host, then sync ssh config',
+            '  remove <name>     Drop a host, then sync ssh config',
+            '  sync              Re-probe addresses, rewrite ~/.ssh/config.d/wtw',
+            '  trust <name>      Show host-key fingerprints, then add to known_hosts',
+            '  test <name>       Probe addresses, ssh config, and the remote wtw',
+            '',
+            'Transports are detected from the address itself:',
+            '  tailscale  *.ts.net or 100.64.0.0/10      mdns   *.local',
+            '  zerotier   a subnet this machine joined   lan    RFC1918 address',
+            '',
+            'Options for add:',
+            '  --alias a,b            Short names (wtw --on at ...)',
+            '  --user <u>             SSH user',
+            '  --address <ip|dns>     HostName for ssh',
+            '  --identity <path>      IdentityFile (also sets IdentitiesOnly)',
+            '  --port <n>             SSH port',
+            '  --platform <p>         windows | linux | macos  (drives remote path translation)',
+            '  --wtw <cmd>            Command used to invoke wtw remotely (default: wtw)',
+            '  --pwsh <path>          Explicit pwsh path, when the probe list misses it',
+            '  --emoji <char>         Per-machine emoji for terminal titles (e.g. a snowflake)',
+            '  --label <short>        Short machine label (default: shortest alias, upper-cased)',
+            '  --separator <s>        Between label and worktree (default: "."; try " " or "")',
+            '  --via <transport>      Prefer tailscale|zerotier|mdns|lan (default: any).',
+            '                         A preference reorders the candidates; it never makes',
+            '                         the host unreachable when that transport is down.',
+            '',
+            'Only the options you pass are written, so `wtw host add x --platform windows`',
+            'is a targeted edit rather than a reset of the other fields.',
+            '',
+            'Example:',
+            '  wtw host add workstation --alias at --user dev --address 192.168.1.10 \',
+            '      --identity ~/.ssh/id_ed25519_workstation --platform windows'
+        ) }
         'agent'       { @('wtw agent profile set <repo> <profile>', 'Configure which agentctl profile wtw create applies for a repo.', '', 'Examples:', '  wtw agent profile set snowmain1 solo', '  wtw agent profile default team', '  wtw agent profile get snowmain1', '  wtw agent profile list') }
         'install'     { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }
         'update'      { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }
         'skill'       { @('wtw skill [--agent claude|agents|all]', 'Install the wtw AI skill into the current repo.', '', 'Copies skill definitions so AI agents (Claude, Codex, Cursor, Gemini)', 'can discover and use wtw commands.', '', 'Options:', '  --agent claude    Claude Code only (.claude/skills/)', '  --agent agents    Cross-agent format (.agents/skills/)', '  --agent all       Both (default)') }
         { $_ -in 'claudecode', 'ccode' } {
             @('wtw claudecode [name] [--prompt <text>]', 'Start a new Claude Code chat in the Claude desktop app, rooted at the target.', '', 'Arguments:', '  name    Target to open (default: detected from cwd)', '', 'Options:', '  --prompt <text>   Pre-fill the new chat''s composer (not submitted)', '', 'Uses the app''s claude://code/new deep link. The desktop app names sessions', 'itself (auto-titled from the first message, renameable in the UI), so wtw', 'cannot set a chat title the way it labels Cursor/ChatGPT projects.', '', 'Use `wtw claude` to just bring the Claude app forward instead.')
+        }
+        { $_ -in 't3', 't3code' } {
+            @('wtw t3 [name]', 'Register a target as a T3 Code project, then launch T3 Code.', '', 'Arguments:', '  name    Target to register (default: detected from cwd)', '', 'T3 Code ships no CLI and no folder-open deep link, so wtw cannot tell a', 'running app to open a directory. Instead it appends the project to T3''s', 'event store under the wtw pretty name, so the worktree is already in the', 'sidebar when the app comes up.', '', 'Registration only runs while T3 Code is stopped — its server owns the', 'store while running. When it is up, wtw points T3''s "Add project starts', 'in" setting at the worktree instead.', '', 'T3 Code has no project color, so `wtw color` does not reach it.')
         }
         default {
             # Check if it's an editor command
