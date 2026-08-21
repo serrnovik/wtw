@@ -324,7 +324,11 @@ function Set-WtwCodexLocalProjectName {
 
     $projectsProp = $State.PSObject.Properties['local-projects']
     $projects = if ($projectsProp -and $projectsProp.Value) { $projectsProp.Value } else { [PSCustomObject]@{} }
-    $entry = @(Get-WtwCodexLocalProjectEntries -State $State -ProjectPath $ProjectPath | Select-Object -First 1)[0]
+    # No `@(...)[0]`: indexing an empty array throws under the module's
+    # Set-StrictMode -Version Latest, and "no entry yet" is the normal case for a
+    # freshly created worktree — which is exactly when this runs. `Select-Object
+    # -First 1` already yields one object or nothing.
+    $entry = Get-WtwCodexLocalProjectEntries -State $State -ProjectPath $ProjectPath | Select-Object -First 1
     $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 
     if ($entry) {
@@ -411,7 +415,9 @@ function Get-WtwCodexProjectLabel {
         return $null
     }
 
-    $project = @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath | Select-Object -First 1)[0]
+    # See Set-WtwCodexLocalProjectName: an unindexed pipeline, because @()[0]
+    # throws under StrictMode when the project is not registered yet.
+    $project = Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath | Select-Object -First 1
     if ($project) { return [string]$project.Value.name }
 
     $labelsProp = $state.PSObject.Properties['electron-workspace-root-labels']
@@ -446,7 +452,8 @@ function Test-WtwCodexProjectLabel {
         return $false
     }
 
-    $project = @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath | Select-Object -First 1)[0]
+    # Same as above: unregistered is the answer this is asked for, not an error.
+    $project = Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath | Select-Object -First 1
     return $project -and $project.Value.name -eq $PrettyName
 }
 

@@ -221,3 +221,68 @@ Describe 'Codex project integration' {
         Should -Invoke Stop-WtwCodexProcess -Times 1 -Exactly
     }
 }
+
+Describe 'Codex project state under the module StrictMode' {
+    # These run through InModuleScope rather than the dot-sourced copies the
+    # Describe above uses. wtw.psm1 sets StrictMode -Version Latest, and a
+    # dot-sourced function called from test scope does not inherit it — which is
+    # how `@(<empty pipeline>)[0]` survived here: harmless in the tests, fatal
+    # from the real CLI, and only on the path that matters, registering a
+    # worktree Codex has never seen.
+
+    BeforeEach {
+        $script:strictTempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-codex-strict-" + [guid]::NewGuid())
+        $script:strictCodexHome = Join-Path $script:strictTempDir '.codex'
+        $script:strictProjectPath = Join-Path $script:strictTempDir 'repo_new-worktree'
+        New-Item -ItemType Directory -Path $script:strictCodexHome, $script:strictProjectPath -Force | Out-Null
+
+        # A state file that already knows about a different project: the shape of
+        # every real machine, and the one that used to throw.
+        $script:strictStatePath = Join-Path $script:strictCodexHome '.codex-global-state.json'
+        [PSCustomObject]@{
+            'local-projects' = [PSCustomObject]@{
+                ([guid]::NewGuid().ToString()) = [PSCustomObject]@{
+                    id        = 'someone-else'
+                    name      = 'unrelated project'
+                    rootPaths = @((Join-Path $script:strictTempDir 'some_other_repo'))
+                    createdAt = 100
+                    updatedAt = 100
+                }
+            }
+        } | ConvertTo-Json -Depth 10 | Set-Content -Path $script:strictStatePath -Encoding utf8
+    }
+
+    AfterEach {
+        Remove-Item -Recurse -Force $script:strictTempDir -ErrorAction SilentlyContinue
+    }
+
+    It 'labels a project the state has never seen' {
+        InModuleScope wtw -Parameters @{ StatePath = $script:strictStatePath; ProjectPath = $script:strictProjectPath } {
+            param($StatePath, $ProjectPath)
+            { Set-WtwCodexProjectLabel -ProjectPath $ProjectPath -PrettyName '🔴 🐙 argocd' -GlobalStatePath $StatePath } |
+                Should -Not -Throw
+            Get-WtwCodexProjectLabel -ProjectPath $ProjectPath -GlobalStatePath $StatePath | Should -Be '🔴 🐙 argocd'
+        }
+    }
+
+    It 'reports an unregistered project as unlabelled instead of throwing' {
+        InModuleScope wtw -Parameters @{ StatePath = $script:strictStatePath; ProjectPath = $script:strictProjectPath } {
+            param($StatePath, $ProjectPath)
+            Get-WtwCodexProjectLabel -ProjectPath $ProjectPath -GlobalStatePath $StatePath | Should -BeNullOrEmpty
+            Test-WtwCodexProjectLabel -ProjectPath $ProjectPath -PrettyName 'anything' -GlobalStatePath $StatePath |
+                Should -BeFalse
+        }
+    }
+
+    It 'keeps the unrelated project it found alongside the new one' {
+        InModuleScope wtw -Parameters @{ StatePath = $script:strictStatePath; ProjectPath = $script:strictProjectPath } {
+            param($StatePath, $ProjectPath)
+            Set-WtwCodexProjectLabel -ProjectPath $ProjectPath -PrettyName 'New One' -GlobalStatePath $StatePath | Out-Null
+
+            $state = Get-Content -Path $StatePath -Raw | ConvertFrom-Json
+            $names = @($state.'local-projects'.PSObject.Properties.Value.name)
+            $names | Should -Contain 'unrelated project'
+            $names | Should -Contain 'New One'
+        }
+    }
+}
