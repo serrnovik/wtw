@@ -74,6 +74,39 @@ wtw install
 
 Re-run `wtw install` from source after pulling updates.
 
+### `wtw install` vs `wtw update`
+
+They are different commands, and which one you want depends on where your copy
+of wtw came from.
+
+| You are running | Update with | What happens |
+| --- | --- | --- |
+| A source checkout | `git pull`, then `wtw install` | Your build is copied to `~/.wtw/module/` |
+| A hand-installed copy (`wtw install` from a checkout) | `wtw update` | Replaces it with the published Gallery release |
+| The Gallery release | `wtw update` | Refreshes it in place |
+
+`wtw install` records where a copy came from in
+`~/.wtw/module/INSTALLATION.json`, and `wtw update` reads it, so wtw always
+offers the command that updates the copy your shell actually loads.
+
+`wtw update` materialises the Gallery package into `~/.wtw/module/` rather than
+leaving it on `PSModulePath`. Every loader wtw installs — the PowerShell profile
+snippet, the zsh and bash wrappers, the Windows `cmd` shim — imports
+`~/.wtw/module/wtw.psm1` by explicit path, so an `Install-Module wtw` that lands
+elsewhere updates a copy none of them ever load. If such a copy already exists,
+`wtw update` says so and offers to remove it, because a bare `Import-Module wtw`
+resolves to that one instead.
+
+```text
+wtw update --check      # report versions and where they came from, change nothing
+wtw update              # prompt, then replace the install with the latest release
+wtw update --yes        # no prompt
+wtw update --force      # bypass the 24h version cache and reinstall
+```
+
+A local build that is **newer** than the published release is normal while you
+are working on wtw, and is reported as current. Same version, no warning either.
+
 ### Update notice
 
 wtw tells you when a newer version is published. It prints a two-line hint once
@@ -81,8 +114,11 @@ per shell session:
 
 ```text
   wtw 0.2.0 is available (you have 0.1.46).
-  Update: wtw install     (or: Update-Module wtw -Scope CurrentUser)
+  Update: wtw update
 ```
+
+The second line follows the install: a checkout is told to `git pull, then wtw
+install`, anything else is told to run `wtw update`.
 
 The hint reads only `~/.wtw/update-check.json`, so it never waits on the
 network; a stale cache is refreshed by a detached background process and used
@@ -176,10 +212,12 @@ wtw clean                 # interactive selection + removal
 | `wtw color [name] [hex\|random]` | Set workspace color |
 | `wtw sync --all [--dry-run] [--repo X]` | Re-apply template to all managed workspaces |
 | `wtw clean [--dry-run] [--force]` | Clean stale AI worktrees (codex, cursor, conductor) |
-| `wtw install [--skip-profile]` | Install/update globally to `~/.wtw/module/` |
+| `wtw install [--skip-profile]` | Install this checkout globally to `~/.wtw/module/` |
+| `wtw update [--check] [--yes] [--force]` | Update the global install to the latest PowerShell Gallery release |
 | `wtw skill [--agent claude\|agents\|all]` | Install AI skill into current repo for agent support |
 | `wtw host [list\|discover\|add\|remove\|sync\|trust\|test]` | Manage remote machines for `--on` |
 | `wtw --on <host> <editor> <name>` | Open a worktree that lives on another machine (see [Remote worktrees](#remote-worktrees)) |
+| `wtw --at <host> ...` | Alias of `--on` |
 
 ## Remote worktrees
 
@@ -199,6 +237,7 @@ wtw list --on at            # what does that machine have?
 wtw --on at cursor auth     # open its "auth" worktree here, in Cursor
 wtw at cursor auth          # same thing — bare host shorthand
 wtw --on at go auth         # ssh into that worktree: pwsh, right directory
+wtw --at at cursor auth     # `--at` is an alias of `--on`
 ```
 
 ### `go` — a shell in the remote worktree

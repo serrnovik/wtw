@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.10'
+    ModuleVersion     = '0.2.11'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -29,6 +29,7 @@
         'Set-WtwColor'
         'Sync-WtwWorkspace'
         'Unregister-WtwEntry'
+        'Update-Wtw'
     )
     AliasesToExport   = @('wtw')
     CmdletsToExport   = @()
@@ -38,7 +39,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'Adds remote worktrees: `wtw --on <host> cursor <name>` opens a worktree that lives on another machine over Remote-SSH, discovering it by asking that machine''s own wtw rather than mirroring its registry. `wtw host` manages those machines and keeps ~/.ssh/config.d/wtw in sync, since the editor resolves hosts through the ssh client: `discover` registers everything on your tailnet (Tailscale, taking the platform from it and skipping devices that cannot host a worktree), `show` describes the effective config, `trust` compares host-key fingerprints against ones you already trust, and `test` diagnoses a failure across addresses, ssh config and the remote wtw. Addresses are an ordered candidate list probed at sync time, classified by transport (tailscale / zerotier / mdns / lan); `--via` picks one, either persistently via `host add` or for a single command via `wtw --on <host> <cmd> --via <transport>`. `editor` in the config now also accepts an ordered chain (["cursor","code"]) — first runnable wins. With --on, `go` opens an interactive pwsh inside the remote worktree — right directory, remote profile, and the local tab titled and coloured from that worktree''s own registry entry. Workspace colors now pick their foreground by WCAG contrast ratio instead of a brightness threshold, so chrome text stays readable on mid-tone palette entries in both light and dark themes, and the active tab gets a border so the current file is identifiable by more than its fill. Internally, the VS Code family (prefixes, CLI candidates, app bundles, Remote-SSH extension ids, settings dirs) comes from one table instead of four lists that could drift.'
+            ReleaseNotes = '`wtw update` replaces the installed copy at ~/.wtw/module with the latest PowerShell Gallery release, and is now a separate command from `wtw install`, which installs the checkout you run it from. The two used to be aliases, so `wtw update` from a normal shell hit the self-install guard and refused to do anything. Which command wtw offers depends on how the running copy was installed: `wtw install` records that in ~/.wtw/module/INSTALLATION.json, and the once-per-session update notice reads it, so a hand-installed copy is no longer told to run `Update-Module wtw` — a command that either errors or updates a copy no loader imports, since the profile snippet, the zsh and bash wrappers and the Windows cmd shim all name ~/.wtw/module/wtw.psm1 by path. A leftover `Install-Module wtw` on PSModulePath is reported and can be removed, because a bare `Import-Module wtw` resolves to that one instead. A local build newer than the published release, or the same version, is reported as current rather than as a problem. `--at` is accepted as an alias of `--on`. Workspace colours now cover every key the Peacock extension also writes, including the command centre, status bar and horizontal activity bar, so nothing is left for it to fill in; wtw records the colour as `wtw.color` rather than `peacock.color`, which is what stopped Peacock re-applying its own palette — in Cursor it forces the title bar and command centre foreground to #595959 whatever the background is. Generated window titles drop the literal spaces around ${separator} so an editor-less window reads "name — Cursor" instead of "name —   — Cursor", and the selected file shows once one is open.'
         }
     }
 }

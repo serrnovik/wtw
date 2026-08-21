@@ -30,7 +30,11 @@ function Install-Wtw {
     if ($sourceDir -eq $installDirResolved) {
         Write-Host ''
         Write-Host '  Cannot install from the global copy — it would delete itself.' -ForegroundColor Red
-        Write-Host '  Run from the repo source instead:' -ForegroundColor Yellow
+        Write-Host '  To pull the latest published release instead:' -ForegroundColor Yellow
+        Write-Host ''
+        Write-Host '    wtw update' -ForegroundColor DarkGray
+        Write-Host ''
+        Write-Host '  To install your own build, run from the repo source:' -ForegroundColor Yellow
         Write-Host ''
         Write-Host '    cd <repo>/devops/worktree-workspace' -ForegroundColor DarkGray
         Write-Host '    Import-Module ./wtw.psm1 -Force; wtw install' -ForegroundColor DarkGray
@@ -96,6 +100,14 @@ function Install-Wtw {
         if (Test-Path $shellDest) { Remove-Item $shellDest -Recurse -Force }
         Copy-Item -Path $shellSrc -Destination $shellDest -Recurse -Force
     }
+
+    # Stamp where this copy came from. `wtw update` reads it to decide whether it
+    # is replacing a hand-installed build (and should say so) or refreshing a
+    # Gallery one, and Write-WtwUpdateNotice reads it to print an update command
+    # that actually applies to this install.
+    $installedVersion = $null
+    try { $installedVersion = (Import-PowerShellDataFile -LiteralPath $manifestFile).ModuleVersion } catch { $installedVersion = $null }
+    Write-WtwInstallRecord -InstallRoot $installDir -Origin 'Manual' -Version $installedVersion -SourcePath $sourceDir
 
     Write-Host "  Module installed to $installDir" -ForegroundColor Green
 

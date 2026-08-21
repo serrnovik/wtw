@@ -114,10 +114,10 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
         'workspace', 'ws'
     )
 
-    # `--on <host>` value completion.
+    # `--on <host>` value completion (`--at` is the same flag).
     if ($elems.Count -ge 2) {
         $prevToken = $elems[$elems.Count - 2].Extent.Text
-        if ($prevToken -ieq '--on') {
+        if ($prevToken -ieq '--on' -or $prevToken -ieq '--at') {
             Get-WtwHostNames | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
                 [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', "remote host $_")
             }

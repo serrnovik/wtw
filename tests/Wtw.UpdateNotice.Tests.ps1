@@ -4,6 +4,8 @@ BeforeAll {
     # property reader they depend on.
     . "$PSScriptRoot/../private/Get-WtwPropertyNames.ps1"
     . "$PSScriptRoot/../private/Write-WtwUpdateNotice.ps1"
+    # The notice picks its update command from how wtw was installed.
+    . "$PSScriptRoot/../private/Get-WtwInstallInfo.ps1"
 
     $script:WtwModuleRoot = (Resolve-Path "$PSScriptRoot/..").Path
     $script:testRoot = Join-Path ([IO.Path]::GetTempPath()) ('wtw-update-' + [guid]::NewGuid().ToString('N'))
@@ -47,7 +49,8 @@ Describe 'Write-WtwUpdateNotice' {
         $second = Get-WtwTestNotice -CachePath $cache -StatePath $state
 
         $first | Should -Match 'wtw 99\.0\.0 is available'
-        $first | Should -Match 'wtw install'
+        # Running from a checkout: git, not the Gallery.
+        $first | Should -Match 'git pull, then wtw install'
         $second | Should -BeNullOrEmpty
     }
 
@@ -136,6 +139,39 @@ Describe 'Invoke-Wtw update-notice wiring' {
             Invoke-Wtw '__aliases' | Out-Null
             Should -Invoke Write-WtwUpdateNotice -Times 0 -Exactly
         }
+    }
+}
+
+Describe 'Write-WtwUpdateNotice install flavours' {
+    It 'points a hand-installed copy at `wtw update`, not at Update-Module' {
+        # Update-Module only knows about copies PowerShellGet installed. Aimed at
+        # ~/.wtw/module it either errors or updates a copy no loader imports.
+        $env:WTW_SHELL_SESSION = 'test-manual-flavour'
+        $cache = New-WtwTestCache
+        $state = Join-Path $script:testRoot 'state-manual.json'
+
+        $output = InModuleScope wtw -Parameters @{ Cache = $cache; State = $state } {
+            param($Cache, $State)
+            Mock Get-WtwInstallInfo { [pscustomobject]@{ Flavour = 'Manual'; ModuleRoot = '/x'; UpdateCommand = 'wtw update' } }
+            (& { Write-WtwUpdateNotice -CachePath $Cache -StatePath $State -Force } 6>&1 | Out-String)
+        }
+
+        $output | Should -Match 'wtw update'
+        $output | Should -Not -Match 'Update-Module'
+    }
+
+    It 'still announces the version when install detection fails' {
+        $env:WTW_SHELL_SESSION = 'test-broken-probe'
+        $cache = New-WtwTestCache
+        $state = Join-Path $script:testRoot 'state-broken.json'
+
+        $output = InModuleScope wtw -Parameters @{ Cache = $cache; State = $state } {
+            param($Cache, $State)
+            Mock Get-WtwInstallInfo { throw 'probe exploded' }
+            (& { Write-WtwUpdateNotice -CachePath $Cache -StatePath $State -Force } 6>&1 | Out-String)
+        }
+
+        $output | Should -Match 'wtw 99\.0\.0 is available'
     }
 }
 

@@ -17,6 +17,24 @@ Describe 'Split-WtwOnHostArgs' {
         $result.Args | Should -Be @('cursor', 'auth')
     }
 
+    It 'accepts --at as an alias of --on' {
+        $result = Split-WtwOnHostArgs -ArgList @('--at', 'at', 'cursor', 'auth') -KnownHosts @('at')
+        $result.Host | Should -Be 'at'
+        $result.Args | Should -Be @('cursor', 'auth')
+    }
+
+    It 'accepts the single-dash -at spelling too' {
+        $result = Split-WtwOnHostArgs -ArgList @('cursor', 'auth', '-at', 'at') -KnownHosts @('at')
+        $result.Host | Should -Be 'at'
+        $result.Args | Should -Be @('cursor', 'auth')
+    }
+
+    It 'drops a dangling --at rather than swallowing the next flag' {
+        $result = Split-WtwOnHostArgs -ArgList @('cursor', '--at') -KnownHosts @('at')
+        $result.Host | Should -BeNullOrEmpty
+        $result.Args | Should -Be @('cursor')
+    }
+
     It 'strips a trailing --on' {
         $result = Split-WtwOnHostArgs -ArgList @('cursor', 'auth', '--on', 'at') -KnownHosts @('at')
         $result.Host | Should -Be 'at'

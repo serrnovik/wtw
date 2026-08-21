@@ -9,6 +9,7 @@ function Split-WtwOnHostArgs {
 
         Two accepted forms:
           wtw --on at cursor auth     explicit, position-independent
+                                      (`--at` is an alias of `--on`)
           wtw at cursor auth          shorthand — only when the first token is a
                                       known host AND something follows it
 
@@ -42,13 +43,17 @@ function Split-WtwOnHostArgs {
     while ($i -lt $items.Count) {
         $arg = "$($items[$i])"
 
-        if ($arg -ieq '--on' -or $arg -ieq '-on') {
+        # `--at` is an accepted spelling of `--on`; both read naturally against a
+        # host name ("--on at" / "--at at"). Nothing else in wtw claims either
+        # token, and no parameter starts with "At", so PowerShell prefix matching
+        # cannot turn `-at` into something else.
+        if ($arg -ieq '--on' -or $arg -ieq '-on' -or $arg -ieq '--at' -or $arg -ieq '-at') {
             if (($i + 1) -lt $items.Count) {
                 $targetHost = "$($items[$i + 1])"
                 $i += 2
                 continue
             }
-            # Dangling `--on` — drop it and let the caller report a missing host.
+            # Dangling selector — drop it and let the caller report a missing host.
             $i++
             continue
         }

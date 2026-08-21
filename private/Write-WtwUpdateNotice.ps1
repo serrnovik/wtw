@@ -302,9 +302,23 @@ function Write-WtwUpdateNotice {
         Save-WtwUpdateNoticeState -Path $stateFile -State $state `
             -NotifiedSession $sessionKey -NotifiedVersion $latestVersion.ToString()
 
+        # The update command depends on how this copy was installed. Telling a
+        # hand-installed copy to run `Update-Module wtw` either errors outright or
+        # updates a copy the shell never loads. Gallery copies are skipped here
+        # deliberately — enumerating PSModulePath is too slow for a notice that
+        # runs on every command.
+        # Guarded: the notice is the point, the tailored command is the garnish.
+        # An install probe that fails must not swallow "a new version exists".
+        $install = try { Get-WtwInstallInfo } catch { $null }
+
         Write-Host ''
         Write-Host ("  wtw {0} is available (you have {1})." -f $latestVersion, $currentVersion) -ForegroundColor Cyan
-        Write-Host '  Update: wtw install     (or: Update-Module wtw -Scope CurrentUser)' -ForegroundColor DarkGray
+        if ($install -and $install.Flavour -eq 'Repo') {
+            Write-Host ("  You are running from a checkout at {0}" -f $install.ModuleRoot) -ForegroundColor DarkGray
+            Write-Host '  Update: git pull, then wtw install' -ForegroundColor DarkGray
+        } else {
+            Write-Host '  Update: wtw update' -ForegroundColor DarkGray
+        }
     } catch {
         # An update hint must never slow down, interrupt, or fail a wtw command.
     }
