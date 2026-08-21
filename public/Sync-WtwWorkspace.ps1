@@ -29,7 +29,9 @@ function Resolve-WtwSyncTargetFromFile {
         if ($repoEntry -and $repoEntry.worktrees -and (Get-WtwPropertyNames -Object $repoEntry.worktrees) -contains $wtName) { "$rn/$wtName" } else { "$rn/main" }
     } else { $null }
     $authColor = if ($taskKey -and (Get-WtwPropertyNames -Object $colors.assignments) -contains $taskKey) { $colors.assignments.$taskKey } else { $null }
-    $workspacePeacockColor = $wsContent.settings.'peacock.color'
+    # `wtw.color` since wtw stopped writing `peacock.color` (which made the Peacock
+    # extension re-apply its own palette over ours); older files still have the latter.
+    $workspacePeacockColor = $wsContent.settings.'wtw.color' ?? $wsContent.settings.'peacock.color'
 
     # Determine color source preference
     $canPrompt = [Environment]::UserInteractive
@@ -44,7 +46,7 @@ function Resolve-WtwSyncTargetFromFile {
         Write-Host ''
         Write-Host '  Which color should drive this sync?' -ForegroundColor Cyan
         Write-Host '    [J] colors.json assignment (default)' -ForegroundColor Gray
-        Write-Host '    [W] peacock.color in the workspace file' -ForegroundColor Gray
+        Write-Host '    [W] wtw.color in the workspace file' -ForegroundColor Gray
         $reply = Read-Host '  Press J or W (Enter = J)'
         $preferWorkspace = (($reply ?? '').Trim()) -match '^[Ww]'
     }
@@ -110,7 +112,7 @@ function Sync-WtwWorkspace {
     .PARAMETER Repo
         Limit --All scope to a specific repo alias or name.
     .PARAMETER ColorSource
-        Choose color precedence: 'Json' (colors.json first) or 'Workspace' (peacock.color first). Omit to prompt interactively.
+        Choose color precedence: 'Json' (colors.json first) or 'Workspace' (wtw.color first). Omit to prompt interactively.
     .EXAMPLE
         wtw sync --all --dry-run
         Preview syncing all managed workspaces without making changes.
@@ -129,7 +131,7 @@ function Sync-WtwWorkspace {
         [string] $Template,  # override template source for this sync
         [string] $Repo,      # limit --all to a specific repo
 
-        # Single-file sync only: prefer colors.json (default) vs workspace peacock.color. Omit to prompt when interactive.
+        # Single-file sync only: prefer colors.json (default) vs workspace wtw.color. Omit to prompt when interactive.
         [ValidateSet('Json', 'Workspace', IgnoreCase = $true)]
         [string] $ColorSource
     )

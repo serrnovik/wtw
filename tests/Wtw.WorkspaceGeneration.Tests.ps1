@@ -101,7 +101,10 @@ Describe 'New-WtwWorkspaceFile' {
             -Managed
 
         $ws = Get-Content $outPath -Raw | ConvertFrom-Json
-        $ws.settings.'peacock.color' | Should -Be '#b300b3'
+        $ws.settings.'wtw.color' | Should -Be '#b300b3'
+        # peacock.color is deliberately absent: writing it makes the Peacock extension
+        # re-apply its own palette over wtw's on the next config change.
+        $ws.settings.PSObject.Properties.Name | Should -Not -Contain 'peacock.color'
         $ws.settings.'workbench.colorCustomizations'.'titleBar.activeBackground' | Should -Be '#b300b3'
         $ws.settings.'workbench.colorCustomizations'.'tab.activeBackground' | Should -Be '#b300b3'
     }
@@ -141,7 +144,11 @@ Describe 'New-WtwWorkspaceFile' {
         $ws.folders[0].name | Should -Be '🟠 Feature workspace'
         $ws.settings.'wtw.task' | Should -Be 'feature-workspace'
         $ws.settings.'wtw.prettyName' | Should -Be '🟠 Feature workspace'
-        $ws.settings.'window.title' | Should -Be '🟠 Feature workspace ${separator} ${dirty}${activeEditorShort}${separator}${appName}'
+        # No literal spaces around ${separator}: VS Code only collapses a conditional
+        # separator when the segments either side of it are empty, and a lone " " is a
+        # non-empty static segment, so the spaced form rendered "name  —   — Cursor"
+        # in a window with no editor open.
+        $ws.settings.'window.title' | Should -Be '🟠 Feature workspace${separator}${dirty}${activeEditorShort}${separator}${appName}'
     }
 
     It 'keeps emoji while making a cross-platform workspace file stem' {

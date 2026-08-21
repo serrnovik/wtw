@@ -105,7 +105,18 @@ function New-WtwWorkspaceFile {
         $peacockBlock = ConvertTo-PeacockColorBlock $Color
         $colorCustomizations = [PSCustomObject]$peacockBlock
         $workspace.settings | Add-Member -NotePropertyName 'workbench.colorCustomizations' -NotePropertyValue $colorCustomizations -Force
-        $workspace.settings | Add-Member -NotePropertyName 'peacock.color' -NotePropertyValue $Color -Force
+        # `wtw.color`, not `peacock.color`. The Peacock extension re-applies its own
+        # palette whenever any `peacock.*` setting changes, which is exactly what
+        # rewriting a workspace file under a live editor does — and in Cursor it then
+        # hard-codes titleBar.activeForeground and commandCenter.foreground to #595959
+        # regardless of the background, i.e. mid-grey on saturated chrome. Its
+        # `keepForegroundColor` opt-out deletes those keys rather than leaving ours in
+        # place, so it is not a fix either. wtw already writes the whole palette; not
+        # naming the trigger setting is what keeps Peacock out of the loop. Anything
+        # that used to read peacock.color reads wtw.color first and falls back.
+        $workspace.settings | Add-Member -NotePropertyName 'wtw.color' -NotePropertyValue $Color -Force
+        $workspace.settings.PSObject.Properties.Remove('peacock.color')
+        $workspace.settings.PSObject.Properties.Remove('peacock.keepForegroundColor')
     }
 
     # Add wtw metadata
@@ -115,7 +126,13 @@ function New-WtwWorkspaceFile {
         $workspace.settings | Add-Member -NotePropertyName 'wtw.repo' -NotePropertyValue $RepoName -Force
         $workspace.settings | Add-Member -NotePropertyName 'wtw.task' -NotePropertyValue $metadataTaskName -Force
         $workspace.settings | Add-Member -NotePropertyName 'wtw.prettyName' -NotePropertyValue $Name -Force
-        $windowTitle = '{0} ${{separator}} ${{dirty}}${{activeEditorShort}}${{separator}}${{appName}}' -f $Name
+        # No literal spaces around ${separator}. VS Code drops a conditional separator
+        # only when the segments on either side of it are empty, and a lone " " is a
+        # non-empty static segment — which is why a window with no editor open read
+        # "name  —   — Cursor" instead of "name — Cursor". Without the spaces the
+        # title collapses to "name — Cursor", and to "name — file.ts — Cursor" once a
+        # file is selected.
+        $windowTitle = '{0}${{separator}}${{dirty}}${{activeEditorShort}}${{separator}}${{appName}}' -f $Name
         $workspace.settings | Add-Member -NotePropertyName 'window.title' -NotePropertyValue $windowTitle -Force
         $workspace.settings | Add-Member -NotePropertyName 'wtw.templateSource' -NotePropertyValue $TemplatePath -Force
         $workspace.settings | Add-Member -NotePropertyName 'wtw.generatedAt' -NotePropertyValue (Get-Date -Format 'o') -Force

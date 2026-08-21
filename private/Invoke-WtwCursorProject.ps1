@@ -521,7 +521,7 @@ function Register-WtwCursorProject {
         history.recentlyOpenedPathsList. The schema does not expose a stable
         custom label field; Cursor renders the workspace from the
         .code-workspace path/name. Colors are carried by the workspace file's
-        workbench.colorCustomizations / peacock.color settings.
+        workbench.colorCustomizations / wtw.color settings.
     #>
     [CmdletBinding()]
     param(

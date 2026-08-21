@@ -493,7 +493,9 @@ Templates define the shared workspace structure and use `{{WTW_*}}` placeholders
 | `{{WTW_CODE_FOLDER}}` | Absolute path to the worktree |
 | `{{WTW_ENV_XYZ}}` | Value of the `XYZ` environment variable on the host machine. If `XYZ` is not set, the entire folder block containing this placeholder is safely skipped and omitted from the generated workspace file. |
 
-Colors (`workbench.colorCustomizations`, `peacock.color`) are **not** in the template — wtw injects them automatically from the color palette.
+Colors (`workbench.colorCustomizations`, `wtw.color`) are **not** in the template — wtw injects them automatically from the color palette.
+
+wtw writes `wtw.color` rather than `peacock.color` on purpose. The Peacock extension re-applies its own palette whenever a `peacock.*` setting changes — which is what rewriting a workspace file under a live editor does — and in Cursor it hard-codes the title bar and command center foreground to `#595959` whatever the background is. wtw already writes the full palette with WCAG-checked foregrounds, so it simply does not name the setting that wakes Peacock up. Workspaces that still carry `peacock.color` are read as a fallback.
 
 ### Template resolution
 
@@ -742,7 +744,7 @@ them and `wtw remove` cleans that registration up:
   `wtw cursor <name>` refreshes that entry before opening it. Cursor does not
   expose a separate stable label field in this state; it displays the workspace
   from the generated workspace filename/folder name. Colors come from the
-  workspace's `workbench.colorCustomizations` and `peacock.color` settings.
+  workspace's `workbench.colorCustomizations` and `wtw.color` settings.
 - **Superset** — creates/removes a local workspace named from the same pretty
   name when the Superset CLI is installed and the repo project can be matched.
 - **SourceGit** — adds/removes the worktree from managed repositories when

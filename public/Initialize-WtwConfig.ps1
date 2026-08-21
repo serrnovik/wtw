@@ -176,11 +176,15 @@ function Initialize-WtwConfig {
 
     # Pick/record main color
     $mainColor = New-WtwColor -RepoName $registryKey -TaskName 'main'
-    # If existing workspace has a Peacock color, prefer that
+    # If an existing workspace already carries a color, prefer that. `wtw.color` is
+    # the current key; `peacock.color` is what wtw wrote before the Peacock extension
+    # was taken out of the loop, so pre-existing workspaces still resolve.
     if ($templateSource -and (Test-Path $templateSource)) {
         $templateContent = Read-JsoncFile $templateSource
-        if ($templateContent -and $templateContent.settings -and $templateContent.settings.'peacock.color') {
-            $existingColor = $templateContent.settings.'peacock.color'
+        $existingColor = if ($templateContent -and $templateContent.settings) {
+            $templateContent.settings.'wtw.color' ?? $templateContent.settings.'peacock.color'
+        } else { $null }
+        if ($existingColor) {
             # Only use it if this is the repo's own workspace (not a shared template)
             if (-not $Template) {
                 $mainColor = $existingColor

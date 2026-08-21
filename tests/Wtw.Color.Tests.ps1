@@ -8,12 +8,34 @@ Describe 'ConvertTo-PeacockColorBlock' {
         $result = ConvertTo-PeacockColorBlock '#e05d44'
         $result | Should -Not -BeNullOrEmpty
         $result.Keys | Should -Contain 'titleBar.activeBackground'
-        $result.Keys | Should -Contain 'peacock.color' -Not
-        # peacock.color is set separately, not in the block
+        $result.Keys | Should -Contain 'wtw.color' -Not
+        # wtw.color is set separately, not in the block
         $result.Keys | Should -Contain 'activityBar.activeBackground'
         $result.Keys | Should -Contain 'statusBarItem.remoteBackground'
         $result.Keys | Should -Contain 'commandCenter.activeForeground'
         $result.Keys | Should -Contain 'commandCenter.inactiveForeground'
+        # Every key the Peacock extension would otherwise fill in itself, so an
+        # editor that also has Peacock installed has nothing left to "correct".
+        $result.Keys | Should -Contain 'commandCenter.foreground'
+        $result.Keys | Should -Contain 'titleBar.activeForeground'
+        $result.Keys | Should -Contain 'statusBar.foreground'
+        $result.Keys | Should -Contain 'activityBar.foreground'
+        $result.Keys | Should -Contain 'activityBarTop.foreground'
+    }
+
+    It 'gives every foreground at least WCAG AA contrast against the color it sits on' {
+        foreach ($base in @('#e05d44', '#b01ad5', '#96dd2c', '#00ffff', '#f9a825', '#0000ff', '#ffff00')) {
+            $result = ConvertTo-PeacockColorBlock $base
+            foreach ($pair in @(
+                    @('titleBar.activeForeground', 'titleBar.activeBackground'),
+                    @('commandCenter.foreground', 'titleBar.activeBackground'),
+                    @('statusBar.foreground', 'statusBar.background'),
+                    @('tab.activeForeground', 'tab.activeBackground'),
+                    @('activityBar.foreground', 'activityBar.background'))) {
+                $ratio = Get-WtwContrastRatio -Foreground $result[$pair[0]] -Background $result[$pair[1]]
+                $ratio | Should -BeGreaterOrEqual 4.5 -Because "$($pair[0]) on $base"
+            }
+        }
     }
 
     It 'uses the base color for titleBar.activeBackground' {
