@@ -57,3 +57,32 @@ Describe 'wtw module loading' {
         }
     }
 }
+
+Describe 'Get-WtwWorkspaceRecordedColor under the module StrictMode' {
+    It 'returns nothing for the shipped minimal template' {
+        InModuleScope wtw {
+            $templatePath = Join-Path $script:WtwModuleRoot 'templates' 'minimal.code-workspace.template'
+            $workspace = Read-JsoncFile $templatePath
+
+            { Get-WtwWorkspaceRecordedColor -Workspace $workspace } | Should -Not -Throw
+            Get-WtwWorkspaceRecordedColor -Workspace $workspace | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'prefers wtw.color and falls back to peacock.color' {
+        InModuleScope wtw {
+            $withCurrent = [PSCustomObject]@{
+                settings = [PSCustomObject]@{
+                    'wtw.color'     = '#111111'
+                    'peacock.color' = '#222222'
+                }
+            }
+            $legacyOnly = [PSCustomObject]@{
+                settings = [PSCustomObject]@{ 'peacock.color' = '#222222' }
+            }
+
+            Get-WtwWorkspaceRecordedColor -Workspace $withCurrent | Should -Be '#111111'
+            Get-WtwWorkspaceRecordedColor -Workspace $legacyOnly | Should -Be '#222222'
+        }
+    }
+}

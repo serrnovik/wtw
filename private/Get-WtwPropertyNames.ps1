@@ -69,3 +69,24 @@ function Get-WtwPropertyValue {
 
     return $property.Value
 }
+
+function Get-WtwWorkspaceRecordedColor {
+    <#
+    .SYNOPSIS
+        Read a workspace's recorded color without violating strict mode.
+    .DESCRIPTION
+        `wtw.color` is current; `peacock.color` is the pre-Peacock-exit fallback.
+        The shipped minimal template has an empty settings object, so a dotted
+        `settings.'wtw.color'` read throws under Set-StrictMode -Version Latest —
+        which is `wtw init` of a repo that has no existing workspace yet.
+    #>
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [object] $Workspace
+    )
+
+    $settings = Get-WtwPropertyValue -Object $Workspace -Name 'settings'
+    return (Get-WtwPropertyValue -Object $settings -Name 'wtw.color') ??
+        (Get-WtwPropertyValue -Object $settings -Name 'peacock.color')
+}

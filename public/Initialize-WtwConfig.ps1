@@ -181,9 +181,7 @@ function Initialize-WtwConfig {
     # was taken out of the loop, so pre-existing workspaces still resolve.
     if ($templateSource -and (Test-Path $templateSource)) {
         $templateContent = Read-JsoncFile $templateSource
-        $existingColor = if ($templateContent -and $templateContent.settings) {
-            $templateContent.settings.'wtw.color' ?? $templateContent.settings.'peacock.color'
-        } else { $null }
+        $existingColor = Get-WtwWorkspaceRecordedColor -Workspace $templateContent
         if ($existingColor) {
             # Only use it if this is the repo's own workspace (not a shared template)
             if (-not $Template) {

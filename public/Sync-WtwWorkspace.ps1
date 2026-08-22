@@ -12,8 +12,9 @@ function Resolve-WtwSyncTargetFromFile {
     $wsContent = Read-JsoncFile $TargetPath
     if (-not $wsContent) { return $null }
 
-    $rn = $wsContent.settings.'wtw.repo'
-    $tn = $wsContent.settings.'wtw.task'
+    $settings = Get-WtwPropertyValue -Object $wsContent -Name 'settings'
+    $rn = Get-WtwPropertyValue -Object $settings -Name 'wtw.repo'
+    $tn = Get-WtwPropertyValue -Object $settings -Name 'wtw.task'
 
     $colors = Get-WtwColors
     $taskKey = if ($tn -and $rn) {
@@ -31,7 +32,7 @@ function Resolve-WtwSyncTargetFromFile {
     $authColor = if ($taskKey -and (Get-WtwPropertyNames -Object $colors.assignments) -contains $taskKey) { $colors.assignments.$taskKey } else { $null }
     # `wtw.color` since wtw stopped writing `peacock.color` (which made the Peacock
     # extension re-apply its own palette over ours); older files still have the latter.
-    $workspacePeacockColor = $wsContent.settings.'wtw.color' ?? $wsContent.settings.'peacock.color'
+    $workspacePeacockColor = Get-WtwWorkspaceRecordedColor -Workspace $wsContent
 
     # Determine color source preference
     $canPrompt = [Environment]::UserInteractive
@@ -57,13 +58,13 @@ function Resolve-WtwSyncTargetFromFile {
         wsFile         = $TargetPath
         repoName       = $rn
         wsName         = $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
-        displayName    = $wsContent.settings.'wtw.prettyName' ?? $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
-        codeFolderPath = $wsContent.settings.'wtw.worktreePath' ?? ($wsContent.folders[0].path)
+        displayName    = (Get-WtwPropertyValue -Object $settings -Name 'wtw.prettyName') ?? $tn ?? [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
+        codeFolderPath = (Get-WtwPropertyValue -Object $settings -Name 'wtw.worktreePath') ?? ($wsContent.folders[0].path)
         color          = $resolvedColor
-        branch         = $wsContent.settings.'wtw.branch'
-        worktreePath   = $wsContent.settings.'wtw.worktreePath'
-        templatePath   = $(if ($TemplateOverride) { $TemplateOverride } else { $wsContent.settings.'wtw.templateSource' })
-        isManaged      = [bool]$wsContent.settings.'wtw.managed'
+        branch         = Get-WtwPropertyValue -Object $settings -Name 'wtw.branch'
+        worktreePath   = Get-WtwPropertyValue -Object $settings -Name 'wtw.worktreePath'
+        templatePath   = $(if ($TemplateOverride) { $TemplateOverride } else { Get-WtwPropertyValue -Object $settings -Name 'wtw.templateSource' })
+        isManaged      = [bool](Get-WtwPropertyValue -Object $settings -Name 'wtw.managed')
     }
 }
 
