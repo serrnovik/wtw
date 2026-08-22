@@ -480,9 +480,13 @@ function Remove-WtwCodexProjectLabel {
     $normalizedProjectPath = Get-WtwCodexNormalizedPath -Path $ProjectPath
     foreach ($project in @(Get-WtwCodexLocalProjectEntries -State $state -ProjectPath $ProjectPath)) {
         $projectId = [string]$project.Name
-        $remainingRoots = @($project.Value.rootPaths) | Where-Object {
+        # Re-wrap the filter: Where-Object on the last remaining root emits
+        # nothing ($null), and on a single leftover root emits a bare string.
+        # `.Count` on either throws under Set-StrictMode -Version Latest — which
+        # is `wtw del` of a normal one-root ChatGPT project.
+        $remainingRoots = @(@($project.Value.rootPaths) | Where-Object {
             $_ -and (Get-WtwCodexNormalizedPath -Path ([string]$_)) -ne $normalizedProjectPath
-        }
+        })
         if ($remainingRoots.Count -eq 0) {
             $state.'local-projects'.PSObject.Properties.Remove($projectId)
             Remove-WtwCodexArrayValue -State $state -PropertyName 'project-order' -Value $projectId

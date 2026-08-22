@@ -285,4 +285,43 @@ Describe 'Codex project state under the module StrictMode' {
             $names | Should -Contain 'New One'
         }
     }
+
+    It 'removes a single-root project without reading Count on null' {
+        InModuleScope wtw -Parameters @{ StatePath = $script:strictStatePath; ProjectPath = $script:strictProjectPath } {
+            param($StatePath, $ProjectPath)
+            Set-WtwCodexProjectLabel -ProjectPath $ProjectPath -PrettyName 'To Delete' -GlobalStatePath $StatePath | Out-Null
+
+            { Remove-WtwCodexProjectLabel -ProjectPath $ProjectPath -GlobalStatePath $StatePath } |
+                Should -Not -Throw
+            Get-WtwCodexProjectLabel -ProjectPath $ProjectPath -GlobalStatePath $StatePath | Should -BeNullOrEmpty
+
+            $state = Get-Content -Path $StatePath -Raw | ConvertFrom-Json
+            @($state.'local-projects'.PSObject.Properties.Value.name) | Should -Contain 'unrelated project'
+            @($state.'local-projects'.PSObject.Properties.Value.name) | Should -Not -Contain 'To Delete'
+        }
+    }
+
+    It 'keeps a multi-root project after dropping one root' {
+        InModuleScope wtw -Parameters @{
+            StatePath = $script:strictStatePath
+            ProjectPath = $script:strictProjectPath
+            AlternateRoot = (Join-Path $script:strictTempDir 'shared-root')
+        } {
+            param($StatePath, $ProjectPath, $AlternateRoot)
+            $projectId = [guid]::NewGuid().ToString()
+            $state = Get-Content -Path $StatePath -Raw | ConvertFrom-Json
+            $state.'local-projects' | Add-Member -NotePropertyName $projectId -NotePropertyValue ([PSCustomObject]@{
+                id        = $projectId
+                name      = 'Shared Project'
+                rootPaths = @($ProjectPath, $AlternateRoot)
+            }) -Force
+            $state | ConvertTo-Json -Depth 10 | Set-Content -Path $StatePath -Encoding utf8
+
+            { Remove-WtwCodexProjectLabel -ProjectPath $ProjectPath -GlobalStatePath $StatePath } |
+                Should -Not -Throw
+
+            $state = Get-Content -Path $StatePath -Raw | ConvertFrom-Json
+            $state.'local-projects'.PSObject.Properties[$projectId].Value.rootPaths | Should -Be @($AlternateRoot)
+        }
+    }
 }
