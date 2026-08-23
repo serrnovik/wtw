@@ -52,9 +52,9 @@ function Edit-WtwEntry {
         [Parameter(Position = 1)]
         [string] $NewName,
 
-        [string] $PrettyName,
+        [string[]] $PrettyName,
         [string] $Task,
-        [string] $Alias,
+        [string[]] $Alias,
         [string] $Key,
         [string] $Repo,
 
@@ -62,7 +62,7 @@ function Edit-WtwEntry {
         [switch] $NoSync
     )
 
-    if (-not $PrettyName -and $NewName) { $PrettyName = $NewName }
+    if (-not $PrettyName -and $NewName) { $PrettyName = @($NewName) }
 
     $nameFromCwd = -not $Name
     if (-not $Name) {
@@ -74,32 +74,13 @@ function Edit-WtwEntry {
         if ($nameFromCwd) { Write-Host "  Detected: $Name" -ForegroundColor DarkGray }
     }
 
-    $target = Resolve-WtwTarget $Name
+    $target = if ($Repo) { Resolve-WtwTarget -Name $Name -RepoAlias $Repo } else { Resolve-WtwTarget $Name }
     if (-not $target) { return }
 
-    if ($Repo) {
-        $registryCheck = Get-WtwRegistry
-        $resolvedRepoName = $null
-        foreach ($rn in (Get-WtwPropertyNames -Object $registryCheck.repos)) {
-            $r = $registryCheck.repos.$rn
-            if ($rn -eq $Repo -or (Test-WtwAliasMatch $r $Repo)) {
-                $resolvedRepoName = $rn
-                break
-            }
-        }
-        if (-not $resolvedRepoName) {
-            Write-Error "Unknown repo '$Repo' (not in registry)."
-            return
-        }
-        if ($target.RepoName -ne $resolvedRepoName) {
-            Write-Error "Target '$Name' resolves to repo '$($target.RepoName)', not '$resolvedRepoName' (--repo mismatch)."
-            return
-        }
-    }
-
-    $hasPretty = -not [string]::IsNullOrWhiteSpace($PrettyName)
+    $prettyText = Get-WtwJoinedEditValue -Value $PrettyName
+    $hasPretty = -not [string]::IsNullOrWhiteSpace($prettyText)
     $hasTask = -not [string]::IsNullOrWhiteSpace($Task)
-    $hasAlias = -not [string]::IsNullOrWhiteSpace($Alias)
+    $hasAlias = @($Alias | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
     $hasKey = -not [string]::IsNullOrWhiteSpace($Key)
     $hasEdits = $hasPretty -or $hasTask -or $hasAlias -or $hasKey
 
@@ -119,7 +100,7 @@ function Edit-WtwEntry {
         }
         Edit-WtwWorktreeRecord `
             -Target $target `
-            -PrettyName $PrettyName `
+            -PrettyName $prettyText `
             -Task $Task `
             -NoSync:$NoSync
         return
@@ -134,7 +115,16 @@ function Edit-WtwEntry {
     Edit-WtwRepoRecord `
         -Target $target `
         -Alias $aliasInput `
-        -Key $Key
+        -Key $Key `
+        -NoSync:$NoSync
+}
+
+function Get-WtwJoinedEditValue {
+    param([AllowNull()] [string[]] $Value)
+    if (-not $Value) { return $null }
+    $joined = (@($Value | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) -join ' ')
+    if ([string]::IsNullOrWhiteSpace($joined)) { return $null }
+    return $joined
 }
 
 function Show-WtwEditableRecord {
@@ -258,13 +248,23 @@ function Edit-WtwWorktreeRecord {
                 $newWsPath = Get-WtwCursorPrettyWorkspacePath -WorkspacePath $wsFile -PrettyName $prettyNow -RepoName $repoName
                 $newWsPath = [System.IO.Path]::GetFullPath($newWsPath)
                 $oldWsPath = [System.IO.Path]::GetFullPath($wsFile)
-                if ($newWsPath -ne $oldWsPath -and -not (Test-Path $newWsPath)) {
-                    Move-Item -LiteralPath $oldWsPath -Destination $newWsPath
-                    $saved | Add-Member -NotePropertyName 'workspace' -NotePropertyValue $newWsPath -Force
-                    $registry.repos.$repoName.worktrees.$newTask = $saved
-                    Save-WtwRegistry $registry
-                    $wsFile = $newWsPath
-                    Write-Host "  Workspace file: $(Split-Path $wsFile -Leaf)" -ForegroundColor DarkGray
+                if ($newWsPath -ne $oldWsPath) {
+                    $canMigrate = Resolve-WtwCursorStateConflict -PrettyName $prettyNow
+                    if ($canMigrate) {
+                        $migratedWorkspace = Move-WtwCursorWorkspaceForAgents `
+                            -WorkspacePath $wsFile `
+                            -PrettyName $prettyNow `
+                            -RepoName $repoName
+                        if ($migratedWorkspace -and $migratedWorkspace -ne $wsFile) {
+                            $saved | Add-Member -NotePropertyName 'workspace' -NotePropertyValue $migratedWorkspace -Force
+                            $registry.repos.$repoName.worktrees.$newTask = $saved
+                            Save-WtwRegistry $registry
+                            $wsFile = $migratedWorkspace
+                            Write-Host "  Workspace file: $(Split-Path $wsFile -Leaf)" -ForegroundColor DarkGray
+                        }
+                    } else {
+                        Write-Host '  Keeping existing workspace filename (Cursor Agents label not migrated).' -ForegroundColor DarkGray
+                    }
                 }
             }
 
@@ -286,12 +286,14 @@ function Edit-WtwRepoRecord {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [PSObject] $Target,
-        [string] $Alias,
-        [string] $Key
+        [string[]] $Alias,
+        [string] $Key,
+        [switch] $NoSync
     )
 
     $oldKey = $Target.RepoName
     $newKey = $oldKey
+    $workspacesToUpdate = @()
     if (-not [string]::IsNullOrWhiteSpace($Key)) {
         $newKey = $Key.Trim()
         if ([string]::IsNullOrWhiteSpace($newKey)) {
@@ -309,11 +311,11 @@ function Edit-WtwRepoRecord {
     $entry = $registry.repos.$oldKey
     $changed = @()
 
-    if (-not [string]::IsNullOrWhiteSpace($Alias)) {
+    if (@($Alias | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
         # Split-WtwAliasList returns `,@(...)` so a naive `@()` wrap nests it.
         [string[]] $aliasArray = Split-WtwAliasList -Value $Alias
         if ($aliasArray.Count -eq 0) {
-            Write-Error "Invalid --alias '$Alias'."
+            Write-Error "Invalid --alias '$($Alias -join ',')'."
             return
         }
         $collision = Test-WtwRepoIdentityCollision -Registry $registry -RepoName $oldKey -NewKey $oldKey -Aliases $aliasArray
@@ -332,13 +334,29 @@ function Edit-WtwRepoRecord {
             Write-Error "Repo '$newKey' is already in the registry."
             return
         }
-        $aliasesForCheck = if (-not [string]::IsNullOrWhiteSpace($Alias)) {
+        $aliasesForCheck = if (@($Alias | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
             [string[]](Split-WtwAliasList -Value $Alias)
         } else {
             Get-WtwRepoAliases $entry
         }
         $collision = Test-WtwRepoIdentityCollision -Registry $registry -RepoName $oldKey -NewKey $newKey -Aliases $aliasesForCheck
         if ($collision) { return }
+
+        $workspacesToUpdate = @()
+        if ($entry.worktrees) {
+            foreach ($task in (Get-WtwPropertyNames -Object $entry.worktrees)) {
+                $ws = Get-WtwPropertyValue -Object $entry.worktrees.$task -Name 'workspace'
+                if ($ws -and (Test-Path $ws)) { $workspacesToUpdate += $ws }
+            }
+        }
+        if (-not $NoSync) {
+            foreach ($ws in $workspacesToUpdate) {
+                if (-not (Update-WtwWorkspaceIdentity -Path $ws -RepoName $newKey)) {
+                    Write-Error "Could not update workspace '$ws' with repo key '$newKey'. Registry was not saved."
+                    return
+                }
+            }
+        }
 
         $registry.repos.$oldKey = $entry
         $registry.repos = Rename-WtwObjectProperty -Object $registry.repos -OldName $oldKey -NewName $newKey
@@ -354,6 +372,14 @@ function Edit-WtwRepoRecord {
     }
 
     Save-WtwRegistry $registry
+
+    if ($newKey -ne $oldKey -and -not $NoSync) {
+        foreach ($ws in @($workspacesToUpdate)) {
+            Write-Host '  Syncing workspace...' -ForegroundColor DarkGray
+            Sync-WtwWorkspace -Target $ws -ColorSource Json
+        }
+    }
+
     Write-Host ''
     Write-Host "  Updated repo $newKey ($($changed -join '; '))." -ForegroundColor Green
     Write-Host "  New shell aliases apply in a new terminal, or re-source the wtw wrapper." -ForegroundColor DarkGray
@@ -402,13 +428,14 @@ function Update-WtwWorkspaceIdentity {
     param(
         [Parameter(Mandatory)] [string] $Path,
         [string] $PrettyName,
-        [string] $TaskName
+        [string] $TaskName,
+        [string] $RepoName
     )
 
     $workspace = Read-JsoncFile $Path
-    if (-not $workspace) { return }
+    if (-not $workspace) { return $false }
     $settings = Get-WtwPropertyValue -Object $workspace -Name 'settings'
-    if (-not $settings) { return }
+    if (-not $settings) { return $false }
 
     if (-not [string]::IsNullOrWhiteSpace($PrettyName)) {
         $settings | Add-Member -NotePropertyName 'wtw.prettyName' -NotePropertyValue $PrettyName -Force
@@ -418,5 +445,14 @@ function Update-WtwWorkspaceIdentity {
     if (-not [string]::IsNullOrWhiteSpace($TaskName)) {
         $settings | Add-Member -NotePropertyName 'wtw.task' -NotePropertyValue $TaskName -Force
     }
-    $workspace | ConvertTo-Json -Depth 20 | Set-Content -Path $Path -Encoding utf8
+    if (-not [string]::IsNullOrWhiteSpace($RepoName)) {
+        $settings | Add-Member -NotePropertyName 'wtw.repo' -NotePropertyValue $RepoName -Force
+    }
+    try {
+        $workspace | ConvertTo-Json -Depth 20 | Set-Content -Path $Path -Encoding utf8
+        return $true
+    } catch {
+        Write-Error "Failed to write workspace identity to '$Path': $_"
+        return $false
+    }
 }

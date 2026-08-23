@@ -290,6 +290,10 @@ function Invoke-Wtw {
             # `--name` is the pretty/alias edit (same flag as create). The
             # target is the first positional, or cwd when omitted. A lone
             # `--name` with no target is therefore the new display name.
+            if ($splat.Contains('Name') -and $splat['Name'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '--name requires a value.'
+                return
+            }
             if ($pos.Count -gt 0) {
                 if ($splat.Contains('Name')) {
                     $splat['PrettyName'] = $splat['Name']

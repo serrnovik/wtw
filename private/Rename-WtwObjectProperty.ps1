@@ -23,6 +23,12 @@ function Rename-WtwObjectProperty {
     $result = [PSCustomObject]@{}
     if (-not $Object) { return $result }
 
+    $existing = Get-WtwPropertyNames -Object $Object
+    if ($OldName -ne $NewName -and $existing -contains $NewName) {
+        Write-Error "Cannot rename '$OldName' to '$NewName': destination already exists."
+        return $Object
+    }
+
     foreach ($prop in $Object.PSObject.Properties) {
         $name = if ($prop.Name -eq $OldName) { $NewName } else { $prop.Name }
         $result | Add-Member -NotePropertyName $name -NotePropertyValue $prop.Value
@@ -45,6 +51,12 @@ function Rename-WtwColorAssignmentKey {
     $colors = Get-WtwColors
     $names = Get-WtwPropertyNames -Object $colors.assignments
     if ($names -notcontains $OldKey) { return }
+    if ($names -contains $NewKey) {
+        Write-Host "  Color assignment '$NewKey' already exists; dropping stale '$OldKey'." -ForegroundColor DarkGray
+        $colors.assignments.PSObject.Properties.Remove($OldKey)
+        Save-WtwColors $colors
+        return
+    }
 
     $colors.assignments = Rename-WtwObjectProperty -Object $colors.assignments -OldName $OldKey -NewName $NewKey
     Save-WtwColors $colors
@@ -72,6 +84,7 @@ function Rename-WtwColorAssignmentRepoPrefix {
             $name = $NewRepo + $name.Substring($OldRepo.Length)
             $changed = $true
         }
+        if ((Get-WtwPropertyNames -Object $newAssignments) -contains $name) { continue }
         $newAssignments | Add-Member -NotePropertyName $name -NotePropertyValue $prop.Value
     }
     if (-not $changed) { return }

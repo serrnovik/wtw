@@ -147,6 +147,7 @@ _wtw_completion() {
         'unregister:Remove a registry entry only'
         'edit:Edit a registry record (name, task, aliases)'
         'rename:Alias for edit'
+        'ren:Alias for edit'
         'workspace:Generate a workspace file'
         'copy:Copy a workspace template'
         'sync:Synchronize workspace settings'

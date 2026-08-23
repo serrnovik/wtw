@@ -140,6 +140,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'unreg'; Tip = 'Alias for unregister' }
             @{ Name = 'edit'; Tip = 'Edit a registry record (name, task, aliases)' }
             @{ Name = 'rename'; Tip = 'Alias for edit' }
+            @{ Name = 'ren';    Tip = 'Alias for edit' }
             @{ Name = 'clean';       Tip = 'Clean stale AI worktrees' }
             @{ Name = 'agent';       Tip = 'Configure agentctl profile overlays' }
             @{ Name = 'skill';       Tip = 'Install AI skill into current repo' }
