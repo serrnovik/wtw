@@ -94,6 +94,39 @@ function Show-WtwCommandHelp {
         'rm'          { @('wtw remove <task>', 'Remove a worktree and its workspace file.', '', 'Arguments:', '  task    Name of the worktree to remove') }
         'unregister'  { @('wtw unregister <name>', 'Remove a repo or worktree from the wtw registry only (no git/disk changes).', 'Pairs with: wtw init (main repo), wtw add (worktree listing). For full worktree teardown use wtw remove.', '', 'Arguments:', '  name    Repo alias, path, worktree, or alias-task', '', 'Options:', '  --repo <name>   Disambiguate when the same task exists in multiple repos', '  --force         Skip confirmation') }
         'unreg'       { @('wtw unregister <name>', 'Remove a repo or worktree from the wtw registry only (no git/disk changes).', 'Pairs with: wtw init (main repo), wtw add (worktree listing). For full worktree teardown use wtw remove.', '', 'Arguments:', '  name    Repo alias, path, worktree, or alias-task', '', 'Options:', '  --repo <name>   Disambiguate when the same task exists in multiple repos', '  --force         Skip confirmation') }
+        { $_ -in 'edit', 'rename', 'ren' } {
+            @(
+                'wtw edit [name] [new-name] [options]',
+                'Edit a registry record. Does not move git worktrees or rename branches.',
+                'No flags: print the current record (cwd when name is omitted).',
+                '',
+                'Arguments:',
+                '  name        Target (same resolution as wtw go). Default: cwd',
+                '  new-name    Shorthand for --name',
+                '',
+                'Worktree options:',
+                '  --name <pretty>   Display name (list/info, editor sidebars). Color circle is kept.',
+                '  --task <key>      Registry key used by `wtw go` and aliases (sn-<key>)',
+                '',
+                'Repo options:',
+                '  --alias a,b       Replace typed aliases',
+                '  --name a,b        Same as --alias when the target is a repo',
+                '  --key <name>      Registry key (also remaps color assignments)',
+                '',
+                'Shared:',
+                '  --repo <name>     Disambiguate when the same task exists in multiple repos',
+                '  --no-sync         Skip workspace-file rewrite and SourceGit bookmark',
+                '',
+                'Aliases: wtw rename, wtw ren',
+                '',
+                'Examples:',
+                '  wtw edit                         Show the current record',
+                '  wtw edit auth --name "Login"     Change the worktree display name',
+                '  wtw rename auth login            Same as --name login',
+                '  wtw edit auth --task login       Retarget wtw go login',
+                '  wtw edit snowmain1 --alias sn,sm Replace repo aliases'
+            )
+        }
         'workspace'   { @('wtw workspace <name>', 'Generate a workspace file only (no git worktree).', '', 'Arguments:', '  name    Target repo/worktree') }
         'ws'          { @('wtw workspace <name>', 'Generate a workspace file only (no git worktree).', '', 'Arguments:', '  name    Target repo/worktree') }
         'copy'        { @('wtw copy <name>', 'Create a standalone copy of workspace from template.', '', 'Arguments:', '  name    Target repo/worktree') }

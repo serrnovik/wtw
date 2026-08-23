@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.13'
+    ModuleVersion     = '0.2.14'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -10,6 +10,7 @@
     FunctionsToExport = @(
         'Add-WtwEntry'
         'Copy-WtwWorkspace'
+        'Edit-WtwEntry'
         'Enter-WtwWorktree'
         'Get-WtwList'
         'Get-WtwUpdateStatus'
@@ -39,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'Fixes `wtw init` throwing PropertyNotFoundException when the shipped minimal template has no `wtw.color` (or `peacock.color`) in settings: a dotted property read throws under the module''s StrictMode, and a first-time init is exactly that case. Color lookup now uses the same StrictMode-safe property reader as the rest of the module, and `wtw sync` reads workspace settings the same way.'
+            ReleaseNotes = 'Adds `wtw edit` (aliases: rename, ren) to update a registry record in place: worktree display name and task key, repo aliases and registry key. Does not move git worktrees or rename branches.'
         }
     }
 }

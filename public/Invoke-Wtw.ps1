@@ -74,6 +74,7 @@ function Invoke-Wtw {
         Write-Host '    ss [name]         Find & open matching Superset workspace (alias: superset, supersetsh)'
         Write-Host '    remove <task>     Remove worktree + workspace  (alias: rm, delete, del)'
         Write-Host '    unregister <name> Drop repo or worktree from wtw registry only (alias: unreg)'
+        Write-Host '    edit [name]       Edit registry record: --name / --task / --alias / --key  (alias: rename, ren)'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'
         Write-Host '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
@@ -285,6 +286,28 @@ function Invoke-Wtw {
         'del'     { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
         'unregister' { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Unregister-WtwEntry @splat }
         'unreg'   { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Unregister-WtwEntry @splat }
+        { $_ -in 'edit', 'rename', 'ren' } {
+            # `--name` is the pretty/alias edit (same flag as create). The
+            # target is the first positional, or cwd when omitted. A lone
+            # `--name` with no target is therefore the new display name.
+            if ($splat.Contains('Name') -and $splat['Name'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '--name requires a value.'
+                return
+            }
+            if ($pos.Count -gt 0) {
+                if ($splat.Contains('Name')) {
+                    $splat['PrettyName'] = $splat['Name']
+                }
+                $splat['Name'] = $pos[0]
+            } elseif ($splat.Contains('Name')) {
+                $splat['PrettyName'] = $splat['Name']
+                $splat.Remove('Name')
+            }
+            if ($pos.Count -gt 1 -and -not $splat.Contains('PrettyName')) {
+                $splat['PrettyName'] = $pos[1]
+            }
+            Edit-WtwEntry @splat
+        }
         'workspace' { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
         'ws'        { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
         'copy'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Copy-WtwWorkspace @splat }

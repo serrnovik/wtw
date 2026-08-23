@@ -121,7 +121,8 @@ function Remove-WtwFlagWithValue {
 # are executed ON the remote, which is what keeps its registry authoritative.
 $script:WtwRemoteExecCommands = @(
     'run', 'create', 'add', 'remove', 'rm', 'delete', 'del', 'sync', 'color',
-    'clean', 'init', 'workspace', 'ws', 'copy', 'unregister', 'unreg', 'install', 'update'
+    'clean', 'init', 'workspace', 'ws', 'copy', 'unregister', 'unreg',
+    'edit', 'rename', 'ren', 'install', 'update'
 )
 
 function Get-WtwRemoteCommandMode {

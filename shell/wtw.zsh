@@ -145,6 +145,9 @@ _wtw_completion() {
         'open:Open a target in the configured editor'
         'remove:Remove a worktree'
         'unregister:Remove a registry entry only'
+        'edit:Edit a registry record (name, task, aliases)'
+        'rename:Alias for edit'
+        'ren:Alias for edit'
         'workspace:Generate a workspace file'
         'copy:Copy a workspace template'
         'sync:Synchronize workspace settings'
@@ -192,6 +195,9 @@ _wtw_completion() {
             remove|rm|delete|del|unregister|unreg)
                 options=('--repo:repository' '--force:skip confirmation')
                 ;;
+            edit|rename|ren)
+                options=('--name:display name or aliases' '--task:worktree registry key' '--alias:repo aliases' '--key:repo registry key' '--repo:repository' '--no-sync:skip workspace synchronization')
+                ;;
             open)
                 options=('--repo:repository' '--editor:editor name')
                 ;;
@@ -216,7 +222,7 @@ _wtw_completion() {
 
     targets=("${_wtw_registered_aliases[@]}")
     case "$subcommand" in
-        list|ls|go|open|remove|rm|delete|del|unregister|unreg|workspace|ws|copy|sync|color|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
+        list|ls|go|open|remove|rm|delete|del|unregister|unreg|edit|rename|ren|workspace|ws|copy|sync|color|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
             if (( ${#targets[@]} )); then
                 _describe -t targets 'wtw target' targets
             fi
@@ -256,12 +262,12 @@ wtw() {
         "")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
         # Commands that modify registry — delegate fully to pwsh
-        init|add|create|remove|rm|delete|del|unregister|unreg|workspace|ws|copy|sync|color|clean|install|update|skill)
+        init|add|create|remove|rm|delete|del|unregister|unreg|edit|rename|ren|workspace|ws|copy|sync|color|clean|install|update|skill)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
             # Regenerate aliases after commands that change the registry
             case "$1" in
-                init|add|create|remove|rm|delete|del|unregister|unreg) _wtw_register_aliases ;;
+                init|add|create|remove|rm|delete|del|unregister|unreg|edit|rename|ren) _wtw_register_aliases ;;
             esac
             ;;
         # List — delegate to pwsh (ANSI output passes through)

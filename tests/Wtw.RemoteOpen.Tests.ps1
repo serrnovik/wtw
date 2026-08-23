@@ -311,7 +311,7 @@ Describe 'Get-WtwRemoteCommandMode' {
     It 'executes registry-mutating commands on the remote' {
         # Running them THERE is what keeps the remote registry authoritative —
         # refusing them outright was too strict.
-        foreach ($cmd in 'create', 'remove', 'rm', 'color', 'sync', 'init', 'clean', 'add', 'copy') {
+        foreach ($cmd in 'create', 'remove', 'rm', 'color', 'sync', 'init', 'clean', 'add', 'copy', 'edit', 'rename', 'ren') {
             Get-WtwRemoteCommandMode -Command $cmd | Should -Be 'exec' -Because "$cmd should run on the remote"
         }
     }

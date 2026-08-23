@@ -207,6 +207,7 @@ wtw clean                 # interactive selection + removal
 | `wtw wmux [name]` | Open the worktree as a wmux workspace on Windows (aliases: `wm`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
+| `wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X]` | Edit a registry record (aliases: `rename`, `ren`) |
 | `wtw workspace <name> [--main] [--worktree-path X]` | Generate workspace file only (no git worktree) |
 | `wtw copy <name> [--code-folder X]` | Standalone workspace copy from template |
 | `wtw color [name] [hex\|random]` | Set workspace color |

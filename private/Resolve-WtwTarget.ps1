@@ -40,10 +40,28 @@ function Resolve-WtwTarget {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
-        [string] $Name
+        [string] $Name,
+
+        # Not named `$Repo` — this function already uses `$repo` for registry
+        # entries, and a [string] parameter would coerce those assignments.
+        [string] $RepoAlias
     )
 
     $registry = Get-WtwRegistry
+    $restrictRepo = $null
+    if ($RepoAlias) {
+        foreach ($rn in (Get-WtwPropertyNames -Object $registry.repos)) {
+            $r = $registry.repos.$rn
+            if ($rn -eq $RepoAlias -or (Test-WtwAliasMatch $r $RepoAlias)) {
+                $restrictRepo = $rn
+                break
+            }
+        }
+        if (-not $restrictRepo) {
+            Write-Error "Unknown repo '$RepoAlias' (not in registry)."
+            return $null
+        }
+    }
 
     # 0. Absolute path resolution (exact then prefix)
     if ([System.IO.Path]::IsPathRooted($Name)) {
@@ -51,6 +69,7 @@ function Resolve-WtwTarget {
 
         # 0a. Exact path match against repo main or worktree path
         foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+            if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
             $repo = $registry.repos.$repoName
             if ($repo.mainPath -and $repo.mainPath.TrimEnd('/', '\') -eq $normInput) {
                 return [PSCustomObject]@{ RepoName=$repoName; RepoEntry=$repo; TaskName=$null; WorktreeEntry=$null }
@@ -68,6 +87,7 @@ function Resolve-WtwTarget {
         # 0b. Path prefix match
         $pathMatches = @()
         foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+            if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
             $repo = $registry.repos.$repoName
             if ($repo.worktrees) {
                 foreach ($taskName in (Get-WtwPropertyNames -Object $repo.worktrees)) {
@@ -91,6 +111,7 @@ function Resolve-WtwTarget {
 
     # 1. Exact repo alias -> main repo
     foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+        if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
         $repo = $registry.repos.$repoName
         if ((Test-WtwAliasMatch $repo $Name) -or $repoName -eq $Name) {
             return [PSCustomObject]@{
@@ -105,6 +126,7 @@ function Resolve-WtwTarget {
     # 1b. Repo name/alias prefix match
     $prefixRepos = @()
     foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+        if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
         $repo = $registry.repos.$repoName
         $matched = $false
         if ($repoName -like "${Name}*") { $matched = $true }
@@ -134,6 +156,7 @@ function Resolve-WtwTarget {
         $aliasOrName = $Matches[1]
         $taskName    = $Matches[2]
         foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+            if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
             $repo = $registry.repos.$repoName
             if (((Test-WtwAliasMatch $repo $aliasOrName) -or $repoName -eq $aliasOrName) -and
                 $repo.worktrees -and (Get-WtwPropertyNames -Object $repo.worktrees) -contains $taskName) {
@@ -150,6 +173,7 @@ function Resolve-WtwTarget {
     # 3. Bare task name exact match -> search all repos
     $found = @()
     foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+        if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
         $repo = $registry.repos.$repoName
         if ($repo.worktrees -and (Get-WtwPropertyNames -Object $repo.worktrees) -contains $Name) {
             $found += [PSCustomObject]@{
@@ -173,6 +197,7 @@ function Resolve-WtwTarget {
         $taskPrefix   = $Matches[2]
         $prefixFound  = @()
         foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+            if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
             $repo = $registry.repos.$repoName
             if (-not ((Test-WtwAliasMatch $repo $aliasOrName) -or $repoName -eq $aliasOrName)) { continue }
             if (-not $repo.worktrees) { continue }
@@ -204,6 +229,7 @@ function Resolve-WtwTarget {
     # 5. Bare task name prefix match -> search all repos
     $prefixFound = @()
     foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+        if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
         $repo = $registry.repos.$repoName
         if (-not $repo.worktrees) { continue }
         foreach ($t in (Get-WtwPropertyNames -Object $repo.worktrees)) {
@@ -234,6 +260,7 @@ function Resolve-WtwTarget {
     $escapedName = [WildcardPattern]::Escape($Name)
     $substringFound = @()
     foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
+        if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
         $repo = $registry.repos.$repoName
         if (-not $repo.worktrees) { continue }
         foreach ($t in (Get-WtwPropertyNames -Object $repo.worktrees)) {
@@ -259,6 +286,16 @@ function Resolve-WtwTarget {
     }
 
     # 6. Fuzzy match - find closest target by edit distance
+    if ($restrictRepo) {
+        $hint = Get-WtwNumericNameHint -Name $Name
+        if ($hint) {
+            Write-Error "Could not resolve '$Name' in repo '$restrictRepo'. $hint"
+        } else {
+            Write-Error "Could not resolve '$Name' in repo '$restrictRepo'."
+        }
+        return $null
+    }
+
     $allTargets = Get-WtwAllTargetNames $registry
     $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
     if ($fuzzy.Match) {

@@ -6,7 +6,8 @@ description: |
   or when managing workspace files for multi-branch workflows.
   Triggers: "create worktree", "new branch workspace", "switch worktree",
   "clean worktrees", "stale worktrees", "worktree disk usage",
-  "set workspace color", "change color", "random color".
+  "set workspace color", "change color", "random color",
+  "rename worktree", "edit registry", "change worktree name".
 metadata:
   version: 0.1.0
 ---
@@ -41,6 +42,9 @@ pwsh -Command "wtw remove <task> [--force]"
 
 # Unregister from wtw only (registry + colors; no git/disk) — pairs with init / add
 pwsh -Command "wtw unregister <name> [--repo X] [--force]"
+
+# Edit a registry record (pretty name, task key, repo aliases)
+pwsh -Command "wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X]"
 
 # Set workspace color
 pwsh -Command "wtw color [name] [hex|random]"

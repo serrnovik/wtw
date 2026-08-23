@@ -11,6 +11,7 @@ Describe 'wtw module loading' {
         $expected = @(
             'Invoke-Wtw', 'Initialize-WtwConfig', 'New-WtwWorktree', 'Get-WtwList',
             'Enter-WtwWorktree', 'Open-WtwWorkspace', 'Remove-WtwWorktree', 'Unregister-WtwEntry',
+            'Edit-WtwEntry',
             'Invoke-WtwClean', 'New-WtwWorkspace', 'Copy-WtwWorkspace',
             'Sync-WtwWorkspace', 'Install-Wtw', 'Register-WtwProfile'
         )
