@@ -96,6 +96,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
 
     $knownSubcommands = @(
         'init', 'add', 'create', 'list', 'ls', 'go', 'open', 'remove', 'rm', 'unregister', 'unreg',
+        'edit', 'rename', 'ren',
         'workspace', 'ws', 'copy', 'sync', 'color', 'clean', 'agent', 'install', 'update', 'skill', 'help',
         'host',
         '__resolve', '__resolve_json', '__aliases'
@@ -106,7 +107,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     )
 
     $targetSubcommands = @(
-        'go', 'open', 'remove', 'rm', 'unregister', 'unreg', 'sync', 'color'
+        'go', 'open', 'remove', 'rm', 'unregister', 'unreg', 'edit', 'rename', 'ren', 'sync', 'color'
     ) + $familyNames + @(
         'sourcegit', 'sgit', 'sg',
         'codex', 'droid', 'factory', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
@@ -137,6 +138,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'remove'; Tip = 'Remove worktree + workspace' }
             @{ Name = 'unregister'; Tip = 'Drop repo/worktree from wtw registry only' }
             @{ Name = 'unreg'; Tip = 'Alias for unregister' }
+            @{ Name = 'edit'; Tip = 'Edit a registry record (name, task, aliases)' }
+            @{ Name = 'rename'; Tip = 'Alias for edit' }
             @{ Name = 'clean';       Tip = 'Clean stale AI worktrees' }
             @{ Name = 'agent';       Tip = 'Configure agentctl profile overlays' }
             @{ Name = 'skill';       Tip = 'Install AI skill into current repo' }
@@ -187,7 +190,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     if ($elems.Count -ge 3 -and $wordToComplete -notmatch '^-') {
         $prev = $elems[$elems.Count - 2].Extent.Text
         if ($prev -ieq '--repo' -and $subCommand -in @(
-                'create', 'remove', 'rm', 'open', 'unregister', 'unreg', 'sync', 'list', 'ls'
+                'create', 'remove', 'rm', 'open', 'unregister', 'unreg', 'edit', 'rename', 'ren', 'sync', 'list', 'ls'
             )) {
             $repos = Build-WtwRepoFilterList $registry
             Filter-WtwMatches $repos $wordToComplete | ForEach-Object {
@@ -244,6 +247,9 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'rm'     { @('--repo', '--force') }
             'unregister' { @('--repo', '--force') }
             'unreg'      { @('--repo', '--force') }
+            'edit'       { @('--name', '--task', '--alias', '--key', '--repo', '--no-sync') }
+            'rename'     { @('--name', '--task', '--alias', '--key', '--repo', '--no-sync') }
+            'ren'        { @('--name', '--task', '--alias', '--key', '--repo', '--no-sync') }
             'open'   { @('--repo', '--editor') }
             'list'   { @('--repo', '--detailed', '-d') }
             'ls'     { @('--repo', '--detailed', '-d') }
