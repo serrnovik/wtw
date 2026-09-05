@@ -315,6 +315,7 @@ function Move-WtwCursorWorkspaceForAgents {
         }
 
         if (Test-Path $storageJsonPath) {
+            Backup-WtwExternalConfig -System 'cursor' -Path $storageJsonPath | Out-Null
             $storageJson = Get-Content -LiteralPath $storageJsonPath -Raw
             $storageJson.Replace($oldUri, $newUri).Replace($oldPath, $newPath).Replace($oldId, $newId) |
                 Set-Content -LiteralPath $storageJsonPath -Encoding utf8

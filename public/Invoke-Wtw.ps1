@@ -52,7 +52,7 @@ function Invoke-Wtw {
         Write-Host '  wtw - Git Worktree + Workspace Manager' -ForegroundColor Cyan
         Write-Host ''
         Write-Host '  Commands:' -ForegroundColor Yellow
-        Write-Host '    init [aliases]    Initialise current repo as a main repo in the registry (run once, from inside it)'
+        Write-Host '    init [aliases]    Initialise current repo as a main repo (--template, --startup-script, --emoji)'
         Write-Host '    add [path]        Adopt an existing on-disk worktree with full registration (workspace + color + cmux/SourceGit/etc.)'
         Write-Host '    create <task>     Create worktree + branch (pass --branch <existing-ref> or --adopt to attach to an existing branch)'
         Write-Host '    list [repo] [-d|--detailed] [--wide]  List repos/worktrees'
@@ -74,12 +74,12 @@ function Invoke-Wtw {
         Write-Host '    ss [name]         Find & open matching Superset workspace (alias: superset, supersetsh)'
         Write-Host '    remove <task>     Remove worktree + workspace  (alias: rm, delete, del)'
         Write-Host '    unregister <name> Drop repo or worktree from wtw registry only (alias: unreg)'
-        Write-Host '    edit [name]       Edit registry record: --name / --task / --alias / --key  (alias: rename, ren)'
+        Write-Host '    edit [name]       Edit registry record: --name / --task / --alias / --key / --emoji / --sourcegit-folder  (alias: rename, ren)'
         Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
         Write-Host '    copy <name>       Standalone copy of workspace from template'
         Write-Host '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
         Write-Host '    sync [file|--all] Re-apply template to managed workspaces'
-        Write-Host '    clean             Clean stale AI worktrees'
+        Write-Host '    clean             Clean stale worktrees and/or merged local branches'
         Write-Host '    agent profile ... Configure agentctl profile overlays'
         Write-Host '    install           Install wtw globally from this checkout (~/.wtw/module/)'
         Write-Host '    update [--check]  Update the global install to the latest PowerShell Gallery release'
@@ -155,7 +155,7 @@ function Invoke-Wtw {
 
         # Interactive ssh into the worktree — the remote sibling of `wtw go`.
         if ($remoteMode -eq 'connect') {
-            $connectName = if ($remotePos.Count -gt 0) { [string]$remotePos[0] } else { '' }
+            $connectName = if ($remotePos.Count -gt 0) { Join-WtwTargetName $remotePos } else { '' }
             Connect-WtwRemoteWorktree `
                 -HostEntry $hostEntry `
                 -Name $connectName `
@@ -189,7 +189,7 @@ function Invoke-Wtw {
             return
         }
         if ($Command -in @('info', 'show')) {
-            $target = if ($remotePos.Count -gt 0) { $remotePos[0] } else { $null }
+            $target = if ($remotePos.Count -gt 0) { Join-WtwTargetName $remotePos } else { $null }
             if (-not $target) { Write-Error "Usage: wtw info <name> --on $($hostEntry.Name)"; return }
             $remote = Get-WtwRemoteTarget -HostEntry $hostEntry -Name $target
             if (-not $remote) { Write-Error "'$target' did not resolve on $($hostEntry.Name)."; return }
@@ -219,7 +219,7 @@ function Invoke-Wtw {
             return
         }
 
-        $name = if ($remotePos.Count -gt 0) { $remotePos[0] } else { $null }
+        $name = if ($remotePos.Count -gt 0) { Join-WtwTargetName $remotePos } else { $null }
         if (-not $name) {
             Write-Error "A remote open needs an explicit target name — the local cwd says nothing about $($hostEntry.Name). Try: wtw list --on $($hostEntry.Name)"
             return
@@ -276,22 +276,26 @@ function Invoke-Wtw {
         }
         'list'    { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
         'ls'      { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
-        'info'    { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Show-WtwInfo @splat }
-        'show'    { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Show-WtwInfo @splat }
-        'go'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Enter-WtwWorktree @splat }
-        'open'    { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Open-WtwWorkspace @splat }
-        'remove'  { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
-        'rm'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
-        'delete'  { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
-        'del'     { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Remove-WtwWorktree @splat }
-        'unregister' { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Unregister-WtwEntry @splat }
-        'unreg'   { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Unregister-WtwEntry @splat }
+        'info'    { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Show-WtwInfo @splat }
+        'show'    { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Show-WtwInfo @splat }
+        'go'      { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Enter-WtwWorktree @splat }
+        'open'    { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Open-WtwWorkspace @splat }
+        'remove'  { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Remove-WtwWorktree @splat }
+        'rm'      { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Remove-WtwWorktree @splat }
+        'delete'  { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Remove-WtwWorktree @splat }
+        'del'     { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Remove-WtwWorktree @splat }
+        'unregister' { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Unregister-WtwEntry @splat }
+        'unreg'   { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Unregister-WtwEntry @splat }
         { $_ -in 'edit', 'rename', 'ren' } {
             # `--name` is the pretty/alias edit (same flag as create). The
             # target is the first positional, or cwd when omitted. A lone
             # `--name` with no target is therefore the new display name.
             if ($splat.Contains('Name') -and $splat['Name'] -is [System.Management.Automation.SwitchParameter]) {
                 Write-Error '--name requires a value.'
+                return
+            }
+            if ($splat.Contains('Emoji') -and $splat['Emoji'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '--emoji requires a value.'
                 return
             }
             if ($pos.Count -gt 0) {
@@ -308,9 +312,9 @@ function Invoke-Wtw {
             }
             Edit-WtwEntry @splat
         }
-        'workspace' { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
-        'ws'        { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; New-WtwWorkspace @splat }
-        'copy'      { if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }; Copy-WtwWorkspace @splat }
+        'workspace' { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; New-WtwWorkspace @splat }
+        'ws'        { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; New-WtwWorkspace @splat }
+        'copy'      { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Copy-WtwWorkspace @splat }
         'sync'      { if ($pos.Count -gt 0) { $splat['Target'] = $pos[0] }; Sync-WtwWorkspace @splat }
         'color'     { 
             $resolved = Resolve-WtwColorArgs $pos
@@ -342,7 +346,7 @@ function Invoke-Wtw {
             # tabs). Used by wtw.cmd so cmd.exe can `cd /d` to it cleanly
             # without parsing tab-delimited fields.
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve_path <name>"; return }
-            $target = & { Resolve-WtwTarget $pos[0] } 6>$null
+            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             Write-Output $p
@@ -354,7 +358,7 @@ function Invoke-Wtw {
             # Deliberately not an extra field on __resolve: the zsh/bash wrappers
             # read that one with fixed positional fields.
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve_json <name>"; return }
-            $target = & { Resolve-WtwTarget $pos[0] } 6>$null
+            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             $ws = if ($target.WorktreeEntry) {
@@ -387,7 +391,7 @@ function Invoke-Wtw {
             # Optional: --shell zsh|bash to resolve per-shell session script
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name> [--shell zsh|bash]"; return }
             $shellType = $splat['Shell'] ?? ''
-            $target = & { Resolve-WtwTarget $pos[0] } 6>$null
+            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             $c = if ($target.WorktreeEntry) {
@@ -432,6 +436,12 @@ function Invoke-Wtw {
                         foreach ($a in $aliases) {
                             Write-Output "${a}-${taskName}`t$($wt.path)`t${wtColor}`t${wtTitle}`t${ss}`t${taskName}`t${wtIdx}"
                         }
+                        foreach ($custom in (Get-WtwWorktreeAliases $wt)) {
+                            $shellName = ConvertTo-WtwShellAliasName $custom
+                            if ($shellName) {
+                                Write-Output "${shellName}`t$($wt.path)`t${wtColor}`t${wtTitle}`t${ss}`t${taskName}`t${wtIdx}"
+                            }
+                        }
                         $wtIdx++
                     }
                 }
@@ -454,15 +464,16 @@ function Invoke-Wtw {
             $resolvedEditor = Resolve-WtwEditorCommand $Command
             if ($resolvedEditor) {
                 $splat['Editor'] = $resolvedEditor
-                if ($pos.Count -gt 0) { $splat['Name'] = $pos[0] }
+                if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }
                 Open-WtwWorkspace @splat
             } else {
                 # Fallback: treat unknown command as "go <name>"
+                $implicitName = Join-WtwTargetName (@($Command) + @($pos))
                 Write-Host "  → " -ForegroundColor DarkGray -NoNewline
-                Write-Host "wtw $Command" -ForegroundColor White -NoNewline
+                Write-Host "wtw $implicitName" -ForegroundColor White -NoNewline
                 Write-Host "  interpreted as  " -ForegroundColor DarkGray -NoNewline
-                Write-Host "wtw go $Command" -ForegroundColor Cyan
-                Enter-WtwWorktree -Name $Command @splat
+                Write-Host "wtw go $implicitName" -ForegroundColor Cyan
+                Enter-WtwWorktree -Name $implicitName @splat
             }
         }
     }

@@ -18,6 +18,11 @@ function Get-WtwAllTargetNames {
                 foreach ($alias in (Get-WtwRepoAliases $repo)) {
                     $targets += "$alias-$task"
                 }
+                foreach ($wtAlias in (Get-WtwWorktreeAliases $repo.worktrees.$task)) {
+                    $targets += $wtAlias
+                    $shellAlias = ConvertTo-WtwShellAliasName $wtAlias
+                    if ($shellAlias -and $shellAlias -ne $wtAlias) { $targets += $shellAlias }
+                }
             }
         }
     }

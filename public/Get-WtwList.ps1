@@ -75,10 +75,12 @@ function Get-WtwList {
             $branch = (& $gitCommand -C $repoEntry.mainPath branch --show-current 2>$null) ?? '?'
         }
 
+        $repoDisplay = Format-WtwRepoDisplayName -Name $name -RepoEntry $repoEntry
+
         # Main entry
         $items += [PSCustomObject]@{
             Kind      = 'repo'
-            Repo      = $name
+            Repo      = $repoDisplay
             Task      = '-'
             Aliases   = ($aliases -join "`n")
             Branch    = $branch
@@ -96,7 +98,9 @@ function Get-WtwList {
                 $wt = $repoEntry.worktrees.$taskName
                 $exists = Test-Path $wt.path
                 $wtWsDisplay = if ($wt.workspace -and (Test-Path $wt.workspace)) { Split-Path $wt.workspace -Leaf } else { '-' }
-                $wtAliases = ($aliases | ForEach-Object { "$_-$taskName" }) -join "`n"
+                $customAliases = @(Get-WtwWorktreeAliases $wt)
+                $derivedAliases = @($aliases | ForEach-Object { "$_-$taskName" })
+                $wtAliases = (@($customAliases + $derivedAliases) | Where-Object { $_ }) -join "`n"
                 $pathDisplay = if ($exists) { $wt.path } else { "$($wt.path) (MISSING)" }
 
                 # Created date: from registry, then git fallback
@@ -116,7 +120,7 @@ function Get-WtwList {
 
                 $items += [PSCustomObject]@{
                     Kind      = 'wt'
-                    Repo      = $name
+                    Repo      = $repoDisplay
                     Task      = $taskName
                     Aliases   = $wtAliases
                     Branch    = $wt.branch

@@ -8,11 +8,15 @@ function Edit-WtwEntry {
 
         Worktree:
           --name / second positional   display (pretty) name
-          --task                       registry key used by ``wtw go`` and aliases
+          --task                       registry key used by ``wtw go`` and derived aliases
+          --alias                      extra typed names (e.g. ``onboarding video``)
 
         Repo:
           --alias / --name / second positional   replace the alias list
           --key                                  registry key (also remaps color keys)
+          --emoji                                SourceGit / list prefix for the whole repo
+          --sourcegit-folder / --no-sourcegit-folder
+                                                 create or skip a SourceGit group folder
 
         With no edit flags, prints the current record (cwd when name is omitted).
     .PARAMETER Name
@@ -24,9 +28,14 @@ function Edit-WtwEntry {
     .PARAMETER Task
         New worktree registry key. Does not rename the folder or branch.
     .PARAMETER Alias
-        Comma-separated repo aliases (replaces the existing list).
+        Comma-separated aliases (replaces the existing list). On a repo this
+        is the typed names for ``wtw go``. On a worktree these are extra names
+        (spaces allowed) in addition to the derived ``alias-task`` forms.
+        Pass ``-`` / ``none`` to clear worktree aliases.
     .PARAMETER Key
         New repo registry key.
+    .PARAMETER Emoji
+        Repo-only display prefix (e.g. ``🎸``, ``🎭 ☸️``). ``-`` / ``none`` clears it.
     .PARAMETER Repo
         Disambiguate when the same task exists in multiple repos.
     .PARAMETER NoSync
@@ -43,6 +52,12 @@ function Edit-WtwEntry {
     .EXAMPLE
         wtw edit snowmain1 --alias sn,sm
         Replace the repo's typed aliases.
+    .EXAMPLE
+        wtw edit snowmain1 --emoji 🎸
+        Prefix SourceGit and ``wtw list`` with a repo emoji.
+    .EXAMPLE
+        wtw edit t3code-ad4f13f1 --alias 'onboarding video,onboarding'
+        After adopting an agent worktree, ``wtw go onboarding`` resolves to it.
     #>
     [CmdletBinding()]
     param(
@@ -56,6 +71,13 @@ function Edit-WtwEntry {
         [string] $Task,
         [string[]] $Alias,
         [string] $Key,
+
+        [AllowEmptyString()]
+        [object] $Emoji,
+
+        [switch] $SourceGitFolder,
+        [switch] $NoSourceGitFolder,
+
         [string] $Repo,
 
         [Alias('ns')]
@@ -82,7 +104,12 @@ function Edit-WtwEntry {
     $hasTask = -not [string]::IsNullOrWhiteSpace($Task)
     $hasAlias = @($Alias | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
     $hasKey = -not [string]::IsNullOrWhiteSpace($Key)
-    $hasEdits = $hasPretty -or $hasTask -or $hasAlias -or $hasKey
+    $emojiBound = $PSBoundParameters.ContainsKey('Emoji')
+    $folderBound = $SourceGitFolder -or $NoSourceGitFolder
+    if ($emojiBound -and -not (Test-WtwEmojiArgument $Emoji)) {
+        return
+    }
+    $hasEdits = $hasPretty -or $hasTask -or $hasAlias -or $hasKey -or $emojiBound -or $folderBound
 
     if (-not $hasEdits) {
         Show-WtwEditableRecord -Target $target
@@ -90,18 +117,23 @@ function Edit-WtwEntry {
     }
 
     if ($target.TaskName) {
-        if ($hasAlias) {
-            Write-Error "--alias is for repos. To change how you type this worktree, use --task."
-            return
-        }
         if ($hasKey) {
             Write-Error "--key is for repos. To rename this worktree's registry key, use --task."
+            return
+        }
+        if ($emojiBound) {
+            Write-Error "--emoji is for repos. Worktree names already get a color-circle prefix."
+            return
+        }
+        if ($folderBound) {
+            Write-Error "--sourcegit-folder is for repos. New worktrees follow the parent repo's folder."
             return
         }
         Edit-WtwWorktreeRecord `
             -Target $target `
             -PrettyName $prettyText `
             -Task $Task `
+            -Alias $Alias `
             -NoSync:$NoSync
         return
     }
@@ -116,6 +148,10 @@ function Edit-WtwEntry {
         -Target $target `
         -Alias $aliasInput `
         -Key $Key `
+        -Emoji $Emoji `
+        -EmojiSpecified:$emojiBound `
+        -SourceGitFolder:$SourceGitFolder `
+        -NoSourceGitFolder:$NoSourceGitFolder `
         -NoSync:$NoSync
 }
 
@@ -140,7 +176,9 @@ function Show-WtwEditableRecord {
         $pretty = Get-WtwPropertyValue -Object $wt -Name 'prettyName'
         $color = Get-WtwPropertyValue -Object $wt -Name 'color'
         $ws = Get-WtwPropertyValue -Object $wt -Name 'workspace'
-        $wtAliases = ($aliases | ForEach-Object { "$_-$($Target.TaskName)" }) -join ', '
+        $derived = ($aliases | ForEach-Object { "$_-$($Target.TaskName)" }) -join ', '
+        $custom = @(Get-WtwWorktreeAliases $wt)
+        $shownAliases = @($custom + @($derived | Where-Object { $_ })) -join ', '
         Write-Host "  Worktree  $repoName / $($Target.TaskName)" -ForegroundColor Cyan
         if ($pretty) { Write-Host "    Name      : $pretty" }
         Write-Host "    Task      : $($Target.TaskName)"
@@ -148,18 +186,30 @@ function Show-WtwEditableRecord {
         Write-Host "    Path      : $(Get-WtwPropertyValue -Object $wt -Name 'path')"
         if ($ws) { Write-Host "    Workspace : $ws" }
         if ($color) { Write-Host "    Color     : $color" }
-        if ($wtAliases) { Write-Host "    Aliases   : $wtAliases" }
+        if ($shownAliases) { Write-Host "    Aliases   : $shownAliases" }
         Write-Host ''
         Write-Host "  wtw edit $($Target.TaskName) --name <pretty>   display name" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $($Target.TaskName) --task <key>      go-target / aliases" -ForegroundColor DarkGray
+        Write-Host "  wtw edit $($Target.TaskName) --task <key>      go-target / derived aliases" -ForegroundColor DarkGray
+        Write-Host "  wtw edit $($Target.TaskName) --alias 'onboarding video'   extra typed name" -ForegroundColor DarkGray
     } else {
-        Write-Host "  Repo  $repoName" -ForegroundColor Cyan
+        $emoji = Get-WtwRepoEmoji -RepoEntry $repoEntry
+        $display = Format-WtwRepoDisplayName -Name $repoName -RepoEntry $repoEntry
+        Write-Host "  Repo  $display" -ForegroundColor Cyan
         Write-Host "    Key       : $repoName"
+        Write-Host "    Emoji     : $(if ($emoji) { $emoji } else { '(none)' })"
+        $folderOn = $false
+        if ((Get-WtwPropertyNames -Object $repoEntry) -contains 'sourceGitFolder') {
+            $folderOn = [bool]$repoEntry.sourceGitFolder
+        }
         Write-Host "    Aliases   : $($aliases -join ', ')"
         Write-Host "    Path      : $(Get-WtwPropertyValue -Object $repoEntry -Name 'mainPath')"
+        Write-Host "    SG folder : $(if ($folderOn) { 'yes' } else { 'if one already exists' })"
         Write-Host ''
         Write-Host "  wtw edit $repoName --alias a,b     typed names for wtw go" -ForegroundColor DarkGray
         Write-Host "  wtw edit $repoName --key <name>    registry key" -ForegroundColor DarkGray
+        Write-Host "  wtw edit $repoName --emoji 🎸      SourceGit / list prefix" -ForegroundColor DarkGray
+        Write-Host "  wtw edit $repoName --emoji none    clear prefix" -ForegroundColor DarkGray
+        Write-Host "  wtw edit $repoName --sourcegit-folder   group worktrees in SourceGit" -ForegroundColor DarkGray
     }
     Write-Host ''
 }
@@ -170,6 +220,7 @@ function Edit-WtwWorktreeRecord {
         [Parameter(Mandatory)] [PSObject] $Target,
         [string] $PrettyName,
         [string] $Task,
+        [string[]] $Alias,
         [switch] $NoSync
     )
 
@@ -213,6 +264,35 @@ function Edit-WtwWorktreeRecord {
         if ($newPretty -ne $oldPretty) {
             $entry | Add-Member -NotePropertyName 'prettyName' -NotePropertyValue $newPretty -Force
             $changed += "name '$oldPretty' → '$newPretty'"
+        }
+    }
+
+    if (@($Alias | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
+        if (Test-WtwAliasClearToken -Value $Alias) {
+            $oldAliases = Get-WtwWorktreeAliases $entry
+            if ((Get-WtwPropertyNames -Object $entry) -contains 'aliases') {
+                $entry.PSObject.Properties.Remove('aliases')
+            }
+            if ((Get-WtwPropertyNames -Object $entry) -contains 'alias') {
+                $entry.PSObject.Properties.Remove('alias')
+            }
+            if (@($oldAliases).Count -gt 0) {
+                $changed += "aliases '$($oldAliases -join ',')' → '(none)'"
+            }
+        } else {
+            [string[]] $aliasArray = Split-WtwAliasList -Value $Alias
+            if ($aliasArray.Count -eq 0) {
+                Write-Error "Invalid --alias '$($Alias -join ',')'."
+                return
+            }
+            $collision = Test-WtwWorktreeAliasCollision -Registry $registry -RepoName $repoName -TaskName $newTask -Aliases $aliasArray
+            if ($collision) { return }
+            $oldAliases = Get-WtwWorktreeAliases $entry
+            $entry | Add-Member -NotePropertyName 'aliases' -NotePropertyValue $aliasArray -Force
+            if ((Get-WtwPropertyNames -Object $entry) -contains 'alias') {
+                $entry.PSObject.Properties.Remove('alias')
+            }
+            $changed += "aliases '$($oldAliases -join ',')' → '$($aliasArray -join ',')'"
         }
     }
 
@@ -273,7 +353,7 @@ function Edit-WtwWorktreeRecord {
         }
 
         if ($wtPath -and $prettyNow) {
-            Add-WtwSourceGitRepository -Path $wtPath -Name $prettyNow -Hex $color
+            Add-WtwSourceGitRepository -Path $wtPath -Name $prettyNow -Hex $color -RepoName $repoName
         }
     }
 
@@ -288,6 +368,11 @@ function Edit-WtwRepoRecord {
         [Parameter(Mandatory)] [PSObject] $Target,
         [string[]] $Alias,
         [string] $Key,
+        [AllowEmptyString()]
+        [object] $Emoji,
+        [switch] $EmojiSpecified,
+        [switch] $SourceGitFolder,
+        [switch] $NoSourceGitFolder,
         [switch] $NoSync
     )
 
@@ -327,6 +412,33 @@ function Edit-WtwRepoRecord {
             $entry.PSObject.Properties.Remove('alias')
         }
         $changed += "aliases '$($oldAliases -join ',')' → '$($aliasArray -join ',')'"
+    }
+
+    $previousDisplay = Format-WtwRepoDisplayName -Name $oldKey -RepoEntry $entry
+    if ($EmojiSpecified) {
+        $oldEmoji = Get-WtwRepoEmoji -RepoEntry $entry
+        $newEmoji = Set-WtwRepoEmojiProperty -RepoEntry $entry -Emoji $Emoji
+        if ($oldEmoji -ne $newEmoji) {
+            $oldShown = if ($oldEmoji) { $oldEmoji } else { '(none)' }
+            $newShown = if ($newEmoji) { $newEmoji } else { '(none)' }
+            $changed += "emoji '$oldShown' → '$newShown'"
+        }
+    }
+
+    if ($SourceGitFolder -and $NoSourceGitFolder) {
+        Write-Error "Pass --sourcegit-folder or --no-sourcegit-folder, not both."
+        return
+    }
+    if ($SourceGitFolder -or $NoSourceGitFolder) {
+        $wantFolder = [bool]$SourceGitFolder
+        $oldFolder = $false
+        if ((Get-WtwPropertyNames -Object $entry) -contains 'sourceGitFolder') {
+            $oldFolder = [bool]$entry.sourceGitFolder
+        }
+        $entry | Add-Member -NotePropertyName 'sourceGitFolder' -NotePropertyValue $wantFolder -Force
+        if ($oldFolder -ne $wantFolder) {
+            $changed += "sourceGitFolder '$oldFolder' → '$wantFolder'"
+        }
     }
 
     if ($newKey -ne $oldKey) {
@@ -373,10 +485,27 @@ function Edit-WtwRepoRecord {
 
     Save-WtwRegistry $registry
 
+    if ($SourceGitFolder -and -not $NoSync) {
+        $savedForFolder = (Get-WtwRegistry).repos.$newKey
+        if ($savedForFolder) {
+            Ensure-WtwSourceGitRepoFolder -RepoName $newKey -RepoEntry $savedForFolder -Force
+        }
+    }
+
     if ($newKey -ne $oldKey -and -not $NoSync) {
         foreach ($ws in @($workspacesToUpdate)) {
             Write-Host '  Syncing workspace...' -ForegroundColor DarkGray
             Sync-WtwWorkspace -Target $ws -ColorSource Json
+        }
+    }
+
+    if (-not $NoSync -and ($EmojiSpecified -or $newKey -ne $oldKey)) {
+        $saved = (Get-WtwRegistry).repos.$newKey
+        if ($saved) {
+            Sync-WtwSourceGitRepoDisplayName `
+                -RepoName $newKey `
+                -RepoEntry $saved `
+                -PreviousDisplayName $previousDisplay
         }
     }
 

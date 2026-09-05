@@ -63,6 +63,8 @@ function New-WtwWorktree {
         otherwise. If `gt track` errors with a stale trunk reference, the
         worktree is left intact and a remediation hint is printed
         (`gt init` + `gt repo sync`).
+    .PARAMETER Alias
+        Extra typed names for ``wtw go`` (spaces allowed).
     .EXAMPLE
         wtw create auth
         Create a worktree and branch named "auth" for the current repo.
@@ -112,7 +114,8 @@ function New-WtwWorktree {
         [switch] $Open,
         [switch] $NoBranch,
         [switch] $Adopt,
-        [switch] $GtTrack
+        [switch] $GtTrack,
+        [string[]] $Alias
     )
 
     # --adopt is a friendlier alias for --no-branch (both opt into "adopt
@@ -289,7 +292,8 @@ function New-WtwWorktree {
         -RepoName $repoName -RepoEntry $repoEntry `
         -Task $Task -Branch $Branch `
         -WorktreePath $worktreePath -FolderSuffix $folderSuffix `
-        -PrettyName $PrettyName -Color $Color
+        -PrettyName $PrettyName -Color $Color `
+        -Alias $Alias
 
     if (-not $meta.Success) {
         # The only failure mode today is a bad --color. We just created the

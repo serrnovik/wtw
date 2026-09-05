@@ -43,14 +43,14 @@ pwsh -Command "wtw remove <task> [--force]"
 # Unregister from wtw only (registry + colors; no git/disk) — pairs with init / add
 pwsh -Command "wtw unregister <name> [--repo X] [--force]"
 
-# Edit a registry record (pretty name, task key, repo aliases)
-pwsh -Command "wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X]"
+# Edit a registry record (pretty name, task key, repo or worktree aliases)
+pwsh -Command "wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X] [--emoji X] [--sourcegit-folder]"
 
 # Set workspace color
 pwsh -Command "wtw color [name] [hex|random]"
 
 # Register current repo
-pwsh -Command "wtw init [aliases] [--template X] [--startup-script X]"
+pwsh -Command "wtw init [aliases] [--template X] [--startup-script X] [--emoji X] [--sourcegit-folder]"
 
 # Open in editor
 pwsh -Command "wtw open [name]"
@@ -59,8 +59,8 @@ pwsh -Command "wtw code [name]"
 pwsh -Command "wtw chatgpt [name] [--skip-restart]" # aliases: cgpt, codex
 pwsh -Command "wtw claudecode [name] [--prompt X]"  # aliases: ccode — new Claude Code chat in the worktree
 
-# Clean stale AI worktrees
-pwsh -Command "wtw clean [--dry-run]"
+# Clean stale AI worktrees and/or leftover merged local branches
+pwsh -Command "wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]"
 
 # Sync templates
 pwsh -Command "wtw sync --all [--dry-run]"
@@ -77,9 +77,11 @@ wtw resolves names flexibly:
 2. Repo/alias prefix (`pr` → `proj` if unique)
 3. `alias-task` format (`app-auth` → worktree)
 4. Bare task name (`auth` → searches all repos)
-5. Task prefix (`au` → `auth` if unique)
-6. Substring (`content` → `my-content-engine`)
-7. Fuzzy match (Levenshtein distance)
+5. Worktree alias (`onboarding video` / `onboarding-video`)
+6. Task prefix (`au` → `auth` if unique)
+7. Substring (`content` → `my-content-engine`)
+8. Pretty name, then branch (lower priority — `onboarding` can match a T3 branch)
+9. Fuzzy match (Levenshtein distance)
 
 ## Color Management
 
@@ -133,6 +135,7 @@ When editing `.code-workspace.template` files, agents can use the following plac
 ## Safety Rules
 
 - NEVER run `wtw clean` without `--dry-run` first
+- `wtw clean --branches` only deletes branches already merged into the default branch (`git branch -d`). Branches still checked out in a worktree are skipped.
 - NEVER run `wtw remove` without confirmation unless `--force` is explicit
 - Prefer `wtw create` over manual `git worktree add`
 - Do not edit `~/.wtw/registry.json` directly — use wtw commands
@@ -161,4 +164,5 @@ pwsh -Command "wtw color auth random"
 
 ```bash
 pwsh -Command "wtw clean --dry-run"
+pwsh -Command "wtw clean --branches --dry-run"
 ```

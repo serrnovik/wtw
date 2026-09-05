@@ -1,6 +1,15 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
     Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
+    $script:originalBackupRoot = $env:WTW_BACKUP_ROOT
+    $env:WTW_BACKUP_ROOT = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-bak-cursor-" + [guid]::NewGuid())
+}
+
+AfterAll {
+    if ($env:WTW_BACKUP_ROOT -and (Test-Path $env:WTW_BACKUP_ROOT)) {
+        Remove-Item -Recurse -Force $env:WTW_BACKUP_ROOT -ErrorAction SilentlyContinue
+    }
+    $env:WTW_BACKUP_ROOT = $script:originalBackupRoot
 }
 
 Describe 'Cursor project integration' {

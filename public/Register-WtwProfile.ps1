@@ -77,6 +77,12 @@ function Register-WtwProfile {
                 foreach ($a in $aliases) {
                     Set-Alias -Name "$a-$taskName" -Value $wtFnName -Scope Global -Force
                 }
+                foreach ($custom in (Get-WtwWorktreeAliases $wt)) {
+                    $shellName = ConvertTo-WtwShellAliasName $custom
+                    if ($shellName -match '^[A-Za-z][\w-]*$') {
+                        Set-Alias -Name $shellName -Value $wtFnName -Scope Global -Force
+                    }
+                }
             }
         }
     }

@@ -29,6 +29,13 @@ function Add-WtwEntry {
     .PARAMETER Color
         Color assignment. Same input format as `wtw create --color`: 'random'
         (default), '#rrggbb' / 'rrggbb', or a palette name.
+    .PARAMETER Alias
+        Extra typed names for ``wtw go`` (spaces allowed). Same as
+        ``wtw edit <task> --alias``.
+    .PARAMETER SourceGitFolder
+        Create a SourceGit group for the parent repo and nest this worktree in it.
+    .PARAMETER NoSourceGitFolder
+        Do not create a SourceGit group. An existing folder still collects this worktree.
     .EXAMPLE
         wtw add /path/to/snowmain1_foo --task foo
         Adopt an existing worktree as task 'foo' under its auto-detected parent.
@@ -46,7 +53,10 @@ function Add-WtwEntry {
         [string] $Task,
         [string] $Branch,
         [string] $PrettyName,
-        [string] $Color
+        [string] $Color,
+        [string[]] $Alias,
+        [switch] $SourceGitFolder,
+        [switch] $NoSourceGitFolder
     )
 
     if (-not $Path) { $Path = (Get-Location).Path }
@@ -141,11 +151,25 @@ function Add-WtwEntry {
     $folderSuffix = $dirName -replace "^${Repo}_", ''
     if (-not $folderSuffix) { $folderSuffix = $dirName }
 
+    if ($SourceGitFolder -and $NoSourceGitFolder) {
+        Write-Error "Pass --sourcegit-folder or --no-sourcegit-folder, not both."
+        return
+    }
+    if ($SourceGitFolder -or $NoSourceGitFolder) {
+        $registry.repos.$Repo | Add-Member -NotePropertyName 'sourceGitFolder' -NotePropertyValue ([bool]$SourceGitFolder) -Force
+        Save-WtwRegistry $registry
+        $repoEntry = $registry.repos.$Repo
+        if ($SourceGitFolder) {
+            Ensure-WtwSourceGitRepoFolder -RepoName $Repo -RepoEntry $repoEntry
+        }
+    }
+
     $meta = Initialize-WtwWorktreeMetadata `
         -RepoName $Repo -RepoEntry $repoEntry `
         -Task $Task -Branch $Branch `
         -WorktreePath $Path -FolderSuffix $folderSuffix `
-        -PrettyName $PrettyName -Color $Color
+        -PrettyName $PrettyName -Color $Color `
+        -Alias $Alias
 
     if (-not $meta.Success) { return }
 

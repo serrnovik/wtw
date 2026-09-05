@@ -216,12 +216,7 @@ function Backup-WtwCmuxConfig {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string] $ConfigPath)
 
-    if (-not (Test-Path $ConfigPath)) { return $null }
-
-    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $backupPath = "$ConfigPath.$timestamp.bak"
-    Copy-Item -Path $ConfigPath -Destination $backupPath -Force
-    return $backupPath
+    return Backup-WtwExternalConfig -System 'cmux' -Path $ConfigPath
 }
 
 function Save-WtwCmuxConfig {

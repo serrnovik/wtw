@@ -170,6 +170,7 @@ Describe 'Edit-WtwEntry' {
     It 'renames a repo key and remaps color prefixes' {
         InModuleScope wtw {
             Mock Sync-WtwWorkspace {}
+            Mock Sync-WtwSourceGitRepoDisplayName {}
             Edit-WtwEntry -Name 'demo' -Key 'snow'
             $reg = Get-WtwRegistry
             (Get-WtwPropertyNames -Object $reg.repos) | Should -Contain 'snow'
@@ -247,10 +248,23 @@ Describe 'Edit-WtwEntry' {
         }
     }
 
-    It 'refuses --alias on a worktree' {
+    It 'stores a worktree alias that matches spaces and hyphens' {
         InModuleScope wtw {
-            { Edit-WtwEntry -Name 'auth' -Alias 'x' -ErrorAction Stop } |
-                Should -Throw -ExpectedMessage '*--alias is for repos*'
+            Mock Sync-WtwWorkspace {}
+            Mock Add-WtwSourceGitRepository {}
+            Edit-WtwEntry -Name 'auth' -Alias 'onboarding video' -NoSync
+            $reg = Get-WtwRegistry
+            @($reg.repos.demo.worktrees.auth.aliases) | Should -Be @('onboarding video')
+            (Resolve-WtwTarget 'onboarding video').TaskName | Should -Be 'auth'
+            (Resolve-WtwTarget 'onboarding-video').TaskName | Should -Be 'auth'
+            (Resolve-WtwTarget 'onboarding').TaskName | Should -Be 'auth'
+        }
+    }
+
+    It 'refuses a worktree alias that collides with a repo' {
+        InModuleScope wtw {
+            { Edit-WtwEntry -Name 'auth' -Alias 'demo' -ErrorAction Stop } |
+                Should -Throw -ExpectedMessage '*collides with repo*'
         }
     }
 

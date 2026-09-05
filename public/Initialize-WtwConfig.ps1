@@ -25,12 +25,18 @@ function Initialize-WtwConfig {
     .PARAMETER StartupScriptBash
         Name of a bash-specific session script (e.g. "start-session.bash").
         Used as the per-shell override when entering a worktree from bash.
+    .PARAMETER Emoji
+        Optional prefix shown in SourceGit and ``wtw list`` (e.g. "🎸" or "🎭 ☸️").
+        Pass ``-`` / ``none`` to clear. Re-init without ``--emoji`` keeps the existing value.
     .EXAMPLE
         wtw init "app,my-app" --template ./workspace.template
         Register the current repo with aliases "app" and "my-app", using a local template file.
     .EXAMPLE
         wtw init "app" --startup-script start-repository-session.ps1
         Register with a custom session startup script.
+    .EXAMPLE
+        wtw init "sn1,sn" --emoji 🎸
+        Register with a SourceGit / list prefix.
     #>
     [CmdletBinding()]
     param(
@@ -42,7 +48,13 @@ function Initialize-WtwConfig {
         [string] $Template,  # alias or registry key of repo, or path to .template file
         [string] $StartupScript,
         [string] $StartupScriptZsh,
-        [string] $StartupScriptBash
+        [string] $StartupScriptBash,
+
+        [AllowEmptyString()]
+        [object] $Emoji,
+
+        [switch] $SourceGitFolder,
+        [switch] $NoSourceGitFolder
     )
 
     # Detect repo root
@@ -93,6 +105,23 @@ function Initialize-WtwConfig {
 
     # Alias collision check
     $registry = Get-WtwRegistry
+    if ($PSBoundParameters.ContainsKey('Emoji') -and -not (Test-WtwEmojiArgument $Emoji)) {
+        return
+    }
+    if ($SourceGitFolder -and $NoSourceGitFolder) {
+        Write-Error "Pass --sourcegit-folder or --no-sourcegit-folder, not both."
+        return
+    }
+    $existing = $null
+    if ((Get-WtwPropertyNames -Object $registry.repos) -contains $registryKey) {
+        $existing = $registry.repos.$registryKey
+    }
+    $resolvedEmoji = $null
+    if ($PSBoundParameters.ContainsKey('Emoji')) {
+        $resolvedEmoji = ConvertTo-WtwNormalizedRepoEmoji $Emoji
+    } elseif ($existing) {
+        $resolvedEmoji = Get-WtwRepoEmoji -RepoEntry $existing
+    }
     foreach ($existingName in (Get-WtwPropertyNames -Object $registry.repos)) {
         if ($existingName -eq $registryKey) { continue }
         $existingRepo = $registry.repos.$existingName
@@ -217,9 +246,14 @@ function Initialize-WtwConfig {
             aliases           = $aliasArray
             worktrees         = [PSCustomObject]@{}
         }
-        if ((Get-WtwPropertyNames -Object $registry.repos) -contains $registryKey) {
-            $existing = $registry.repos.$registryKey
-            if ($existing.worktrees) { $repoEntry.worktrees = $existing.worktrees }
+        if ($existing -and $existing.worktrees) { $repoEntry.worktrees = $existing.worktrees }
+        if ($resolvedEmoji) {
+            $repoEntry | Add-Member -NotePropertyName 'emoji' -NotePropertyValue $resolvedEmoji -Force
+        }
+        if ($SourceGitFolder -or $NoSourceGitFolder) {
+            $repoEntry | Add-Member -NotePropertyName 'sourceGitFolder' -NotePropertyValue ([bool]$SourceGitFolder) -Force
+        } elseif ($existing -and ((Get-WtwPropertyNames -Object $existing) -contains 'sourceGitFolder')) {
+            $repoEntry | Add-Member -NotePropertyName 'sourceGitFolder' -NotePropertyValue $existing.sourceGitFolder -Force
         }
         $registry.repos | Add-Member -NotePropertyName $registryKey -NotePropertyValue $repoEntry -Force
         Save-WtwRegistry $registry
@@ -250,16 +284,32 @@ function Initialize-WtwConfig {
             aliases           = $aliasArray
             worktrees         = [PSCustomObject]@{}
         }
-        if ((Get-WtwPropertyNames -Object $registry.repos) -contains $registryKey) {
-            $existing = $registry.repos.$registryKey
-            if ($existing.worktrees) { $repoEntry.worktrees = $existing.worktrees }
+        if ($existing -and $existing.worktrees) { $repoEntry.worktrees = $existing.worktrees }
+        if ($resolvedEmoji) {
+            $repoEntry | Add-Member -NotePropertyName 'emoji' -NotePropertyValue $resolvedEmoji -Force
+        }
+        if ($SourceGitFolder -or $NoSourceGitFolder) {
+            $repoEntry | Add-Member -NotePropertyName 'sourceGitFolder' -NotePropertyValue ([bool]$SourceGitFolder) -Force
+        } elseif ($existing -and ((Get-WtwPropertyNames -Object $existing) -contains 'sourceGitFolder')) {
+            $repoEntry | Add-Member -NotePropertyName 'sourceGitFolder' -NotePropertyValue $existing.sourceGitFolder -Force
         }
         $registry.repos | Add-Member -NotePropertyName $registryKey -NotePropertyValue $repoEntry -Force
         Save-WtwRegistry $registry
     }
 
+    $savedRepo = (Get-WtwRegistry).repos.$registryKey
+    if ($savedRepo) {
+        Sync-WtwSourceGitRepoDisplayName -RepoName $registryKey -RepoEntry $savedRepo
+        if (((Get-WtwPropertyNames -Object $savedRepo) -contains 'sourceGitFolder') -and $savedRepo.sourceGitFolder -eq $true) {
+            Ensure-WtwSourceGitRepoFolder -RepoName $registryKey -RepoEntry $savedRepo
+        }
+    }
+
     Write-Host ''
     Write-Host "  Registered '$registryKey' (aliases: $($aliasArray -join ', '))" -ForegroundColor Green
+    if ($resolvedEmoji) {
+        Write-Host "  Emoji:          $resolvedEmoji" -ForegroundColor Cyan
+    }
     if ($Template) {
         Write-Host "  Template shared from: $Template" -ForegroundColor DarkGray
     }

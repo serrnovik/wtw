@@ -910,6 +910,7 @@ function Set-WtwT3AddProjectBaseDirectory {
     # type names and corrupt the file.
     $temp = "$settingsPath.wtw-$PID.tmp"
     try {
+        Backup-WtwExternalConfig -System 't3' -Path $settingsPath | Out-Null
         Set-Content -Path $temp -Value ($settings | ConvertTo-Json -Depth 100) -NoNewline -ErrorAction Stop
         Move-Item -Path $temp -Destination $settingsPath -Force -ErrorAction Stop
     } catch {

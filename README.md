@@ -134,7 +134,7 @@ comparison on demand.
 
 ```powershell
 cd ~/projects/my-app
-wtw init "app,my-app"
+wtw init "app,my-app" --emoji 🎸
 
 cd ~/projects/api-service
 wtw init "api,api-service" --template ./workspace.code-workspace.template
@@ -176,20 +176,26 @@ wtw wmux auth             # Windows: open the worktree as a wmux workspace (or: 
 wtw remove auth           # removes worktree + workspace + branch
 ```
 
-### 5. Clean up stale AI worktrees
+### 5. Clean up stale worktrees and merged branches
 
 ```powershell
-wtw clean --dry-run       # preview (codex, cursor, conductor worktrees)
-wtw clean                 # interactive selection + removal
+wtw clean                      # ask: worktrees / branches / all, then pick items
+wtw clean --worktrees --dry-run
+wtw clean --branches --dry-run # leftover local branches already merged into main
+wtw clean --all --force
 ```
+
+`--branches` uses `git branch --merged` against the repo default branch and
+skips any branch still checked out in a worktree (`wtw remove` those first).
+Delete is `git branch -d` only — unmerged branches are never force-deleted.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X]` | Register current repo with aliases, template, and per-shell session scripts |
-| `wtw add [path] [--repo X --task X]` | Import an existing worktree into the registry |
-| `wtw create <task> [--branch X] [--open] [--no-branch]` | Create worktree + workspace + branch |
+| `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X] [--emoji X] [--sourcegit-folder]` | Register current repo with aliases, template, per-shell session scripts, optional SourceGit / list prefix, and optional SourceGit group folder |
+| `wtw add [path] [--repo X --task X] [--alias a,b] [--sourcegit-folder]` | Import an existing worktree into the registry |
+| `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b]` | Create worktree + workspace + branch |
 | `wtw list [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`--wide` = full aliases and paths) |
 | `wtw <name>` | Switch to repo/worktree — implicit `go` (cd + session init) |
 | `wtw go <name>` | Same as above, explicit |
@@ -207,12 +213,12 @@ wtw clean                 # interactive selection + removal
 | `wtw wmux [name]` | Open the worktree as a wmux workspace on Windows (aliases: `wm`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
-| `wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X]` | Edit a registry record (aliases: `rename`, `ren`) |
+| `wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X] [--emoji X] [--sourcegit-folder]` | Edit a registry record (aliases: `rename`, `ren`). `--emoji` and `--sourcegit-folder` are repo-only; `--alias` on a worktree adds extra typed names |
 | `wtw workspace <name> [--main] [--worktree-path X]` | Generate workspace file only (no git worktree) |
 | `wtw copy <name> [--code-folder X]` | Standalone workspace copy from template |
 | `wtw color [name] [hex\|random]` | Set workspace color |
 | `wtw sync --all [--dry-run] [--repo X]` | Re-apply template to all managed workspaces |
-| `wtw clean [--dry-run] [--force]` | Clean stale AI worktrees (codex, cursor, conductor) |
+| `wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]` | Clean stale AI / detached worktrees and leftover merged local branches |
 | `wtw install [--skip-profile]` | Install this checkout globally to `~/.wtw/module/` |
 | `wtw update [--check] [--yes] [--force]` | Update the global install to the latest PowerShell Gallery release |
 | `wtw skill [--agent claude\|agents\|all]` | Install AI skill into current repo for agent support |
@@ -490,6 +496,16 @@ wtw add /path/to/worktree --repo my-app --task my-feature
 
 After importing, the worktree appears in `wtw list` and you can use `wtw go my-feature`.
 
+To keep a short name without renaming the folder or task (typical after adopting a T3/agent worktree):
+
+```powershell
+wtw add ~/.t3/worktrees/snowmain1/t3code-ad4f13f1 --alias "onboarding video"
+wtw edit t3code-ad4f13f1 --alias "onboarding video"
+wtw go onboarding          # or: wtw go onboarding video
+```
+
+Spaces and hyphens are equivalent. `--alias none` clears the extra names. Derived `alias-task` names (`sn1-t3code-ad4f13f1`) stay.
+
 ## Name Resolution
 
 All commands that accept a target name (`go`, `open`, `remove`, editor shortcuts, and the implicit go) share the same resolution logic via `Resolve-WtwTarget`:
@@ -497,6 +513,13 @@ All commands that accept a target name (`go`, `open`, `remove`, editor shortcuts
 1. **Exact repo alias** — `app` goes to main repo
 2. **alias-task format** — `app-auth` resolves to repo `app` + worktree `auth`
 3. **Bare task name** — `auth` searches all repos (works if unambiguous)
+4. **Worktree alias** — `onboarding video` / `onboarding-video` (spaces and hyphens match)
+5. **Task prefix / substring** — `au` → `auth`, `content` → `my-content-engine`
+6. **Worktree alias prefix / substring**
+7. **Pretty name, then branch** — lower priority so a task or alias always wins. `wtw go onboarding` can land on `t3code/pronouncefit-…-onboarding-video` with no rename
+8. **Fuzzy match** (Levenshtein) on task / alias names
+
+Unquoted leftovers are joined for `go` / `open` / `info` / editor shortcuts: `wtw go onboarding video` is the same as `wtw go "onboarding video"`.
 
 Multiple aliases per repo: `wtw init "app,my-app"` registers both.
 
@@ -788,7 +811,16 @@ them and `wtw remove` cleans that registration up:
 - **Superset** — creates/removes a local workspace named from the same pretty
   name when the Superset CLI is installed and the repo project can be matched.
 - **SourceGit** — adds/removes the worktree from managed repositories when
-  SourceGit is installed.
+  SourceGit is installed. If a group folder already exists for the repo
+  (`wtw-folder:<repo>` or a folder that already holds the main checkout),
+  new worktrees land under it. `--sourcegit-folder` on `init` / `add` / `edit`
+  creates that folder and moves the main checkout in; `--no-sourcegit-folder`
+  only skips *creating* one — an existing folder still collects new worktrees.
+  Repo-level `--emoji` prefixes the main checkout
+  (and any SourceGit group named after the registry key), e.g. `🎸 snowmain1`.
+  Before every write, wtw copies `preference.json` into `~/.wtw/backups/sourcegit/`
+  (last 3 copies plus one snapshot each at 3 / 7 / 30 days). The same rotating
+  backup is used for cmux, Codex, Claude, Cursor, and T3 configs wtw edits.
 - **cmux** — `wtw cmux <name>` (alias `wtw cm <name>`) selects an existing live
   cmux workspace for the worktree's path, or creates one via
   `cmux new-workspace --name <pretty> --cwd <path>`. `wtw create` registers a

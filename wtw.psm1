@@ -103,6 +103,8 @@ if ($wtwEdition -ne 'Core') {
 Set-StrictMode -Version Latest
 
 $script:WtwCmuxApplyingFromInit = $false
+$script:WtwSourceGitForce = $false
+$script:WtwBackupRoot = $null
 
 $dotSourceParams = @{
     Filter      = '*.ps1'

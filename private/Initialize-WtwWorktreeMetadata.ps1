@@ -42,6 +42,8 @@ function Initialize-WtwWorktreeMetadata {
     .PARAMETER Color
         Optional palette/hex/'random' input passed to Resolve-WtwColorInput.
         Defaults to 'random' (max-contrast pick).
+    .PARAMETER Alias
+        Optional extra typed names for this worktree (``wtw go``, completions).
     #>
     [CmdletBinding()]
     param(
@@ -52,7 +54,8 @@ function Initialize-WtwWorktreeMetadata {
         [Parameter(Mandatory)] [string] $WorktreePath,
         [Parameter(Mandatory)] [string] $FolderSuffix,
         [string] $PrettyName,
-        [string] $Color
+        [string] $Color,
+        [string[]] $Alias
     )
 
     $result = @{
@@ -66,6 +69,17 @@ function Initialize-WtwWorktreeMetadata {
         CursorWorkspacePath = $null
         CmuxCommandKey      = $null
         WmuxWorkspaceName   = $null
+    }
+
+    $aliasArray = @()
+    if (@($Alias | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -and -not (Test-WtwAliasClearToken -Value $Alias)) {
+        [string[]] $aliasArray = Split-WtwAliasList -Value $Alias
+        if ($aliasArray.Count -gt 0) {
+            $registryForAlias = Get-WtwRegistry
+            if (Test-WtwWorktreeAliasCollision -Registry $registryForAlias -RepoName $RepoName -TaskName $Task -Aliases $aliasArray) {
+                return $result
+            }
+        }
     }
 
     # Pick color: explicit hex/name/random, else default to random max-contrast pick.
@@ -154,6 +168,9 @@ function Initialize-WtwWorktreeMetadata {
         cmuxCommandKey      = $null
         wmuxWorkspaceName   = $null
     }
+    if ($aliasArray.Count -gt 0) {
+        $wtEntry | Add-Member -NotePropertyName 'aliases' -NotePropertyValue $aliasArray -Force
+    }
     $registry.repos.$RepoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
 
@@ -212,7 +229,7 @@ function Initialize-WtwWorktreeMetadata {
     }
 
     # Register in SourceGit's managed repository list (no-op when app absent).
-    Add-WtwSourceGitRepository -Path $WorktreePath -Name $PrettyName -Hex $resolvedColor
+    Add-WtwSourceGitRepository -Path $WorktreePath -Name $PrettyName -Hex $resolvedColor -RepoName $RepoName
 
     # Attach the user's local AI-agent overlay when the optional personal
     # `agentctl` helper is installed. Best-effort: must not block setup.

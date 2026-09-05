@@ -16,6 +16,10 @@ function Show-WtwCommandHelp {
             '  --startup-script-bash <name> Bash-specific session script',
             '  --workspaces-dir <path>     Override workspace files directory',
             '  --name <key>                Override the registry key',
+            '  --emoji <prefix>            SourceGit / list prefix (e.g. 🎸 or "🎭 ☸️")',
+            '                              Pass - / none to clear. Re-init keeps the existing value.',
+            '  --sourcegit-folder          Put the main checkout in a SourceGit group folder',
+            '  --no-sourcegit-folder       Do not create a folder (existing folders still collect worktrees)',
             '',
             'Session scripts are detected by extension:',
             '  .ps1  -> run with pwsh       (default for PowerShell sessions)',
@@ -40,10 +44,15 @@ function Show-WtwCommandHelp {
             '  --name <pretty>   Display name (Superset workspace title, cmux entry, etc.)',
             '  --color <hex|name|random>',
             '                    Workspace color. Same input as `create --color`.',
+            '  --alias a,b       Extra typed names for wtw go (spaces allowed)',
+            '  --sourcegit-folder / --no-sourcegit-folder',
+            '                    Create or skip a SourceGit group for the parent repo',
             '',
             'Examples:',
             '  wtw add ../snowmain1_foo --task foo',
-            '  cd ../snowmain1_foo ; wtw add --task foo --color "forest green"'
+            '  cd ../snowmain1_foo ; wtw add --task foo --color "forest green"',
+            '  wtw add ~/.t3/worktrees/snowmain1/t3code-ad4f13f1 --alias "onboarding video"',
+            '  wtw add . --sourcegit-folder'
         ) }
         'create'      { @(
             'wtw create <task> [options]',
@@ -74,6 +83,7 @@ function Show-WtwCommandHelp {
             '                      "forest green", "navy"), or "random" (default).',
             '  --repo <alias>      Target repo when not auto-detected from cwd',
             '  --open              Open the workspace in the default editor after creating',
+            '  --alias a,b         Extra typed names for wtw go (spaces allowed)',
             '',
             'Examples:',
             '  wtw create auth                                   # new branch + new worktree',
@@ -109,9 +119,14 @@ function Show-WtwCommandHelp {
                 '  --task <key>      Registry key used by `wtw go` and aliases (sn-<key>)',
                 '',
                 'Repo options:',
-                '  --alias a,b       Replace typed aliases',
+                '  --alias a,b       Repo: replace typed aliases. Worktree: extra names',
+                '                    (e.g. "onboarding video"). Pass - / none to clear worktree aliases',
                 '  --name a,b        Same as --alias when the target is a repo',
                 '  --key <name>      Registry key (also remaps color assignments)',
+                '  --emoji <prefix>  SourceGit / list prefix for the whole repo',
+                '                    Pass - / none to clear',
+                '  --sourcegit-folder / --no-sourcegit-folder',
+                '                    Create or skip a SourceGit group folder',
                 '',
                 'Shared:',
                 '  --repo <name>     Disambiguate when the same task exists in multiple repos',
@@ -124,7 +139,10 @@ function Show-WtwCommandHelp {
                 '  wtw edit auth --name "Login"     Change the worktree display name',
                 '  wtw rename auth login            Same as --name login',
                 '  wtw edit auth --task login       Retarget wtw go login',
-                '  wtw edit snowmain1 --alias sn,sm Replace repo aliases'
+                '  wtw edit snowmain1 --alias sn,sm Replace repo aliases',
+                '  wtw edit snowmain1 --emoji 🎸     Prefix SourceGit / list names',
+                '  wtw edit t3code-ad4f13f1 --alias "onboarding video"',
+                '  wtw edit snowmain1 --sourcegit-folder'
             )
         }
         'workspace'   { @('wtw workspace <name>', 'Generate a workspace file only (no git worktree).', '', 'Arguments:', '  name    Target repo/worktree') }
@@ -132,7 +150,26 @@ function Show-WtwCommandHelp {
         'copy'        { @('wtw copy <name>', 'Create a standalone copy of workspace from template.', '', 'Arguments:', '  name    Target repo/worktree') }
         'sync'        { @('wtw sync [name] [--all]', 'Re-apply template settings to managed workspaces.', '', 'Arguments:', '  name    Target workspace (alias, task, or file path; default: detected from cwd)', '', 'Options:', '  --all               Sync all managed workspaces', '  --repo <name>       Limit --all to a specific repo', '  --template <path>   Override template source', '  --dry-run           Show what would be synced without writing', '  --color-source      json | workspace (single-file sync; skips interactive prompt)', '                      Default when omitted: prompt if interactive, else json-first', '', 'Examples:', '  wtw sync                  Sync current workspace', '  wtw sync proj-fix         Sync a specific workspace by name', '  wtw sync --all            Sync all registered workspaces', '  wtw sync --all --repo proj Sync all workspaces for one repo') }
         'color'       { @('wtw color [name] [hex|random]', 'Set or show the Peacock color for a workspace.', '', 'Arguments:', '  name     Target workspace (default: detected from cwd)', '  color    A hex color (rrggbb) or "random" for max contrast', '', 'Options:', '  --no-sync   Skip syncing the workspace file after color change', '', 'Examples:', '  wtw color                  Show color for current workspace', '  wtw color proj random      Pick a maximally contrasting color', '  wtw color my-task e05d44   Set a specific color', '', 'Note: # starts a comment in PowerShell. Either omit it', '  or quote it: ''#e05d44''') }
-        'clean'       { @('wtw clean', 'Remove stale AI-created worktrees that no longer have active branches.') }
+        'clean'       { @(
+            'wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]',
+            'Remove stale AI / detached worktrees and leftover local branches',
+            'that are already merged into the repo default branch (main/master).',
+            '',
+            'Options:',
+            '  --worktrees   Stale AI folders (codex / cursor / conductor) and detached HEADs',
+            '  --branches    Local branches fully merged into the default branch',
+            '                (skips any branch still checked out in a worktree)',
+            '  --all         Both sweeps',
+            '  --dry-run     List only',
+            '  --force       Skip the all/none/1,3,5 picker',
+            '',
+            'With none of --worktrees / --branches / --all, asks which sweep to run.',
+            '',
+            'Examples:',
+            '  wtw clean',
+            '  wtw clean --branches --dry-run',
+            '  wtw clean --all --force'
+        ) }
         'host'        { @(
             'wtw host [list|show|discover|add|remove|sync|trust|test] [name] [options]',
             'Manage the remote machines `wtw --on <host>` can open worktrees on.',

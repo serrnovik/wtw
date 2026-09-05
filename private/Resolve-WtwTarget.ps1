@@ -29,9 +29,12 @@ function Resolve-WtwTarget {
           1b. Repo name/alias prefix match -> unique prefix on repo names and aliases
           2. "alias-task" exact match      -> returns repo + worktree
           3. Bare task name exact match    -> searches all repos for unique match
+          3b. Exact worktree alias         -> typed aliases set with ``wtw edit --alias``
           4. "alias-task" prefix match     -> unique prefix on task name (proj-b -> proj-backend-refactor)
           5. Bare task name prefix match   -> unique prefix across all repos
           5b. Substring match on task     -> "content" matches "my-content-engine"
+          5c. Worktree alias prefix / substring
+          5d. Pretty-name then branch match (lower priority than task / alias)
           6. Fuzzy match (Levenshtein)    -> auto-resolve if unique close match, suggest if tied
     .OUTPUTS
         PSCustomObject with: RepoName, RepoEntry, TaskName, WorktreeEntry
@@ -191,6 +194,15 @@ function Resolve-WtwTarget {
         return $null
     }
 
+    # 3b. Exact worktree alias (spaces/hyphens equivalent)
+    $aliasExact = @(Get-WtwMatchingWorktrees -Registry $registry -RestrictRepo $restrictRepo -Name $Name -Mode Exact -Field Alias)
+    if ($aliasExact.Count -eq 1) { return $aliasExact[0] }
+    if ($aliasExact.Count -gt 1) {
+        $names = ($aliasExact | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
+        Write-Error "Ambiguous alias '$Name'. Matches: $names"
+        return $null
+    }
+
     # 4. "alias-task" prefix match - proj-b matches proj-backend-refactor
     if ($Name -match '^(.+?)-(.+)$') {
         $aliasOrName  = $Matches[1]
@@ -283,6 +295,38 @@ function Resolve-WtwTarget {
         $names = ($substringFound | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
         Write-Error "Ambiguous substring '$Name'. Matches: $names"
         return $null
+    }
+
+    # 5c. Worktree alias prefix, then substring
+    $aliasPrefix = @(Get-WtwMatchingWorktrees -Registry $registry -RestrictRepo $restrictRepo -Name $Name -Mode Prefix -Field Alias)
+    if ($aliasPrefix.Count -eq 1) { return $aliasPrefix[0] }
+    if ($aliasPrefix.Count -gt 1) {
+        $names = ($aliasPrefix | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
+        Write-Error "Ambiguous alias prefix '$Name'. Matches: $names"
+        return $null
+    }
+    $aliasSub = @(Get-WtwMatchingWorktrees -Registry $registry -RestrictRepo $restrictRepo -Name $Name -Mode Substring -Field Alias)
+    if ($aliasSub.Count -eq 1) { return $aliasSub[0] }
+    if ($aliasSub.Count -gt 1) {
+        $names = ($aliasSub | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
+        Write-Error "Ambiguous alias substring '$Name'. Matches: $names"
+        return $null
+    }
+
+    # 5d. Pretty name then branch — lower priority so a task/alias always wins
+    foreach ($field in @('Pretty', 'Branch')) {
+        foreach ($mode in @('Exact', 'Prefix', 'Substring')) {
+            $hits = @(Get-WtwMatchingWorktrees -Registry $registry -RestrictRepo $restrictRepo -Name $Name -Mode $mode -Field $field)
+            if ($hits.Count -eq 1) {
+                Write-Verbose "$field $mode match: '$Name' -> '$($hits[0].TaskName)'"
+                return $hits[0]
+            }
+            if ($hits.Count -gt 1) {
+                $names = ($hits | ForEach-Object { "$($_.RepoName)/$($_.TaskName)" }) -join ', '
+                Write-Error "Ambiguous $($field.ToLowerInvariant()) $mode '$Name'. Matches: $names"
+                return $null
+            }
+        }
     }
 
     # 6. Fuzzy match - find closest target by edit distance

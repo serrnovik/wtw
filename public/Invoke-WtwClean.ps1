@@ -1,24 +1,43 @@
 function Invoke-WtwClean {
     <#
     .SYNOPSIS
-        Find and remove stale AI-created worktrees.
+        Find and remove stale AI worktrees and/or local branches already merged.
     .DESCRIPTION
-        Scans configured stale worktree paths (codex, cursor, conductor) and registered
-        repos for detached HEAD worktrees. Shows sizes and allows interactive selection
-        of which items to remove. Prunes git worktree metadata after removal.
+        Two independent sweeps:
+
+          --worktrees   stale AI folders (codex / cursor / conductor) and
+                        detached-HEAD worktrees on registered repos
+          --branches    local branches fully merged into the repo default
+                        branch, skipping any branch still checked out
+          --all         both
+
+        With none of those flags, asks which sweep to run. Item pick
+        (all / none / 1,3,5) still applies unless ``--force``.
+    .PARAMETER All
+        Run both sweeps.
+    .PARAMETER Worktrees
+        Only the stale-worktree sweep.
+    .PARAMETER Branches
+        Only the merged-branch sweep.
     .PARAMETER DryRun
-        Preview stale worktrees without removing anything.
+        Preview without removing anything.
     .PARAMETER Force
-        Remove all stale worktrees without interactive prompting.
+        Remove every listed item without the all/none/1,3,5 picker.
     .EXAMPLE
-        wtw clean --dry-run
-        List all stale worktrees with sizes but make no changes.
+        wtw clean
+        Ask worktrees / branches / all, then pick items.
     .EXAMPLE
-        wtw clean --force
-        Remove all stale worktrees without prompting.
+        wtw clean --branches --dry-run
+        List leftover merged local branches.
+    .EXAMPLE
+        wtw clean --all --force
+        Remove every stale worktree and every leftover merged branch.
     #>
     [CmdletBinding()]
     param(
+        [switch] $All,
+        [switch] $Worktrees,
+        [switch] $Branches,
         [switch] $DryRun,
         [switch] $Force
     )
@@ -30,22 +49,46 @@ function Invoke-WtwClean {
     }
 
     Write-Host ''
+    $scope = Resolve-WtwCleanScope -All:$All -Worktrees:$Worktrees -Branches:$Branches
+    if (-not $scope) { return }
+
+    $registry = Get-WtwRegistry
+    $didWork = $false
+
+    if ($scope.Worktrees) {
+        $didWork = $true
+        Invoke-WtwCleanWorktrees -Config $config -Registry $registry -DryRun:$DryRun -Force:$Force
+    }
+    if ($scope.Branches) {
+        $didWork = $true
+        Invoke-WtwCleanMergedBranches -Registry $registry -DryRun:$DryRun -Force:$Force
+    }
+    if (-not $didWork) {
+        Write-Host '  Nothing selected.' -ForegroundColor DarkGray
+    }
+}
+
+function Invoke-WtwCleanWorktrees {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Config,
+        [Parameter(Mandatory)] $Registry,
+        [switch] $DryRun,
+        [switch] $Force
+    )
+
     Write-Host '  Scanning for stale worktrees...' -ForegroundColor Cyan
 
-    # Build a guard set of live Superset workspace dirs so we never delete an
-    # active checkout. Superset materializes worktrees at:
-    #   ~/.superset/worktrees/<project-slug>/<workspace-name>
-    #   ~/.superset/worktrees/<project-id>/<workspace-name>
     $supersetGuard = @{}
     if (Get-Command superset -ErrorAction SilentlyContinue) {
         $projJson = & superset projects list --json 2>$null
         $projExit = $LASTEXITCODE
-        $wsJson   = & superset workspaces list --json 2>$null
-        $wsExit   = $LASTEXITCODE
+        $wsJson = & superset workspaces list --json 2>$null
+        $wsExit = $LASTEXITCODE
         if ($projExit -eq 0 -and $wsExit -eq 0 -and $projJson -and $wsJson) {
             try {
                 $projs = $projJson | ConvertFrom-Json
-                $ws    = $wsJson | ConvertFrom-Json
+                $ws = $wsJson | ConvertFrom-Json
                 $projById = @{}
                 foreach ($p in $projs) { $projById[$p.id] = $p }
                 foreach ($w in $ws) {
@@ -62,9 +105,12 @@ function Invoke-WtwClean {
     }
 
     $staleItems = @()
+    $stalePaths = @()
+    if ((Get-WtwPropertyNames -Object $Config) -contains 'staleWorktreePaths' -and $Config.staleWorktreePaths) {
+        $stalePaths = @($Config.staleWorktreePaths)
+    }
 
-    # 1. Scan stale worktree paths (AI tools)
-    foreach ($stalePath in $config.staleWorktreePaths) {
+    foreach ($stalePath in $stalePaths) {
         $resolvedPath = $stalePath.Replace('~', $HOME)
         $resolvedPath = [System.IO.Path]::GetFullPath($resolvedPath)
 
@@ -73,10 +119,8 @@ function Invoke-WtwClean {
         $toolName = Split-Path (Split-Path $resolvedPath -Parent) -Leaf
         if ($toolName -eq $HOME) { $toolName = Split-Path $resolvedPath -Leaf }
 
-        # Find all repo-like directories under the stale path
         $dirs = Get-ChildItem -Path $resolvedPath -Directory -ErrorAction SilentlyContinue
         foreach ($dir in $dirs) {
-            # Look for repo directories inside (e.g., .codex/worktrees/3cc3/myrepo/)
             $repoDirs = Get-ChildItem -Path $dir.FullName -Directory -ErrorAction SilentlyContinue
             if ($repoDirs) {
                 foreach ($repoDir in $repoDirs) {
@@ -97,7 +141,6 @@ function Invoke-WtwClean {
                 }
             } else {
                 if ($supersetGuard.ContainsKey($dir.FullName)) { continue }
-                # Might be a flat worktree dir
                 $gitFile = Join-Path $dir.FullName '.git'
                 if (Test-Path $gitFile) {
                     $size = Get-DirectorySize $dir.FullName
@@ -115,10 +158,8 @@ function Invoke-WtwClean {
         }
     }
 
-    # 2. Scan registered repos for detached HEAD worktrees
-    $registry = Get-WtwRegistry
-    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
-        $repo = $registry.repos.$repoName
+    foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
+        $repo = $Registry.repos.$repoName
         if (-not (Test-Path $repo.mainPath)) { continue }
 
         $wtList = git -C $repo.mainPath worktree list --porcelain 2>$null
@@ -131,9 +172,7 @@ function Invoke-WtwClean {
             } elseif ($line -match '^HEAD (.+)$' -and $currentWt) {
                 $currentWt.head = $Matches[1]
             } elseif ($line -eq 'detached' -and $currentWt) {
-                # Skip main repo
                 if ($currentWt.path -ne $repo.mainPath) {
-                    # Skip if already in our stale list
                     $alreadyListed = $staleItems | Where-Object { $_.Path -eq $currentWt.path }
                     if (-not $alreadyListed -and (Test-Path $currentWt.path)) {
                         $dir = Get-Item $currentWt.path
@@ -160,9 +199,7 @@ function Invoke-WtwClean {
         return
     }
 
-    # Sort by size descending
-    $staleItems = $staleItems | Sort-Object -Property Size -Descending
-
+    $staleItems = @($staleItems | Sort-Object -Property Size -Descending)
     $totalSize = ($staleItems | Measure-Object -Property Size -Sum).Sum
 
     Write-Host ''
@@ -176,27 +213,9 @@ function Invoke-WtwClean {
         return
     }
 
-    # Interactive selection
-    if (-not $Force) {
-        Write-Host '  Options:' -ForegroundColor Yellow
-        Write-Host '    all    - Remove all stale worktrees'
-        Write-Host '    none   - Cancel'
-        Write-Host '    1,3,5  - Remove specific items (by number)'
-        Write-Host ''
-        $selection = Read-Host '  Select'
+    $staleItems = Select-WtwCleanItems -Items $staleItems -Force:$Force -Noun 'stale worktrees'
+    if ($null -eq $staleItems) { return }
 
-        if ($selection -eq 'none' -or -not $selection) {
-            Write-Host '  Cancelled.' -ForegroundColor DarkGray
-            return
-        }
-
-        if ($selection -ne 'all') {
-            $indices = $selection -split '[,\s]+' | ForEach-Object { [int]$_ - 1 }
-            $staleItems = $indices | ForEach-Object { $staleItems[$_] } | Where-Object { $_ }
-        }
-    }
-
-    # Remove selected items
     $removedSize = 0
     $removedCount = 0
 
@@ -204,10 +223,9 @@ function Invoke-WtwClean {
         Write-Host "  Removing: $($item.Path)..." -ForegroundColor Cyan -NoNewline
 
         try {
-            # Try git worktree remove first
             $parentRepo = $null
-            foreach ($rn in (Get-WtwPropertyNames -Object $registry.repos)) {
-                $r = $registry.repos.$rn
+            foreach ($rn in (Get-WtwPropertyNames -Object $Registry.repos)) {
+                $r = $Registry.repos.$rn
                 if ($item.Path.StartsWith($r.mainPath) -or $item.Repo -eq (Split-Path $r.mainPath -Leaf)) {
                     $parentRepo = $r.mainPath
                     break
@@ -218,7 +236,6 @@ function Invoke-WtwClean {
                 git -C $parentRepo worktree remove $item.Path --force 2>$null
             }
 
-            # If still exists, force remove
             if (Test-Path $item.Path) {
                 Remove-Item -Path $item.Path -Recurse -Force
             }
@@ -231,9 +248,8 @@ function Invoke-WtwClean {
         }
     }
 
-    # Prune all registered repos
-    foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
-        $repo = $registry.repos.$repoName
+    foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
+        $repo = $Registry.repos.$repoName
         if (Test-Path $repo.mainPath) {
             git -C $repo.mainPath worktree prune 2>$null
         }
@@ -243,17 +259,83 @@ function Invoke-WtwClean {
     Write-Host "  Removed $removedCount worktrees, freed $(Format-Size $removedSize)" -ForegroundColor Green
 }
 
+function Invoke-WtwCleanMergedBranches {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Registry,
+        [switch] $DryRun,
+        [switch] $Force
+    )
+
+    Write-Host '  Scanning for merged local branches...' -ForegroundColor Cyan
+
+    $items = @()
+    $skipped = @()
+    foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
+        $repo = $Registry.repos.$repoName
+        $mainPath = Get-WtwPropertyValue -Object $repo -Name 'mainPath'
+        if (-not $mainPath -or -not (Test-Path $mainPath)) { continue }
+
+        $found = Get-WtwMergedLocalBranches -RepoPath $mainPath -RepoName $repoName
+        if ($found.Items) { $items += @($found.Items) }
+        foreach ($name in @($found.Skipped)) {
+            $skipped += "$repoName/$name"
+        }
+    }
+
+    if ($items.Count -eq 0) {
+        Write-Host '  No leftover merged branches found.' -ForegroundColor Green
+        if ($skipped.Count -gt 0) {
+            Write-Host "  Still checked out in a worktree (use wtw remove): $($skipped -join ', ')" -ForegroundColor DarkGray
+        }
+        return
+    }
+
+    Write-Host ''
+    Write-Host "  Found $($items.Count) merged local branch(es)" -ForegroundColor Yellow
+    Write-Host ''
+    Format-WtwTable $items @('Repo', 'Branch', 'Into', 'Status')
+    Write-Host ''
+    if ($skipped.Count -gt 0) {
+        Write-Host "  Skipped (still in a worktree): $($skipped -join ', ')" -ForegroundColor DarkGray
+        Write-Host ''
+    }
+
+    if ($DryRun) {
+        Write-Host '  (dry-run: no changes made)' -ForegroundColor DarkGray
+        return
+    }
+
+    $items = Select-WtwCleanItems -Items $items -Force:$Force -Noun 'merged branches'
+    if ($null -eq $items) { return }
+
+    $removed = 0
+    foreach ($item in $items) {
+        $repo = $Registry.repos.($item.Repo)
+        $mainPath = Get-WtwPropertyValue -Object $repo -Name 'mainPath'
+        Write-Host "  Deleting $($item.Repo)/$($item.Branch)..." -ForegroundColor Cyan -NoNewline
+        git -C $mainPath branch -d $item.Branch 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $removed++
+            Write-Host ' done' -ForegroundColor Green
+        } else {
+            Write-Host ' FAILED (not fully merged, or still checked out)' -ForegroundColor Red
+        }
+    }
+
+    Write-Host ''
+    Write-Host "  Deleted $removed merged branch(es)." -ForegroundColor Green
+}
+
 function Get-DirectorySize {
     param([string] $Path)
     try {
         if (-not $IsWindows) {
-            # du -sk is orders of magnitude faster than Get-ChildItem recursion
             $duOutput = du -sk $Path 2>$null
             if ($duOutput -match '^\s*(\d+)') {
                 return [long]$Matches[1] * 1024
             }
         }
-        # Fallback for Windows
         $bytes = (Get-ChildItem -Path $Path -Recurse -File -Force -ErrorAction SilentlyContinue |
             Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
         return [long]($bytes ?? 0)

@@ -100,7 +100,7 @@ function Set-WtwColor {
         Save-WtwRegistry $registry
 
         # Keep SourceGit's bookmark + display name in sync with the new color
-        Add-WtwSourceGitRepository -Path $target.WorktreeEntry.path -Name $newPretty -Hex $newColor
+        Add-WtwSourceGitRepository -Path $target.WorktreeEntry.path -Name $newPretty -Hex $newColor -RepoName $target.RepoName
     }
 
     Write-Host ''

@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.14'
+    ModuleVersion     = '0.2.16'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -40,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'Adds `wtw edit` (aliases: rename, ren) to update a registry record in place: worktree display name and task key, repo aliases and registry key. Does not move git worktrees or rename branches.'
+            ReleaseNotes = 'Worktree `--alias` (spaces allowed) so an adopted T3/agent checkout can be called `wtw go onboarding`. Shared name resolution also matches pretty names and branches at lower priority than task/alias. SourceGit: existing repo folders collect new worktrees; `--sourcegit-folder` / `--no-sourcegit-folder` on init/add/edit create or skip a group. `wtw clean --branches` deletes leftover local branches already merged into the default branch (`--worktrees` / `--all`; interactive when none). Also: rotating external-config backups, repo `--emoji`, and nested SourceGit add/remove.'
         }
     }
 }

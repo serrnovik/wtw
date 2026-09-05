@@ -113,6 +113,7 @@ function Set-WtwClaudeCodeProjectTrust {
 
     $temp = "$configPath.wtw-$PID.tmp"
     try {
+        Backup-WtwExternalConfig -System 'claude' -Path $configPath | Out-Null
         Set-Content -Path $temp -Value $json -NoNewline -ErrorAction Stop
         Move-Item -Path $temp -Destination $configPath -Force -ErrorAction Stop
     } catch {

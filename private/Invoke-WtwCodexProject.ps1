@@ -209,6 +209,7 @@ function Set-WtwCodexProjectTrust {
         $raw = $prefix + $header + [Environment]::NewLine + $trustLine + [Environment]::NewLine
     }
 
+    Backup-WtwExternalConfig -System 'codex' -Path $ConfigPath | Out-Null
     Set-Content -Path $ConfigPath -Value $raw -Encoding utf8
 }
 
@@ -239,6 +240,7 @@ function Remove-WtwCodexProjectTrust {
         $raw = $raw.Substring(0, $match.Index) + $newSection + $raw.Substring($match.Index + $section.Length)
     }
 
+    Backup-WtwExternalConfig -System 'codex' -Path $ConfigPath | Out-Null
     Set-Content -Path $ConfigPath -Value $raw.TrimEnd() -Encoding utf8
 }
 
@@ -392,6 +394,7 @@ function Set-WtwCodexProjectLabel {
     $state | Add-Member -NotePropertyName 'electron-workspace-root-labels' -NotePropertyValue $labels -Force
 
     try {
+        Backup-WtwExternalConfig -System 'codex' -Path $GlobalStatePath | Out-Null
         $state | ConvertTo-Json -Depth 80 -Compress | Set-Content -Path $GlobalStatePath -Encoding utf8
         return $true
     } catch {
@@ -501,6 +504,7 @@ function Remove-WtwCodexProjectLabel {
     }
 
     try {
+        Backup-WtwExternalConfig -System 'codex' -Path $GlobalStatePath | Out-Null
         $state | ConvertTo-Json -Depth 80 -Compress | Set-Content -Path $GlobalStatePath -Encoding utf8
         return $true
     } catch {

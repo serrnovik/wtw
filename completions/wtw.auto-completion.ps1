@@ -43,6 +43,17 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
                             $list.Add([ordered]@{ Name = "$a-$task"; Tip = $wtTip })
                         }
                     }
+                    if ((Get-WtwPropertyNames -Object $wt) -contains 'aliases' -and $wt.aliases) {
+                        foreach ($custom in @($wt.aliases)) {
+                            if ($custom) {
+                                $list.Add([ordered]@{ Name = [string]$custom; Tip = $wtTip })
+                                $shell = ([string]$custom).Trim() -replace '\s+', '-'
+                                if ($shell -and $shell -ne $custom) {
+                                    $list.Add([ordered]@{ Name = $shell; Tip = $wtTip })
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -239,18 +250,18 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
 
     if ($wordToComplete -like '-*' -or $wordToComplete -like '--*') {
         $flags = switch ($subCommand) {
-            'init'   { @('--template', '--startup-script', '--startup-script-zsh', '--startup-script-bash', '--workspaces-dir', '--name') }
+            'init'   { @('--template', '--startup-script', '--startup-script-zsh', '--startup-script-bash', '--workspaces-dir', '--name', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder') }
             'skill'  { @('--agent') }
-            'add'    { @('--repo', '--task', '--branch') }
-            'create' { @('--name', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track') }
-            'clean'  { @('--dry-run', '--force') }
+            'add'    { @('--repo', '--task', '--branch', '--name', '--color', '--alias', '--sourcegit-folder', '--no-sourcegit-folder') }
+            'create' { @('--name', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track', '--alias') }
+            'clean'  { @('--dry-run', '--force', '--all', '--worktrees', '--branches') }
             'remove' { @('--repo', '--force') }
             'rm'     { @('--repo', '--force') }
             'unregister' { @('--repo', '--force') }
             'unreg'      { @('--repo', '--force') }
-            'edit'       { @('--name', '--task', '--alias', '--key', '--repo', '--no-sync') }
-            'rename'     { @('--name', '--task', '--alias', '--key', '--repo', '--no-sync') }
-            'ren'        { @('--name', '--task', '--alias', '--key', '--repo', '--no-sync') }
+            'edit'       { @('--name', '--task', '--alias', '--key', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder', '--repo', '--no-sync') }
+            'rename'     { @('--name', '--task', '--alias', '--key', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder', '--repo', '--no-sync') }
+            'ren'        { @('--name', '--task', '--alias', '--key', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder', '--repo', '--no-sync') }
             'open'   { @('--repo', '--editor') }
             'list'   { @('--repo', '--detailed', '-d') }
             'ls'     { @('--repo', '--detailed', '-d') }
