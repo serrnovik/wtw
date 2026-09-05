@@ -323,7 +323,9 @@ _wtw_register_aliases() {
 
     # Generate a block of function definitions and eval it in the current shell
     local _wtw_defs=""
-    local _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s _wtw_wid _wtw_widx
+    local _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s _wtw_wid _wtw_widx _wtw_runtime_name
+    _wtw_runtime_name=$_wtw_pwsh
+    _wtw_runtime_name=${_wtw_runtime_name##*/}
     while IFS=$'\t' read -r _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s _wtw_wid _wtw_widx; do
         [ -z "$_wtw_a" ] && continue
         [[ "$_wtw_a" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
@@ -331,7 +333,7 @@ _wtw_register_aliases() {
         # A worktree aliased `cursor` used to replace the real `cursor` binary
         # and turn `wtw cursor` (or a bare `cursor`) into unbounded recursion.
         case "$_wtw_a" in
-            wtw|pwsh|powershell|cursor|code|antigravity|windsurf|codium|git|ssh|sudo|cd|ls) continue ;;
+            wtw|$_wtw_runtime_name|powershell|cursor|code|antigravity|windsurf|codium|git|ssh|sudo|cd|ls) continue ;;
         esac
         _wtw_p="${_wtw_p//\'/\'\\\'\'}"
         _wtw_c="${_wtw_c//\'/\'\\\'\'}"
