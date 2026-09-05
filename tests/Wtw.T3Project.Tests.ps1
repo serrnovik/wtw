@@ -4,14 +4,6 @@ BeforeAll {
     Get-ChildItem -Path "$PSScriptRoot/../public" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
     $script:originalBackupRoot = $env:WTW_BACKUP_ROOT
     $env:WTW_BACKUP_ROOT = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-bak-t3-" + [guid]::NewGuid())
-}
-
-AfterAll {
-    if ($env:WTW_BACKUP_ROOT -and (Test-Path $env:WTW_BACKUP_ROOT)) {
-        Remove-Item -Recurse -Force $env:WTW_BACKUP_ROOT -ErrorAction SilentlyContinue
-    }
-    $env:WTW_BACKUP_ROOT = $script:originalBackupRoot
-}
 
     $script:Sqlite = (Get-Command sqlite3 -CommandType Application -ErrorAction SilentlyContinue |
         Select-Object -First 1)?.Source
@@ -58,6 +50,13 @@ CREATE TABLE projection_projects (
 );
 '@ | & $script:Sqlite $Path
     }
+}
+
+AfterAll {
+    if ($env:WTW_BACKUP_ROOT -and (Test-Path $env:WTW_BACKUP_ROOT)) {
+        Remove-Item -Recurse -Force $env:WTW_BACKUP_ROOT -ErrorAction SilentlyContinue
+    }
+    $env:WTW_BACKUP_ROOT = $script:originalBackupRoot
 }
 
 Describe 'T3 Code project registration' -Skip:(-not (Get-Command sqlite3 -CommandType Application -ErrorAction SilentlyContinue)) {
