@@ -31,6 +31,30 @@ Describe 'Test-WtwEditorCli' {
         }
     }
 
+    It 'returns $false for a PowerShell function so wtw cursor cannot recurse' {
+        function global:wtw-function-only-editor { }
+        try {
+            Test-WtwEditorCli -Cmd 'wtw-function-only-editor' | Should -BeFalse
+        } finally {
+            Remove-Item function:global:wtw-function-only-editor -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'skips the cursor-agent PATH shim' {
+        $shimDir = Join-Path $script:tmp 'shim-bin'
+        New-Item -ItemType Directory -Path $shimDir | Out-Null
+        $shim = Join-Path $shimDir 'cursor'
+        Set-Content -Path $shim -Value "#!/bin/sh`n# Find cursor executable in PATH, excluding the current shim`nexit 1"
+        if (-not $IsWindows) { chmod +x $shim }
+        $oldPath = $env:PATH
+        try {
+            $env:PATH = $shimDir
+            Test-WtwEditorCli -Cmd 'cursor' | Should -BeFalse
+        } finally {
+            $env:PATH = $oldPath
+        }
+    }
+
     It 'returns $true for a real executable on PATH' {
         $realDir = Join-Path $script:tmp 'real'
         New-Item -ItemType Directory -Path $realDir | Out-Null
@@ -66,6 +90,7 @@ Describe 'Invoke-WtwEditorCli' {
     It 'opens Cursor workspaces in a new IDE window' {
         $script:cursorArguments = $null
         Mock Test-WtwEditorCli { $true }
+        Mock Get-WtwEditorCliPath { $null }
         Mock cursor {
             param($first, $second)
             $script:cursorArguments = @($first, $second)

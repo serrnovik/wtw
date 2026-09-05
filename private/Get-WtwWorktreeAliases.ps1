@@ -50,6 +50,21 @@ function ConvertTo-WtwShellAliasName {
     return (($Alias.Trim() -replace '\s+', '-'))
 }
 
+function Test-WtwReservedShellAliasName {
+    <#
+    .SYNOPSIS
+        True when a generated alias would shadow wtw, pwsh, or an editor CLI.
+    #>
+    param([AllowNull()] [string] $Name)
+
+    $key = ConvertTo-WtwLookupKey $Name
+    return $key -in @(
+        'wtw', 'pwsh', 'powershell',
+        'cursor', 'code', 'antigravity', 'windsurf', 'codium',
+        'git', 'ssh', 'sudo', 'cd', 'ls'
+    )
+}
+
 function Test-WtwLookupMatch {
     param(
         [string] $Query,

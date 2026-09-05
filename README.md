@@ -101,7 +101,7 @@ resolves to that one instead.
 wtw update --check      # report versions and where they came from, change nothing
 wtw update              # prompt, then replace the install with the latest release
 wtw update --yes        # no prompt
-wtw update --force      # bypass the 24h version cache and reinstall
+wtw update --force      # reinstall even when the versions already match
 ```
 
 A local build that is **newer** than the published release is normal while you
@@ -804,7 +804,9 @@ them and `wtw remove` cleans that registration up:
   writes for ChatGPT/Cursor. Plain `wtw claude <name>` just brings the app forward.
 - **Cursor** — registers the generated `.code-workspace` in Cursor's recent
   workspace list (`state.vscdb`) when Cursor and `sqlite3` are present.
-  `wtw cursor <name>` refreshes that entry before opening it. Cursor does not
+  `wtw cursor <name>` refreshes that entry before opening it. The
+  `~/.local/bin/cursor` stub from `cursor agent` is skipped so it cannot
+  recurse back into wtw. Cursor does not
   expose a separate stable label field in this state; it displays the workspace
   from the generated workspace filename/folder name. Colors come from the
   workspace's `workbench.colorCustomizations` and `wtw.color` settings.

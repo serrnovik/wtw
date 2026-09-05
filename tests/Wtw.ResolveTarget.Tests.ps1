@@ -88,6 +88,14 @@ Describe 'Resolve-WtwTarget worktree aliases and branches' {
         }
     }
 
+    It 'does not stack-overflow when fuzzy returns the same unresolved name' {
+        InModuleScope wtw {
+            Mock Get-WtwAllTargetNames { @('ghost-target') }
+            { Resolve-WtwTarget 'ghost-target' -ErrorAction SilentlyContinue } | Should -Not -Throw
+            Resolve-WtwTarget 'ghost-target' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        }
+    }
+
     It 'joins leftover go words so unquoted aliases still resolve' {
         InModuleScope wtw {
             Mock Enter-WtwWorktree { }

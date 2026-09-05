@@ -60,7 +60,7 @@ function Resolve-WtwEditorCommand {
     # handles those shortcuts.
     $allNames = $editors | ForEach-Object { $_.prefixes } | ForEach-Object { $_ } | Where-Object { $_.Length -ge 3 }
     $fuzzy = Resolve-WtwFuzzyMatch $Name $allNames
-    if ($fuzzy.Match) {
+    if ($fuzzy.Match -and $fuzzy.Match -ne $Name) {
         return (Resolve-WtwEditorCommand $fuzzy.Match)
     }
     # Tied or no match - fall through to target resolution

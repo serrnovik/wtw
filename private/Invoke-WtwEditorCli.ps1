@@ -46,8 +46,9 @@ function Invoke-WtwEditorCli {
     # 1. First CLI candidate that resolves to a real, runnable binary.
     $runnable = $candidates | Where-Object { Test-WtwEditorCli -Cmd $_ } | Select-Object -First 1
     if ($runnable) {
-        if ($PassThru) { return @{ Exe = $runnable; Arguments = $arguments } }
-        & $runnable @arguments
+        $exe = Get-WtwEditorCliPath -Cmd $runnable
+        if ($PassThru) { return @{ Exe = $(if ($exe) { $exe } else { $runnable }); Arguments = $arguments } }
+        if ($exe) { & $exe @arguments } else { & $runnable @arguments }
         return
     }
 
@@ -89,4 +90,19 @@ function Get-WtwEditorCliName {
     $member = Get-WtwEditorFamilyMember -Id $Cmd
     $candidates = if ($member) { @($member.Cli) } else { @($Cmd) }
     return ($candidates | Where-Object { Test-WtwEditorCli -Cmd $_ } | Select-Object -First 1)
+}
+
+function Get-WtwEditorCliPath {
+    <#
+    .SYNOPSIS
+        Absolute path of the first real editor CLI, skipping agent shims.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Cmd)
+
+    $found = @(Get-Command $Cmd -CommandType Application, ExternalScript -All -ErrorAction SilentlyContinue)
+    foreach ($candidate in $found) {
+        if (Test-WtwEditorCliCandidate $candidate) { return $candidate.Source }
+    }
+    return $null
 }

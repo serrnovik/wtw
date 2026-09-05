@@ -16,10 +16,40 @@ function Test-WtwEditorCli {
         CLI as `antigravity-ide` at /Applications/Antigravity IDE.app/.
     #>
     param([string]$Cmd)
-    $found = Get-Command $Cmd -ErrorAction SilentlyContinue
+    # Functions and aliases are not editor CLIs. Trusting them lets a shell
+    # `function cursor { wtw cursor; }` (or a Pester stub) recurse until
+    # "Stack overflow." Only an Application / ExternalScript on PATH counts.
+    $found = @(Get-Command $Cmd -CommandType Application, ExternalScript -All -ErrorAction SilentlyContinue)
+    foreach ($candidate in $found) {
+        if (Test-WtwEditorCliCandidate $candidate) { return $true }
+    }
+    return $false
+}
+
+function Test-WtwCursorAgentShim {
+    <#
+    .SYNOPSIS
+        The ~/.local/bin/cursor stub from `cursor agent` re-execs another cursor.
+    #>
+    param([string] $Path)
+    if (-not $Path) { return $false }
+    $normalized = $Path.Replace('\', '/').TrimEnd('/')
+    if ($normalized -eq "$($HOME.Replace('\', '/'))/.local/bin/cursor") { return $true }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+    try {
+        $head = Get-Content -LiteralPath $Path -TotalCount 20 -ErrorAction Stop
+        return [bool]($head -match 'excluding the current shim')
+    } catch {
+        return $false
+    }
+}
+
+function Test-WtwEditorCliCandidate {
+    param($found)
     if (-not $found) { return $false }
     $resolved = $found.Source
-    if (-not $resolved) { return $true }   # builtin / function — trust it
+    if (-not $resolved) { return $false }
+    if (Test-WtwCursorAgentShim $resolved) { return $false }
     $item = Get-Item -LiteralPath $resolved -ErrorAction SilentlyContinue
     if (-not $item) { return $false }
     # Non-symlink: a FileInfo means it exists as a regular file.

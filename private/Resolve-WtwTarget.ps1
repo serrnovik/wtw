@@ -47,7 +47,13 @@ function Resolve-WtwTarget {
 
         # Not named `$Repo` — this function already uses `$repo` for registry
         # entries, and a [string] parameter would coerce those assignments.
-        [string] $RepoAlias
+        [string] $RepoAlias,
+
+        # Internal: the Levenshtein hop already ran. A second pass must not
+        # fuzzy-match again — Get-WtwAllTargetNames can contain a string that
+        # earlier stages do not resolve (shell-hyphenated alias, stale name),
+        # and `return (Resolve-WtwTarget $fuzzy.Match)` then stack-overflows.
+        [switch] $SkipFuzzy
     )
 
     $registry = Get-WtwRegistry
@@ -340,10 +346,12 @@ function Resolve-WtwTarget {
         return $null
     }
 
-    $allTargets = Get-WtwAllTargetNames $registry
-    $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
-    if ($fuzzy.Match) {
-        return (Resolve-WtwTarget $fuzzy.Match)
+    if (-not $SkipFuzzy) {
+        $allTargets = Get-WtwAllTargetNames $registry
+        $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
+        if ($fuzzy.Match -and (ConvertTo-WtwLookupKey $fuzzy.Match) -ne (ConvertTo-WtwLookupKey $Name)) {
+            return (Resolve-WtwTarget -Name $fuzzy.Match -RepoAlias $RepoAlias -SkipFuzzy)
+        }
     }
     # An all-digit name almost always means PowerShell ate a leading zero:
     # argument mode parses a bare `033` as the NUMBER 33, so wtw never sees the

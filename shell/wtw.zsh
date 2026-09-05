@@ -327,6 +327,12 @@ _wtw_register_aliases() {
     while IFS=$'\t' read -r _wtw_a _wtw_p _wtw_c _wtw_t _wtw_s _wtw_wid _wtw_widx; do
         [ -z "$_wtw_a" ] && continue
         [[ "$_wtw_a" =~ ^[a-zA-Z0-9_-]+$ ]] || continue
+        # Never clobber the dispatcher, the pwsh hand-off, or editor CLIs.
+        # A worktree aliased `cursor` used to replace the real `cursor` binary
+        # and turn `wtw cursor` (or a bare `cursor`) into unbounded recursion.
+        case "$_wtw_a" in
+            wtw|pwsh|powershell|cursor|code|antigravity|windsurf|codium|git|ssh|sudo|cd|ls) continue ;;
+        esac
         _wtw_p="${_wtw_p//\'/\'\\\'\'}"
         _wtw_c="${_wtw_c//\'/\'\\\'\'}"
         _wtw_t="${_wtw_t//\'/\'\\\'\'}"

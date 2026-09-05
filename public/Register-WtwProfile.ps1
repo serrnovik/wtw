@@ -58,6 +58,7 @@ function Register-WtwProfile {
         }.GetNewClosure()
 
         foreach ($a in $aliases) {
+            if (Test-WtwReservedShellAliasName $a) { continue }
             Set-Alias -Name $a -Value $fnName -Scope Global -Force
         }
 
@@ -75,11 +76,13 @@ function Register-WtwProfile {
                 }.GetNewClosure()
 
                 foreach ($a in $aliases) {
-                    Set-Alias -Name "$a-$taskName" -Value $wtFnName -Scope Global -Force
+                    $combo = "$a-$taskName"
+                    if (Test-WtwReservedShellAliasName $combo) { continue }
+                    Set-Alias -Name $combo -Value $wtFnName -Scope Global -Force
                 }
                 foreach ($custom in (Get-WtwWorktreeAliases $wt)) {
                     $shellName = ConvertTo-WtwShellAliasName $custom
-                    if ($shellName -match '^[A-Za-z][\w-]*$') {
+                    if ($shellName -match '^[A-Za-z][\w-]*$' -and -not (Test-WtwReservedShellAliasName $shellName)) {
                         Set-Alias -Name $shellName -Value $wtFnName -Scope Global -Force
                     }
                 }

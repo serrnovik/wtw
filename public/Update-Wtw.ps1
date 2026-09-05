@@ -23,7 +23,8 @@ function Update-Wtw {
         Skip the confirmation prompt.
     .PARAMETER Force
         Reinstall from the Gallery even when the installed version already
-        matches, and bypass the 24h version cache.
+        matches. A plain ``wtw update`` already live-checks the Gallery; the
+        24h cache is only for the background notice.
     .EXAMPLE
         wtw update
         Compare against the Gallery and offer to replace the installed copy.
@@ -40,7 +41,9 @@ function Update-Wtw {
 
     $installRoot = Join-Path $HOME '.wtw' 'module'
     $info = Get-WtwInstallInfo -IncludeGalleryCopies
-    $status = Get-WtwUpdateStatus -Force:$Force
+    # Always live-check. The 24h cache is for the startup notice, not for an
+    # explicit update — otherwise a just-published release looks "up to date".
+    $status = Get-WtwUpdateStatus -Force
 
     # The version that matters is the one in ~/.wtw/module — the copy every
     # loader imports — not the checkout this command happens to be running from.

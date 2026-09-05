@@ -431,7 +431,7 @@ function Save-WtwCursorRecentlyOpenedState {
         New-Item -Path $stateDir -ItemType Directory -Force | Out-Null
     }
 
-    $json = $State | ConvertTo-Json -Depth 80 -Compress
+    $json = $State | ConvertTo-Json -Depth 8 -Compress
     $jsonLiteral = ConvertTo-WtwSqliteLiteral $json
     $sql = @(
         'create table if not exists ItemTable (key TEXT, value BLOB);',

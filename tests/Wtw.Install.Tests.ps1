@@ -250,6 +250,27 @@ Describe 'Update-Wtw' {
             Should -Invoke Save-WtwGalleryPackage -Times 0 -Exactly
         }
     }
+
+    It 'live-checks the Gallery even when --force is not set' {
+        InModuleScope wtw {
+            Mock Get-WtwInstallInfo { [pscustomobject]@{
+                    Flavour = 'Gallery'; ModuleRoot = (Join-Path $HOME '.wtw/module')
+                    InstallRoot = (Join-Path $HOME '.wtw/module'); Version = [version]'1.0.0'
+                    SourcePath = ''; SourceCommit = ''; InstalledAtUtc = $null
+                    GalleryCopies = @(); ShadowedBy = $null; UpdateCommand = 'wtw update'
+                } }
+            Mock Get-WtwUpdateStatus { [pscustomobject]@{
+                    CurrentVersion = [version]'1.0.0'; LatestVersion = [version]'1.0.0'
+                    UpdateAvailable = $false; Status = 'Available'; CheckedAtUtc = [DateTime]::UtcNow; Source = 'gallery'
+                } } -ParameterFilter { $Force }
+            Mock Test-Path { $true } -ParameterFilter { $LiteralPath -like '*wtw.psm1' }
+            Mock Save-WtwGalleryPackage { }
+
+            $null = Update-Wtw -Check 6>&1
+
+            Should -Invoke Get-WtwUpdateStatus -Times 1 -Exactly
+        }
+    }
 }
 
 Describe 'Invoke-Wtw update dispatch' {
