@@ -93,19 +93,13 @@ function Open-WtwWorkspace {
     # ChatGPT Desktop (formerly Codex) — prefer the supported CLI app launcher (`codex app <dir>`),
     # falling back to macOS open-app behavior when only the app bundle exists.
     if ($editorType -eq 'codex') {
-        $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
-        if (-not ($dir -and (Test-Path $dir))) {
+        $metadata = Resolve-WtwTerminalWorkspaceMetadata -Target $target
+        if (-not ($metadata -and $metadata.Path -and (Test-Path $metadata.Path))) {
             Write-Error "No directory found for '$Name'."
             return
         }
-        $prettyName = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
-            $target.WorktreeEntry.prettyName
-        } elseif ($target.TaskName) {
-            $target.TaskName
-        } else {
-            Split-Path $dir -Leaf
-        }
-        $fullDir = [System.IO.Path]::GetFullPath($dir)
+        $prettyName = $metadata.PrettyName
+        $fullDir = $metadata.Path
         $codexHome = Get-WtwCodexHome
         if (Test-WtwCodexPresent -CodexHome $codexHome) {
             $globalStatePath = Join-Path $codexHome '.codex-global-state.json'
@@ -200,15 +194,10 @@ function Open-WtwWorkspace {
     # Workspace file found — open it
     if ($wsFile -and (Test-Path $wsFile)) {
         if ($editorCmd -eq 'cursor') {
-            $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
-            $prettyName = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
-                $target.WorktreeEntry.prettyName
-            } elseif ($target.TaskName) {
-                $target.TaskName
-            } else {
-                Split-Path $dir -Leaf
-            }
-            $color = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'color') { $target.WorktreeEntry.color } else { $null }
+            $metadata = Resolve-WtwTerminalWorkspaceMetadata -Target $target
+            $dir = if ($metadata) { $metadata.Path } elseif ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
+            $prettyName = if ($metadata) { $metadata.PrettyName } else { Split-Path $dir -Leaf }
+            $color = if ($metadata) { $metadata.Color } else { $null }
             if ($target.WorktreeEntry) {
                 $prettyWorkspacePath = Get-WtwCursorPrettyWorkspacePath -WorkspacePath $wsFile -PrettyName $prettyName -RepoName $target.RepoName
                 $needsAgentsLabelMigration = [System.IO.Path]::GetFullPath($prettyWorkspacePath) -ne [System.IO.Path]::GetFullPath($wsFile)

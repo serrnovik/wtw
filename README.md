@@ -193,7 +193,7 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 
 | Command | Description |
 |---------|-------------|
-| `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X] [--emoji X] [--sourcegit-folder]` | Register current repo with aliases, template, per-shell session scripts, optional SourceGit / list prefix, and optional SourceGit group folder |
+| `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X] [--emoji X] [--sourcegit-folder]` | Register current repo with aliases, template, per-shell session scripts, optional SourceGit / list / cmux / wmux / T3 prefix, and optional SourceGit group folder |
 | `wtw add [path] [--repo X --task X] [--alias a,b] [--sourcegit-folder]` | Import an existing worktree into the registry |
 | `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b]` | Create worktree + workspace + branch |
 | `wtw list [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`--wide` = full aliases and paths) |
@@ -209,7 +209,7 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 | `wtw droid [name]` | Open in Factory desktop app (alias: `factory`) |
 | `wtw claude [name]` | Bring the Claude desktop app forward (aliases: `cowork`) |
 | `wtw claudecode [name] [--prompt X]` | Start a new Claude Code chat rooted at the worktree (aliases: `ccode`) |
-| `wtw cmux [name]` | Open the worktree as a cmux workspace (aliases: `cm`) |
+| `wtw cmux [name]` | Open the worktree as a cmux workspace (aliases: `cm`). With `--on` / `--at`, opens a local cmux whose terminal SSHs to that host |
 | `wtw wmux [name]` | Open the worktree as a wmux workspace on Windows (aliases: `wm`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
@@ -244,6 +244,7 @@ wtw list --on at            # what does that machine have?
 wtw --on at cursor auth     # open its "auth" worktree here, in Cursor
 wtw at cursor auth          # same thing — bare host shorthand
 wtw --on at go auth         # ssh into that worktree: pwsh, right directory
+wtw --on at cmux auth       # same session, in a local cmux workspace
 wtw --at at cursor auth     # `--at` is an alias of `--on`
 ```
 
@@ -293,6 +294,25 @@ Three details that a plain `ssh host` does not give you:
 
 A worktree that is registered but no longer on disk is reported in-session rather
 than dumping you in the home directory behind a scrolled-off error.
+
+### `cmux` — a local multiplexer tab over that ssh session
+
+`wtw cmux auth` locally means "open this worktree as a cmux workspace". With
+`--on` the cmux window stays on this machine; the surface command is
+`wtw --on <host> go [name]`, so you get the same interactive remote shell as
+`go`, titled with the host prefix (`🧊AT.🟢 PF037 …`). Existing remote tabs are
+matched by title or `wtw-remote:` description, never by the local home
+directory they share as cwd. Omit the name to land in the remote home directory.
+
+```powershell
+wtw --on at cmux auth
+wtw --at workstation cmux --via tailscale
+wtw --on at cmux
+```
+
+wmux, T3, Claude Code, and ChatGPT stay refused under `--on` — those launchers
+are ambiguous (open here vs register over there). Use `wtw --on box run t3 auth`
+when the intent is the remote registration.
 
 ### Tailscale
 
@@ -408,8 +428,8 @@ there. Nothing is cached, so nothing goes stale.
 
 ### What crosses the network
 
-Only reads and editor launches. `open`, the VS Code family editors, `list` and
-`info` accept `--on`.
+Only reads, editor launches, and local-window SSH sessions. `open`, the VS Code
+family editors, `list`, `info`, `go`, and `cmux` accept `--on`.
 
 `list --on` delegates to the remote's own `wtw list` rather than reimplementing
 it, so every flag behaves exactly as it does locally (`--detailed`, `--wide`,
@@ -429,11 +449,12 @@ wtw --on box run init "app,my-app" --cwd /srv/repos/my-app
 `--cwd` sets the remote working directory, which repo-scoped commands need — an
 ssh command starts in the remote home directory, not in a repo.
 
-One category is refused outright: `t3` / `cmux` / `wmux` / `claudecode` /
-`chatgpt` / `ss`. These are ambiguous rather than impossible — "open T3 here
-pointing at a remote path" cannot work, while "register that project over there"
-is perfectly meaningful — so the intent has to be stated:
-`wtw --on box run t3 auth`.
+One category is refused outright: `t3` / `wmux` / `claudecode` / `chatgpt` /
+`ss`. These are ambiguous rather than impossible — "open T3 here pointing at a
+remote path" cannot work, while "register that project over there" is perfectly
+meaningful — so the intent has to be stated: `wtw --on box run t3 auth`.
+`cmux` is the exception among multiplexers: the window is local and the
+terminal is `wtw --on <host> go`.
 
 ### Setup notes
 
@@ -820,22 +841,28 @@ them and `wtw remove` cleans that registration up:
   only skips *creating* one — an existing folder still collects new worktrees.
   Repo-level `--emoji` prefixes the main checkout
   (and any SourceGit group named after the registry key), e.g. `🎸 snowmain1`.
+  The same prefix is reused for cmux / wmux / T3 / ChatGPT main-checkout titles
+  and `wtw list`. Worktrees keep their own color-circle pretty names.
   Before every write, wtw copies `preference.json` into `~/.wtw/backups/sourcegit/`
   (last 3 copies plus one snapshot each at 3 / 7 / 30 days). The same rotating
   backup is used for cmux, Codex, Claude, Cursor, and T3 configs wtw edits.
 - **cmux** — `wtw cmux <name>` (alias `wtw cm <name>`) selects an existing live
   cmux workspace for the worktree's path, or creates one via
-  `cmux new-workspace --name <pretty> --cwd <path>`. `wtw create` registers a
-  Command-Palette workspace entry in `~/.config/cmux/cmux.json`, and
-  `wtw remove` cleans that entry up. Inside cmux terminals, the `wtw.bash` /
+  `cmux new-workspace --name <pretty> --cwd <path>`. Main-repo titles include
+  the repo `--emoji` when set. `wtw --on <host> cmux [name]` opens a local cmux
+  workspace whose terminal is `wtw --on <host> go [name]`. `wtw create`
+  registers a Command-Palette workspace entry in `~/.config/cmux/cmux.json`,
+  and `wtw remove` cleans that entry up. Inside cmux terminals, the `wtw.bash` /
   `wtw.zsh` shell init stamps the worktree's pretty name, color, and a
   `wtw:<repo>/<task>` status pill onto the surrounding cmux workspace. All of
   this is a no-op when the cmux CLI is not installed.
 - **wmux** — `wtw wmux <name>` (alias `wtw wm <name>`) on Windows selects an
-  existing same-named [wmux](https://github.com/amirlehmam/wmux) workspace for
-  the worktree's path, or creates one via
+  existing [wmux](https://github.com/amirlehmam/wmux) workspace for the
+  worktree's path (cwd first, then title — so a repo-emoji rename does not
+  duplicate the tab), or creates one via
   `wmux new-workspace --title <pretty> --cwd <path> --shell pwsh` (starting wmux
   if it isn't running — this is the only command that launches the app).
+  Main-repo titles include the repo `--emoji` when set.
   `wtw create` / `wtw add` create the live workspace only when wmux is already
   open; otherwise they skip and print `wtw wmux <name>`. `wtw remove` closes it.
   wmux workspaces are live (daemon-backed) rather than a static config registry,

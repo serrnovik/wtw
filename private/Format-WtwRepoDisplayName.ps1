@@ -51,10 +51,11 @@ function Get-WtwRepoEmoji {
 function Format-WtwRepoDisplayName {
     <#
     .SYNOPSIS
-        Prefix a repo registry key with its optional emoji (SourceGit / list).
+        Prefix a repo registry key with its optional emoji (SourceGit / list / muxers).
     .DESCRIPTION
         Worktrees keep their color-circle pretty names. This is repo-only:
-        ``🎸 snowmain1``, ``🎭 ☸️ tn1-gitops``.
+        ``🎸 snowmain1``, ``🎭 ☸️ tn1-gitops``. Same string is reused for cmux,
+        wmux, and T3 main-checkout titles.
     #>
     [CmdletBinding()]
     param(

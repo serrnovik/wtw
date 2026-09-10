@@ -139,19 +139,22 @@ function Get-WtwRemoteCommandMode {
           none     refused, because no reading of it makes sense.
 
         `go` maps to connect rather than being refused: the verb means "be in
-        that worktree", and over ssh that is exactly what it can do. The
-        app-launchers (t3, cmux, claudecode, chatgpt…) stay refused because they
-        are ambiguous rather than impossible — "register that project over there"
-        is meaningful — so they are reachable through the explicit `run`, where
-        the intent is stated rather than guessed.
+        that worktree", and over ssh that is exactly what it can do.
+
+        `cmux` is a local window whose terminal is that same ssh session, so it
+        maps to ``cmux`` rather than being refused. Other app-launchers (t3,
+        wmux, claudecode, chatgpt…) stay refused because they are ambiguous
+        rather than impossible — "register that project over there" is
+        meaningful — so they are reachable through the explicit `run`.
     .OUTPUTS
-        'local' | 'exec' | 'connect' | 'none'
+        'local' | 'exec' | 'connect' | 'cmux' | 'none'
     #>
     [CmdletBinding()]
     param([AllowNull()] [string] $Command)
 
     if (-not $Command) { return 'none' }
     if ($Command -in @('go', 'connect', 'conn', 'ssh')) { return 'connect' }
+    if ($Command -in @('cmux', 'cm')) { return 'cmux' }
     if ($Command -in @('open', 'list', 'ls', 'info', 'show')) { return 'local' }
     if (Resolve-WtwEditorFamilyMember -Name $Command) { return 'local' }
     if ($Command -in $script:WtwRemoteExecCommands) { return 'exec' }

@@ -134,3 +134,39 @@ Describe 'Get-WtwWmuxInvoker' {
         }
     } -Skip:(-not $IsWindows)
 }
+
+Describe 'Find-WtwWmuxWorkspace cwd matching' {
+    It 'reuses a workspace by cwd when the title still lacks the repo emoji' {
+        InModuleScope wtw {
+            $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-wmux-find-" + [guid]::NewGuid())
+            New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+            $full = [System.IO.Path]::GetFullPath($tmp)
+            try {
+                Mock Get-WtwWmuxLiveWorkspaces {
+                    @(
+                        [PSCustomObject]@{ id = 'ws-old'; title = 'snowmain1'; cwd = $full }
+                        [PSCustomObject]@{ id = 'ws-emoji'; title = '🎸 snowmain1'; cwd = (Join-Path $full 'other') }
+                    )
+                }
+
+                $found = Find-WtwWmuxWorkspace -PrettyName '🎸 snowmain1' -ProjectPath $full
+                $found.id | Should -Be 'ws-old'
+            } finally {
+                Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    It 'falls back to title when no cwd matches' {
+        InModuleScope wtw {
+            Mock Get-WtwWmuxLiveWorkspaces {
+                @(
+                    [PSCustomObject]@{ id = 'ws-emoji'; title = '🎸 snowmain1'; cwd = '/somewhere/else' }
+                )
+            }
+
+            $found = Find-WtwWmuxWorkspace -PrettyName '🎸 snowmain1' -ProjectPath ([System.IO.Path]::GetTempPath())
+            $found.id | Should -Be 'ws-emoji'
+        }
+    }
+}

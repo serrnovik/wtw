@@ -238,6 +238,42 @@ Describe 'Open-WtwCmuxWorkspace' {
         $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:4 --action set-color --color #228833'
     }
 
+    It 'titles a main checkout with the repo emoji, not the first alias' {
+        Mock Get-WtwColors {
+            [PSCustomObject]@{ assignments = [PSCustomObject]@{} }
+        } -ModuleName wtw
+        Mock Invoke-WtwCmuxCommand {
+            $script:cmuxCalls.Add(($ArgumentList -join ' '))
+            $command = $ArgumentList -join ' '
+            if ($command -eq 'list-workspaces --json') {
+                return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+            }
+            if ($command -eq 'current-workspace') {
+                return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:5' }
+            }
+            return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+        } -ModuleName wtw
+
+        $target = [PSCustomObject]@{
+            RepoName      = 'snowmain1'
+            TaskName      = $null
+            WorktreeEntry = $null
+            RepoEntry     = [PSCustomObject]@{
+                mainPath = $script:projectPath
+                aliases  = @('sn1')
+                emoji    = '🎸'
+            }
+        }
+
+        Open-WtwCmuxWorkspace -Target $target
+
+        $create = $script:cmuxCalls | Where-Object { $_ -like 'new-workspace *' } | Select-Object -First 1
+        $create | Should -Match '--name 🎸 snowmain1'
+        $create | Should -Not -Match '--name sn1'
+        $create | Should -Match ([regex]::Escape("--cwd $script:projectPath"))
+        $create | Should -Match '--description wtw: snowmain1'
+    }
+
     It 'uses AppleScript fallback when socket workspace creation is denied' {
         Mock Invoke-WtwCmuxCommand {
             $script:cmuxCalls.Add(($ArgumentList -join ' '))
@@ -392,6 +428,197 @@ Describe 'cmux shell startup metadata hook' {
         } finally {
             $env:CMUX_WORKSPACE_ID = $oldWorkspaceId
             $env:CMUX_SURFACE_ID = $oldSurfaceId
+        }
+    }
+}
+
+Describe 'cmux remote SSH workspace' {
+    BeforeEach {
+        $script:cmuxCalls = [System.Collections.Generic.List[string]]::new()
+        $script:remoteHost = @{
+            Name      = 'workstation'
+            Aliases   = @('at')
+            Emoji     = '🧊'
+            Label     = 'AT'
+            User      = 'dev'
+            HostName  = 'workstation.local'
+            HostNames = @('workstation.local')
+        }
+    }
+
+    It 'builds a go command that keeps the typed host and optional via' {
+        Get-WtwCmuxRemoteGoInnerCommand -HostSelector 'at' | Should -Be 'wtw --on at go'
+        Get-WtwCmuxRemoteGoInnerCommand -HostSelector 'at' -Name 'auth' |
+            Should -Be 'wtw --on at go auth'
+        Get-WtwCmuxRemoteGoInnerCommand -HostSelector 'at' -Name 'auth' -Via 'tailscale' |
+            Should -Be 'wtw --on at --via tailscale go auth'
+        Get-WtwCmuxRemoteGoInnerCommand -HostSelector 'at' -Name 'onboarding video' |
+            Should -Be "wtw --on at go 'onboarding video'"
+        Get-WtwCmuxRemoteGoCommand -HostSelector 'at' -Name 'auth' |
+            Should -Be 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on at go auth"'
+    }
+
+    It 'prefixes the host identity and does not resolve a missing name' {
+        InModuleScope wtw -Parameters @{ HostEntry = $script:remoteHost } {
+            Mock Get-WtwRemoteTarget { throw 'home sessions do not resolve a remote target' }
+
+            $session = Resolve-WtwCmuxRemoteSession -HostEntry $HostEntry -HostSelector 'at'
+            $session.PrettyName | Should -Be '🧊AT.at'
+            $session.StatusValue | Should -Be 'wtw-remote: at'
+            $session.Command | Should -Be 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on at go"'
+            $session.RemotePath | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'uses the remote pretty name when a worktree is named' {
+        InModuleScope wtw -Parameters @{ HostEntry = $script:remoteHost } {
+            Mock Get-WtwRemoteTarget {
+                @{
+                    Path       = '/remote/app_auth'
+                    Color      = '#336699'
+                    Title      = 'app/auth'
+                    PrettyName = '🟢 Auth'
+                }
+            }
+
+            $session = Resolve-WtwCmuxRemoteSession -HostEntry $HostEntry -HostSelector 'at' -Name 'auth'
+            $session.PrettyName | Should -Be '🧊AT.🟢 Auth'
+            $session.StatusValue | Should -Be 'wtw-remote: at/app/auth'
+            $session.Color | Should -Be '#336699'
+            $session.RemotePath | Should -Be '/remote/app_auth'
+        }
+    }
+
+    It 'matches remote workspaces by title or description, never by shared home cwd' {
+        InModuleScope wtw {
+            $home = if ($HOME) { [System.IO.Path]::GetFullPath($HOME) } else { (Get-Location).Path }
+            Mock Get-WtwCmuxLiveWorkspaces {
+                @(
+                    [PSCustomObject]@{
+                        ref         = 'workspace:home'
+                        title       = 'unrelated home tab'
+                        cwd         = $home
+                        description = 'local shell'
+                    }
+                    [PSCustomObject]@{
+                        ref         = 'workspace:remote'
+                        title       = '🧊AT.🟢 Auth'
+                        cwd         = $home
+                        description = 'wtw-remote: at/app/auth'
+                    }
+                )
+            }
+
+            $byTitle = Find-WtwCmuxRemoteWorkspace -PrettyName '🧊AT.🟢 Auth' -StatusValue 'wtw-remote: at/app/auth'
+            $byTitle.ref | Should -Be 'workspace:remote'
+
+            $byDescription = Find-WtwCmuxRemoteWorkspace -PrettyName 'stale title' -StatusValue 'wtw-remote: at/app/auth'
+            $byDescription.ref | Should -Be 'workspace:remote'
+
+            $miss = Find-WtwCmuxRemoteWorkspace -PrettyName '🧊AT.other' -StatusValue 'wtw-remote: other'
+            $miss | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'prints the cmux create line without contacting cmux' {
+        InModuleScope wtw -Parameters @{ HostEntry = $script:remoteHost } {
+            Mock Get-WtwRemoteTarget {
+                @{
+                    Path       = '/remote/app_auth'
+                    Color      = $null
+                    Title      = 'app/auth'
+                    PrettyName = 'Auth'
+                }
+            }
+            Mock Test-WtwCmuxPresent { throw 'print-only must not require cmux' }
+            Mock Invoke-WtwCmuxCommand { throw 'print-only must not invoke cmux' }
+
+            $out = Open-WtwCmuxRemoteWorkspace -HostEntry $HostEntry -HostSelector 'at' -Name 'auth' -Via 'tailscale' -PrintOnly 6>&1 | Out-String
+            $out | Should -Match 'new-workspace --name 🧊AT.Auth'
+            $out | Should -Match 'wtw --on at --via tailscale go auth'
+        }
+    }
+
+    It 'creates a home-cwd remote workspace instead of selecting an unrelated home tab' {
+        InModuleScope wtw -Parameters @{ HostEntry = $script:remoteHost } {
+            $script:cmuxCalls = [System.Collections.Generic.List[string]]::new()
+            Mock Test-WtwCmuxPresent { $true }
+            Mock Open-WtwCmuxAppleScriptWorkspace { $false }
+            Mock Invoke-WtwCmuxCommand {
+                $script:cmuxCalls.Add(($ArgumentList -join ' '))
+                $command = $ArgumentList -join ' '
+                if ($command -eq 'list-workspaces --json') {
+                    $home = if ($HOME) { [System.IO.Path]::GetFullPath($HOME).Replace('\', '\\') } else { '' }
+                    return [PSCustomObject]@{
+                        ExitCode = 0
+                        Output   = @"
+{
+  "workspaces": [
+    {
+      "ref": "workspace:home",
+      "title": "unrelated home tab",
+      "current_directory": "$home"
+    }
+  ]
+}
+"@
+                    }
+                }
+                if ($command -eq 'current-workspace') {
+                    return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:remote' }
+                }
+                return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+            }
+
+            Open-WtwCmuxRemoteWorkspace -HostEntry $HostEntry -HostSelector 'at'
+
+            @($script:cmuxCalls | Where-Object { $_ -like 'select-workspace*' }).Count | Should -Be 0
+            $create = $script:cmuxCalls | Where-Object { $_ -like 'new-workspace *' } | Select-Object -First 1
+            $create | Should -Match '--name 🧊AT.at'
+            $create | Should -Match '--command pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on at go"'
+            $create | Should -Match '--description wtw-remote: at'
+        }
+    }
+
+    It 'selects an existing remote workspace by description' {
+        InModuleScope wtw -Parameters @{ HostEntry = $script:remoteHost } {
+            $script:cmuxCalls = [System.Collections.Generic.List[string]]::new()
+            Mock Get-WtwRemoteTarget {
+                @{
+                    Path       = '/remote/app_auth'
+                    Color      = '#336699'
+                    Title      = 'app/auth'
+                    PrettyName = '🟢 Auth'
+                }
+            }
+            Mock Test-WtwCmuxPresent { $true }
+            Mock Invoke-WtwCmuxCommand {
+                $script:cmuxCalls.Add(($ArgumentList -join ' '))
+                $command = $ArgumentList -join ' '
+                if ($command -eq 'list-workspaces --json') {
+                    return [PSCustomObject]@{
+                        ExitCode = 0
+                        Output   = @'
+{
+  "workspaces": [
+    {
+      "ref": "workspace:remote",
+      "title": "stale remote title",
+      "description": "wtw-remote: at/app/auth"
+    }
+  ]
+}
+'@
+                    }
+                }
+                return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+            }
+
+            Open-WtwCmuxRemoteWorkspace -HostEntry $HostEntry -HostSelector 'at' -Name 'auth'
+
+            $script:cmuxCalls | Should -Contain 'select-workspace --workspace workspace:remote'
+            @($script:cmuxCalls | Where-Object { $_ -like 'new-workspace*' }).Count | Should -Be 0
+            $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:remote --action rename --title 🧊AT.🟢 Auth'
         }
     }
 }

@@ -58,6 +58,8 @@ pwsh -Command "wtw cursor [name]"
 pwsh -Command "wtw code [name]"
 pwsh -Command "wtw chatgpt [name] [--skip-restart]" # aliases: cgpt, codex
 pwsh -Command "wtw claudecode [name] [--prompt X]"  # aliases: ccode — new Claude Code chat in the worktree
+pwsh -Command "wtw cmux [name]"                    # cmux workspace; `wtw --on <host> cmux [name]` SSHs from a local tab
+pwsh -Command "wtw wmux [name]"                    # Windows wmux workspace
 
 # Clean stale AI worktrees and/or leftover merged local branches
 pwsh -Command "wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]"

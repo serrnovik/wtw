@@ -16,7 +16,7 @@ function Show-WtwCommandHelp {
             '  --startup-script-bash <name> Bash-specific session script',
             '  --workspaces-dir <path>     Override workspace files directory',
             '  --name <key>                Override the registry key',
-            '  --emoji <prefix>            SourceGit / list prefix (e.g. 🎸 or "🎭 ☸️")',
+            '  --emoji <prefix>            SourceGit / list / cmux / wmux / T3 prefix (e.g. 🎸 or "🎭 ☸️")',
             '                              Pass - / none to clear. Re-init keeps the existing value.',
             '  --sourcegit-folder          Put the main checkout in a SourceGit group folder',
             '  --no-sourcegit-folder       Do not create a folder (existing folders still collect worktrees)',
@@ -123,7 +123,7 @@ function Show-WtwCommandHelp {
                 '                    (e.g. "onboarding video"). Pass - / none to clear worktree aliases',
                 '  --name a,b        Same as --alias when the target is a repo',
                 '  --key <name>      Registry key (also remaps color assignments)',
-                '  --emoji <prefix>  SourceGit / list prefix for the whole repo',
+                '  --emoji <prefix>  SourceGit / list / cmux / wmux / T3 prefix for the whole repo',
                 '                    Pass - / none to clear',
                 '  --sourcegit-folder / --no-sourcegit-folder',
                 '                    Create or skip a SourceGit group folder',
@@ -140,7 +140,7 @@ function Show-WtwCommandHelp {
                 '  wtw rename auth login            Same as --name login',
                 '  wtw edit auth --task login       Retarget wtw go login',
                 '  wtw edit snowmain1 --alias sn,sm Replace repo aliases',
-                '  wtw edit snowmain1 --emoji 🎸     Prefix SourceGit / list names',
+                '  wtw edit snowmain1 --emoji 🎸     Prefix SourceGit / list / cmux / wmux names',
                 '  wtw edit t3code-ad4f13f1 --alias "onboarding video"',
                 '  wtw edit snowmain1 --sourcegit-folder'
             )
@@ -223,6 +223,41 @@ function Show-WtwCommandHelp {
         'skill'       { @('wtw skill [--agent claude|agents|all]', 'Install the wtw AI skill into the current repo.', '', 'Copies skill definitions so AI agents (Claude, Codex, Cursor, Gemini)', 'can discover and use wtw commands.', '', 'Options:', '  --agent claude    Claude Code only (.claude/skills/)', '  --agent agents    Cross-agent format (.agents/skills/)', '  --agent all       Both (default)') }
         { $_ -in 'claudecode', 'ccode' } {
             @('wtw claudecode [name] [--prompt <text>]', 'Start a new Claude Code chat in the Claude desktop app, rooted at the target.', '', 'Arguments:', '  name    Target to open (default: detected from cwd)', '', 'Options:', '  --prompt <text>   Pre-fill the new chat''s composer (not submitted)', '', 'Uses the app''s claude://code/new deep link. The desktop app names sessions', 'itself (auto-titled from the first message, renameable in the UI), so wtw', 'cannot set a chat title the way it labels Cursor/ChatGPT projects.', '', 'Use `wtw claude` to just bring the Claude app forward instead.')
+        }
+        { $_ -in 'cmux', 'cm' } {
+            @(
+                'wtw cmux [name]',
+                'Open a target as a local cmux workspace (alias: cm).',
+                '',
+                'Arguments:',
+                '  name    Target to open (default: detected from cwd)',
+                '',
+                'Main-repo titles use the registry key plus the optional repo --emoji',
+                '(e.g. 🎸 snowmain1). Worktrees keep their stored pretty names.',
+                '',
+                'With --on / --at the cmux window stays on this machine; its terminal is',
+                'an ssh session into that host (the same as `wtw --on <host> go [name]`).',
+                'Omit the name to land in the remote home directory.',
+                '',
+                'Examples:',
+                '  wtw cmux snowmain1',
+                '  wtw --on at cmux',
+                '  wtw --at workstation cmux auth --via tailscale'
+            )
+        }
+        { $_ -in 'wmux', 'wm' } {
+            @(
+                'wtw wmux [name]',
+                'Open a target as a wmux workspace on Windows (alias: wm).',
+                '',
+                'Arguments:',
+                '  name    Target to open (default: detected from cwd)',
+                '',
+                'Main-repo titles use the registry key plus the optional repo --emoji',
+                '(e.g. 🎸 snowmain1). Worktrees keep their stored pretty names.',
+                'Existing workspaces are matched by cwd so an emoji rename does not',
+                'create a duplicate tab.'
+            )
         }
         { $_ -in 't3', 't3code' } {
             @('wtw t3 [name]', 'Register a target as a T3 Code project, then launch T3 Code.', '', 'Arguments:', '  name    Target to register (default: detected from cwd)', '', 'T3 Code ships no CLI and no folder-open deep link, so wtw cannot tell a', 'running app to open a directory. Instead it appends the project to T3''s', 'event store under the wtw pretty name, so the worktree is already in the', 'sidebar when the app comes up.', '', 'Registration only runs while T3 Code is stopped — its server owns the', 'store while running. When it is up, wtw points T3''s "Add project starts', 'in" setting at the worktree instead.', '', 'T3 Code has no project color, so `wtw color` does not reach it.')

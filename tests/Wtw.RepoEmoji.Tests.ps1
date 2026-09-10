@@ -115,3 +115,74 @@ Describe 'Invoke-Wtw edit --emoji' {
         }
     }
 }
+
+Describe 'Resolve-WtwTerminalWorkspaceMetadata repo emoji' {
+    It 'prefixes the registry key, not the first alias, for a main checkout' {
+        InModuleScope wtw {
+            Mock Get-WtwColors {
+                [PSCustomObject]@{ assignments = [PSCustomObject]@{} }
+            }
+
+            $target = [PSCustomObject]@{
+                RepoName      = 'snowmain1'
+                TaskName      = $null
+                WorktreeEntry = $null
+                RepoEntry     = [PSCustomObject]@{
+                    mainPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'wtw-emoji-meta')
+                    aliases  = @('sn1', 'sm')
+                    emoji    = '🎸'
+                }
+            }
+
+            $meta = Resolve-WtwTerminalWorkspaceMetadata -Target $target
+            $meta.PrettyName | Should -Be '🎸 snowmain1'
+            $meta.StatusValue | Should -Be 'snowmain1'
+        }
+    }
+
+    It 'prepends a main-checkout color circle in front of the repo emoji' {
+        InModuleScope wtw {
+            Mock Get-WtwColors {
+                [PSCustomObject]@{
+                    assignments = [PSCustomObject]@{ 'snowmain1/main' = '#4BA532' }
+                }
+            }
+
+            $target = [PSCustomObject]@{
+                RepoName      = 'snowmain1'
+                TaskName      = $null
+                WorktreeEntry = $null
+                RepoEntry     = [PSCustomObject]@{
+                    mainPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'wtw-emoji-meta')
+                    emoji    = '🎸'
+                }
+            }
+
+            $meta = Resolve-WtwTerminalWorkspaceMetadata -Target $target
+            $meta.PrettyName | Should -Be '🟢 🎸 snowmain1'
+            $meta.Color | Should -Be '#4BA532'
+        }
+    }
+
+    It 'leaves a worktree pretty name unchanged' {
+        InModuleScope wtw {
+            $target = [PSCustomObject]@{
+                RepoName      = 'snowmain1'
+                TaskName      = 'feature'
+                WorktreeEntry = [PSCustomObject]@{
+                    path       = (Join-Path ([System.IO.Path]::GetTempPath()) 'wtw-emoji-meta-wt')
+                    prettyName = 'Blue Feature'
+                    color      = '#336699'
+                }
+                RepoEntry     = [PSCustomObject]@{
+                    mainPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'wtw-emoji-meta')
+                    emoji    = '🎸'
+                }
+            }
+
+            $meta = Resolve-WtwTerminalWorkspaceMetadata -Target $target
+            $meta.PrettyName | Should -Be 'Blue Feature'
+            $meta.StatusValue | Should -Be 'snowmain1/feature'
+        }
+    }
+}
