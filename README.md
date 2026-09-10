@@ -835,14 +835,16 @@ them and `wtw remove` cleans that registration up:
   existing same-named [wmux](https://github.com/amirlehmam/wmux) workspace for
   the worktree's path, or creates one via
   `wmux new-workspace --title <pretty> --cwd <path> --shell pwsh` (starting wmux
-  if it isn't running). `wtw create` / `wtw add` likewise create the workspace,
-  and `wtw remove` closes it. wmux workspaces are live (daemon-backed) rather
-  than a static config registry, so there is no on-disk equivalent of
-  `cmux.json`. wmux ships without an installer; wtw finds its Node CLI
-  (`<install>/resources/cli/wmux.js`) via `$env:WMUX_EXE`, a running wmux
-  process, `wmux.exe` on PATH, then common install dirs — set `$env:WMUX_EXE`
-  (and `$env:WMUX_NODE` if `node` isn't on PATH) to override. All of this is a
-  no-op when wmux / Node are not found.
+  if it isn't running — this is the only command that launches the app).
+  `wtw create` / `wtw add` create the live workspace only when wmux is already
+  open; otherwise they skip and print `wtw wmux <name>`. `wtw remove` closes it.
+  wmux workspaces are live (daemon-backed) rather than a static config registry,
+  so there is no on-disk equivalent of `cmux.json`. wmux ships without an
+  installer; wtw finds its Node CLI (`<install>/resources/cli/wmux.js`) via
+  `$env:WMUX_EXE`, a running wmux process, `wmux.exe` on PATH, then common install
+  dirs — set `$env:WMUX_EXE` to override. The CLI is run with `node` when present,
+  otherwise with `wmux.exe` and `ELECTRON_RUN_AS_NODE` (same as wmux's own shims).
+  All of this is a no-op when wmux is not found.
 - **agentctl** — when installed, attaches ignored local AI-agent overlay files
   to the new worktree using the configured profile. Defaults to `team` for
   safety unless a repo/global override selects another profile.

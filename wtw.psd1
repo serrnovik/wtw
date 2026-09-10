@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.17'
+    ModuleVersion     = '0.2.18'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -40,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = '`wtw update` live-checks the PowerShell Gallery instead of trusting the 24h startup-notice cache. `wtw cursor` no longer stack-overflows when a PATH shim, a same-name fuzzy hop, or a shell function named `cursor` loops back into wtw.'
+            ReleaseNotes = '`wtw wmux` waits for a cold-start pipe and runs the CLI via Electron-as-node when `node` is missing. `wtw create` / `wtw add` no longer auto-start wmux.'
         }
     }
 }

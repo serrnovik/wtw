@@ -25,7 +25,8 @@ function Open-WtwWmuxWorkspace {
 Could not find the wmux CLI. wmux ships without an installer, so wtw locates it
 via (in order): $env:WMUX_EXE, a running wmux process, `wmux.exe` on PATH, then
 common install dirs. Install wmux from https://github.com/amirlehmam/wmux, or set
-$env:WMUX_EXE to its wmux.exe. (Node is also required: $env:WMUX_NODE or `node` on PATH.)
+$env:WMUX_EXE to its wmux.exe. The CLI is `resources/cli/wmux.js` run with Node, or
+with wmux.exe itself via ELECTRON_RUN_AS_NODE when `node` is not on PATH.
 '@
         return
     }

@@ -77,21 +77,20 @@ Describe 'Register-WtwWmuxProject' {
             try {
                 $result = Register-WtwWmuxProject -ProjectPath $proj -PrettyName 'Blue Feature' -RepoName 'repo' -TaskName 'feature'
                 $result | Should -Be 'Blue Feature'
-                ($script:wmuxCalls | Where-Object { $_ -like 'new-workspace *' }).Count | Should -Be 1
+                @($script:wmuxCalls | Where-Object { $_ -like 'new-workspace *' }).Count | Should -Be 1
             } finally {
                 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
             }
         }
     } -Skip:(-not $IsWindows)
 
-    It 'skips creation when wmux is not running and cannot be started' {
+    It 'skips creation when wmux is not already running without starting it' {
         InModuleScope wtw {
-            $script:wmuxCalls = [System.Collections.Generic.List[string]]::new()
+            $script:started = $false
             Mock Test-WtwWmuxPresent { $true }
             Mock Test-WtwWmuxRunning { $false }
-            Mock Start-WtwWmuxApp { $false }
+            Mock Start-WtwWmuxApp { $script:started = $true; $false }
             Mock Invoke-WtwWmuxCommand {
-                $script:wmuxCalls.Add(($ArgumentList -join ' '))
                 return [PSCustomObject]@{ ExitCode = 0; Output = '{"workspaces":[]}' }
             }
 
@@ -101,10 +100,37 @@ Describe 'Register-WtwWmuxProject' {
             try {
                 $result = Register-WtwWmuxProject -ProjectPath $proj -PrettyName 'Blue Feature' -RepoName 'repo' -TaskName 'feature'
                 $result | Should -BeNullOrEmpty
-                ($script:wmuxCalls | Where-Object { $_ -like 'new-workspace *' }).Count | Should -Be 0
+                $script:started | Should -BeFalse
             } finally {
                 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
             }
+        }
+    } -Skip:(-not $IsWindows)
+}
+
+Describe 'Get-WtwWmuxInvoker' {
+    It 'runs wmux.js via Electron when standalone node is missing' {
+        InModuleScope wtw {
+            Mock Get-WtwWmuxCliScript { 'C:\wmux\resources\cli\wmux.js' }
+            Mock Get-WtwWmuxNode { $null }
+            Mock Get-WtwWmuxExe { 'C:\wmux\wmux.exe' }
+
+            $invoker = Get-WtwWmuxInvoker
+            $invoker.Exe | Should -Be 'C:\wmux\wmux.exe'
+            $invoker.Prefix | Should -Be @('C:\wmux\resources\cli\wmux.js')
+            $invoker.ElectronAsNode | Should -BeTrue
+        }
+    } -Skip:(-not $IsWindows)
+
+    It 'does not treat a bare wmux.exe on PATH as the CLI' {
+        InModuleScope wtw {
+            Mock Get-WtwWmuxCliScript { $null }
+            Mock Get-Command {
+                [PSCustomObject]@{ CommandType = 'Application'; Source = 'C:\wmux\wmux.exe' }
+            } -ParameterFilter { $Name -eq 'wmux' }
+
+            $invoker = Get-WtwWmuxInvoker
+            $invoker | Should -BeNullOrEmpty
         }
     } -Skip:(-not $IsWindows)
 }

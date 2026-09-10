@@ -156,10 +156,23 @@ function Get-WtwWmuxNode {
 
     if ($env:WMUX_NODE -and (Test-Path $env:WMUX_NODE)) { return $env:WMUX_NODE }
 
-    $cmd = Get-Command node -ErrorAction SilentlyContinue
+    $cmd = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($cmd -and $cmd.Source) { return $cmd.Source }
 
     return $null
+}
+
+function Test-WtwWmuxElectronNode {
+    <#
+    .SYNOPSIS
+        True when $Path is wmux's Electron binary used as Node (ELECTRON_RUN_AS_NODE).
+    #>
+    [CmdletBinding()]
+    param([string] $Path)
+
+    if (-not $Path) { return $false }
+    if ($env:WMUX_NODE_ELECTRON) { return $true }
+    return ([System.IO.Path]::GetFileName($Path) -eq 'wmux.exe')
 }
 
 function Get-WtwWmuxInvoker {
@@ -167,10 +180,12 @@ function Get-WtwWmuxInvoker {
     .SYNOPSIS
         Resolve how to run the wmux CLI.
     .DESCRIPTION
-        Returns an object @{ Exe; Prefix } where invoking `& $Exe @Prefix @args`
-        runs the wmux CLI. Preferred shape is `node <wmux.js>`; falls back to a
-        `wmux` command on PATH if it is a real executable/script shim. Returns
-        $null when no usable CLI can be found.
+        Returns an object @{ Exe; Prefix; ElectronAsNode } where invoking
+        `& $Exe @Prefix @args` runs the wmux JSON-RPC CLI. Preferred shape is
+        `node <wmux.js>`. When standalone Node is missing, the same `wmux.js` is
+        run via wmux.exe with ELECTRON_RUN_AS_NODE — that is what wmux's own
+        cmd/ps1 shims do. Never fall back to launching wmux.exe as a GUI with
+        CLI args: `wmux.exe ping` starts the app instead of talking to the pipe.
     #>
     [CmdletBinding()]
     param()
@@ -178,12 +193,29 @@ function Get-WtwWmuxInvoker {
     $script = Get-WtwWmuxCliScript
     if ($script) {
         $node = Get-WtwWmuxNode
-        if ($node) { return [PSCustomObject]@{ Exe = $node; Prefix = @($script) } }
+        if ($node) {
+            return [PSCustomObject]@{
+                Exe            = $node
+                Prefix         = @($script)
+                ElectronAsNode = [bool](Test-WtwWmuxElectronNode -Path $node)
+            }
+        }
+
+        $exe = Get-WtwWmuxExe
+        if ($exe) {
+            return [PSCustomObject]@{
+                Exe            = $exe
+                Prefix         = @($script)
+                ElectronAsNode = $true
+            }
+        }
     }
 
+    # PowerShell shim (wmux.ps1) wraps node/wmux.js. The GUI exe must not be
+    # used here — CommandType Application is almost always wmux.exe.
     $cmd = Get-Command wmux -ErrorAction SilentlyContinue
-    if ($cmd -and $cmd.CommandType -in @('Application', 'ExternalScript') -and $cmd.Source) {
-        return [PSCustomObject]@{ Exe = $cmd.Source; Prefix = @() }
+    if ($cmd -and $cmd.CommandType -eq 'ExternalScript' -and $cmd.Source) {
+        return [PSCustomObject]@{ Exe = $cmd.Source; Prefix = @(); ElectronAsNode = $false }
     }
 
     return $null
@@ -210,12 +242,24 @@ function Invoke-WtwWmuxCommand {
 
     $allArgs = @($invoker.Prefix) + $ArgumentList
     Write-Verbose "wmux command: $($invoker.Exe) $($allArgs -join ' ')"
-    $output = & $invoker.Exe @allArgs 2>&1
-    $outputText = $output -join [Environment]::NewLine
-    $exitCode = $LASTEXITCODE
-    if ($null -eq $exitCode) { $exitCode = 0 }
 
-    return [PSCustomObject]@{ ExitCode = $exitCode; Output = $outputText }
+    $previousElectron = $env:ELECTRON_RUN_AS_NODE
+    try {
+        if ($invoker.ElectronAsNode) {
+            $env:ELECTRON_RUN_AS_NODE = '1'
+        }
+        $output = & $invoker.Exe @allArgs 2>&1
+        $outputText = $output -join [Environment]::NewLine
+        $exitCode = $LASTEXITCODE
+        if ($null -eq $exitCode) { $exitCode = 0 }
+        return [PSCustomObject]@{ ExitCode = $exitCode; Output = $outputText }
+    } finally {
+        if ($null -eq $previousElectron -or $previousElectron -eq '') {
+            Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+        } else {
+            $env:ELECTRON_RUN_AS_NODE = $previousElectron
+        }
+    }
 }
 
 function ConvertFrom-WtwWmuxJsonOutput {
@@ -259,18 +303,28 @@ function Test-WtwWmuxRunning {
 function Start-WtwWmuxApp {
     <#
     .SYNOPSIS
-        Launch the wmux app and wait (briefly) for its CLI pipe to come up.
+        Launch the wmux app and wait for its CLI pipe to come up.
+    .DESCRIPTION
+        Cold start installs Claude hooks and checks for updates before the
+        named pipe answers `ping`. 12s was too short: the app would come up,
+        wtw would give up, and the user would see the GUI logs followed by
+        "wmux is not running and could not be started."
     #>
     [CmdletBinding()]
-    param([int] $TimeoutSeconds = 12)
+    param([int] $TimeoutSeconds = 45)
 
     $exe = Get-WtwWmuxExe
     if (-not $exe) { return $false }
 
+    $previousElectron = $env:ELECTRON_RUN_AS_NODE
     try {
+        # GUI launch must not inherit ELECTRON_RUN_AS_NODE from a prior CLI call.
+        Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
         Start-Process -FilePath $exe | Out-Null
     } catch {
         return $false
+    } finally {
+        if ($previousElectron) { $env:ELECTRON_RUN_AS_NODE = $previousElectron }
     }
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -285,7 +339,10 @@ function Start-WtwWmuxApp {
 function Confirm-WtwWmuxRunning {
     <#
     .SYNOPSIS
-        Ensure wmux is running, starting it when necessary.
+        Check that wmux is running. With -StartIfStopped, launch it.
+    .DESCRIPTION
+        Only `wtw wmux` passes -StartIfStopped. `wtw create` / `wtw add` must
+        not auto-start the GUI — they skip live workspace creation instead.
     #>
     [CmdletBinding()]
     param([switch] $StartIfStopped)
@@ -425,10 +482,11 @@ function Register-WtwWmuxProject {
         Create a wmux workspace for a worktree (called by `wtw add` / `wtw create`).
     .DESCRIPTION
         wmux has no static SourceGit-style on-disk repository registry; its
-        workspaces are live. So registration here means creating the workspace in
-        a running wmux (starting wmux if needed). Best-effort: never blocks
-        worktree setup. Returns the workspace title (stored as wmuxWorkspaceName)
-        so it can be found/closed later, or $null when nothing was created.
+        workspaces are live. Registration here means creating the workspace in
+        an already-running wmux. It does not start the app — that is reserved
+        for the explicit `wtw wmux` command. Best-effort: never blocks worktree
+        setup. Returns the workspace title (stored as wmuxWorkspaceName) so it
+        can be found/closed later, or $null when nothing was created.
     #>
     [CmdletBinding()]
     param(
@@ -444,7 +502,7 @@ function Register-WtwWmuxProject {
         return $null
     }
 
-    if (-not (Confirm-WtwWmuxRunning -StartIfStopped)) {
+    if (-not (Confirm-WtwWmuxRunning)) {
         $hint = if ($TaskName) { "wtw wmux $TaskName" } else { 'wtw wmux <name>' }
         Write-Host "  wmux: app not running - skipped. Run '$hint' to create the workspace once wmux is open." -ForegroundColor DarkGray
         return $null
