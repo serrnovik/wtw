@@ -156,19 +156,84 @@ function ConvertTo-WtwPosixSingleQuotedLiteral {
 function Get-WtwCmuxLocalAppleScriptInitCommand {
     <#
     .SYNOPSIS
-        POSIX command typed into cmux's existing tab during AppleScript fallback.
+        POSIX command typed into cmux's default macOS tab during AppleScript fallback.
     .DESCRIPTION
-        cmux's default macOS surface is zsh. PowerShell cmdlets like Set-Location
-        fail there, and the zsh ``wtw`` wrapper used to treat
-        ``__cmux_init_current`` as a worktree name. cd in the current shell, then
-        refresh cmux metadata through the same hook zsh already runs on go.
+        cmux's default surface is zsh. Do not type PowerShell (Set-Location / Clear-Host)
+        and do not call ``wtw``: a new tab's zshrc may not have loaded the wrapper yet,
+        and older wrappers treated ``__cmux_*`` as an implicit go target. ``cd`` is a
+        builtin, so this works even  before PATH or wtw.zsh exist.
     #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][string] $ProjectPath)
 
     $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
     $quoted = ConvertTo-WtwPosixSingleQuotedLiteral -Value $fullPath
-    return "clear; cd $quoted; wtw __cmux_apply_current"
+    return "clear; cd $quoted"
+}
+
+function Get-WtwCmuxAppleScriptFallbackSource {
+    <#
+    .SYNOPSIS
+        osascript body for the cmux AppleScript fallback.
+    .DESCRIPTION
+        Searches every window (not only the front one). Creating a tab in the
+        front window dumped snowmain1's init command into whatever project was
+        focused (e.g. kulissa-landing). A miss opens a new window.
+    #>
+    [CmdletBinding()]
+    param()
+
+    return @'
+on run argv
+    set targetPath to item 1 of argv
+    set targetName to item 2 of argv
+    set initCommand to item 3 of argv
+    set matchByNameOnly to false
+    if (count of argv) ≥ 4 then
+        set matchByNameOnly to ((item 4 of argv) is "name-only")
+    end if
+    set tabLabel to targetName
+    if (count of argv) ≥ 5 then
+        set tabLabel to item 5 of argv
+    end if
+
+    tell application "cmux"
+        activate
+
+        repeat with candidateWindow in windows
+            repeat with workspaceTab in tabs of candidateWindow
+                try
+                    set tabName to (name of workspaceTab as text)
+                    if tabName is targetName or tabName is tabLabel then
+                        select tab workspaceTab
+                        return "selected"
+                    end if
+
+                    if not matchByNameOnly then
+                        repeat with workspaceTerminal in terminals of workspaceTab
+                            try
+                                if (working directory of workspaceTerminal as text) is targetPath then
+                                    select tab workspaceTab
+                                    return "selected"
+                                end if
+                            end try
+                        end repeat
+                    end if
+                end try
+            end repeat
+        end repeat
+
+        set createdWindow to new window
+        delay 1.0
+        set createdTab to tab 1 of createdWindow
+        select tab createdTab
+        delay 0.4
+        set createdTerminal to focused terminal of createdTab
+        input text (initCommand & return) to createdTerminal
+        return "created"
+    end tell
+end run
+'@
 }
 
 function Open-WtwCmuxAppleScriptWorkspace {
@@ -188,55 +253,9 @@ function Open-WtwCmuxAppleScriptWorkspace {
         $InitCommand = Get-WtwCmuxLocalAppleScriptInitCommand -ProjectPath $fullPath
     }
     $matchMode = if ($MatchByNameOnly) { 'name-only' } else { 'name-or-cwd' }
-    $script = @'
-on run argv
-    set targetPath to item 1 of argv
-    set targetName to item 2 of argv
-    set initCommand to item 3 of argv
-    set matchByNameOnly to false
-    if (count of argv) ≥ 4 then
-        set matchByNameOnly to ((item 4 of argv) is "name-only")
-    end if
-
-    tell application "cmux"
-        activate
-        if (count of windows) is 0 then
-            set targetWindow to new window
-        else
-            set targetWindow to front window
-        end if
-
-        repeat with workspaceTab in tabs of targetWindow
-            try
-                if (name of workspaceTab as text) is targetName then
-                    select tab workspaceTab
-                    return "selected"
-                end if
-
-                if not matchByNameOnly then
-                    repeat with workspaceTerminal in terminals of workspaceTab
-                        try
-                            if (working directory of workspaceTerminal as text) is targetPath then
-                                select tab workspaceTab
-                                return "selected"
-                            end if
-                        end try
-                    end repeat
-                end if
-            end try
-        end repeat
-
-        set createdTab to new tab in targetWindow
-        select tab createdTab
-        delay 0.4
-        set createdTerminal to focused terminal of createdTab
-        input text (initCommand & return) to createdTerminal
-        return "created"
-    end tell
-end run
-'@
-
-    $result = & osascript @('-e', $script, '--', $fullPath, $PrettyName, $InitCommand, $matchMode) 2>&1
+    $tabLabel = Get-WtwCmuxTabLabel -PrettyName $PrettyName
+    $script = Get-WtwCmuxAppleScriptFallbackSource
+    $result = & osascript @('-e', $script, '--', $fullPath, $PrettyName, $InitCommand, $matchMode, $tabLabel) 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Verbose "cmux AppleScript fallback failed: $($result -join [Environment]::NewLine)"
         return $false

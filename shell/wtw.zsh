@@ -130,6 +130,40 @@ _wtw_quote_args() {
     echo "$result"
 }
 
+_wtw_invoke() {
+    local cmd_args=$(_wtw_quote_args "$@")
+    "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
+}
+
+_wtw_list_has() {
+    local needle="$1"
+    shift
+    local item
+    for item in "$@"; do
+        [[ "$item" == "$needle" ]] && return 0
+    done
+    return 1
+}
+
+# Hardcoded fallback so bats (and a stale ~/.wtw/module) still route real
+# subcommands to pwsh. Get-WtwCliCommandNames is the source of truth; install
+# refreshes this list via `wtw __shell_state`. `go` stays native (parent cd).
+_wtw_passthrough_commands=(
+    init add create list ls info show open
+    remove rm delete del unregister unreg
+    edit rename ren workspace ws copy sync color clean
+    host agent install update skill sbx help run
+    connect conn ssh
+    sourcegit sgit sg
+    chatgpt cgpt codex droid factory
+    claude cowork claudecode ccode
+    t3 t3code cmux cm wmux wm
+    ss superset supersetsh
+    cursor cur code co antigravity anti ag windsurf wind codium vscodium
+)
+_wtw_refresh_commands=(init add create remove rm delete del unregister unreg edit rename ren host)
+_wtw_known_hosts=()
+
 # Native zsh completion. PowerShell's Register-ArgumentCompleter does not apply
 # to this wrapper, so without a compdef zsh falls back to completing local files.
 _wtw_completion() {
@@ -141,6 +175,8 @@ _wtw_completion() {
         'add:Register an existing worktree'
         'create:Create a worktree and workspace'
         'list:List registered repositories and worktrees'
+        'info:Show full details for a repo or worktree'
+        'show:Alias for info'
         'go:Switch to a registered target'
         'open:Open a target in the configured editor'
         'remove:Remove a worktree'
@@ -153,9 +189,15 @@ _wtw_completion() {
         'sync:Synchronize workspace settings'
         'color:Set or show a workspace color'
         'clean:Find stale worktrees'
+        'host:Manage remote machines for --on'
         'agent:Configure agent profiles'
         'install:Install or update WTW'
         'skill:Install the WTW agent skill'
+        'sbx:Launch an AI sandbox'
+        'run:Run a wtw command on a remote host'
+        'connect:SSH into a remote worktree'
+        'chatgpt:Open a target in ChatGPT'
+        'cgpt:Open a target in ChatGPT'
         'cursor:Open a target in Cursor'
         'code:Open a target in VS Code'
         'antigravity:Open a target in Antigravity'
@@ -167,6 +209,7 @@ _wtw_completion() {
         'factory:Open a target in Factory desktop app'
         'cmux:Open a target in cmux'
         'wmux:Open a target in wmux'
+        'ss:Find and open a matching Superset workspace'
         'claude:Open a target in Claude'
         'claudecode:Start a new Claude Code chat in a target'
         't3:Register + open a target as a T3 Code project'
@@ -222,7 +265,7 @@ _wtw_completion() {
 
     targets=("${_wtw_registered_aliases[@]}")
     case "$subcommand" in
-        list|ls|go|open|remove|rm|delete|del|unregister|unreg|edit|rename|ren|workspace|ws|copy|sync|color|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
+        list|ls|info|show|go|open|remove|rm|delete|del|unregister|unreg|edit|rename|ren|workspace|ws|copy|sync|color|sbx|run|connect|conn|ssh|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|ss|superset|supersetsh|claude|cowork|claudecode|ccode|t3|t3code)
             if (( ${#targets[@]} )); then
                 _describe -t targets 'wtw target' targets
             fi
@@ -260,54 +303,33 @@ wtw() {
         go)
             shift; _wtw_go "$@" ;;
         "")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
-        # Commands that modify registry — delegate fully to pwsh
-        init|add|create|remove|rm|delete|del|unregister|unreg|edit|rename|ren|workspace|ws|copy|sync|color|clean|install|update|skill)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
-            # Regenerate aliases after commands that change the registry
-            case "$1" in
-                init|add|create|remove|rm|delete|del|unregister|unreg|edit|rename|ren) _wtw_register_aliases ;;
-            esac
-            ;;
-        # List — delegate to pwsh (ANSI output passes through)
-        list|ls)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
-        # Open — delegate to pwsh
-        open)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
-        # Editor shortcuts — delegate to pwsh
-        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
-        # Help
+            _wtw_invoke ;;
         help|-h|--help)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
+            _wtw_invoke "$@" ;;
         # Internal hooks (__cmux_*) and flag-first invocations (--on, --at)
         # must reach pwsh. Implicit go would treat them as worktree names.
         __*|-*|--*)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
-        # Unknown: try as implicit "go" (same as pwsh behavior)
+            _wtw_invoke "$@" ;;
         *)
-            _wtw_go "$1" ;;
+            if _wtw_list_has "$1" "${_wtw_passthrough_commands[@]}"; then
+                _wtw_invoke "$@"
+                if _wtw_list_has "$1" "${_wtw_refresh_commands[@]}"; then
+                    _wtw_register_aliases
+                fi
+            elif [ -n "${2:-}" ] && _wtw_list_has "$1" "${_wtw_known_hosts[@]}"; then
+                _wtw_invoke "$@"
+            else
+                _wtw_go "$1"
+            fi
+            ;;
     esac
 }
 
 # Register aliases from the registry — called on shell startup and after create/remove
 _wtw_registered_aliases=()
 
-_wtw_register_aliases() {
-    [ ! -f "$_wtw_module" ] && return
-    local _wtw_output
-    _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
-        Import-Module '${_wtw_module}' -DisableNameChecking
-        Invoke-Wtw __aliases --shell zsh
-    " 2>/dev/null) || return
-    [ -z "$_wtw_output" ] && return
+_wtw_apply_alias_output() {
+    local _wtw_output="$1"
 
     # Remove previously registered aliases that are no longer in the registry
     local _wtw_new_names=()
@@ -357,6 +379,55 @@ _wtw_register_aliases() {
     done <<< "$_wtw_output"
 
     eval "$_wtw_defs"
+}
+
+_wtw_apply_shell_state() {
+    local _wtw_state="$1"
+    local section="" line
+    local -a cmds hosts
+    cmds=()
+    hosts=()
+    local alias_buf=""
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            '#wtw-commands') section=commands; continue ;;
+            '#wtw-hosts') section=hosts; continue ;;
+            '#wtw-aliases') section=aliases; continue ;;
+        esac
+        case "$section" in
+            commands)
+                [ -n "$line" ] && [ "$line" != "go" ] && cmds+=("$line")
+                ;;
+            hosts)
+                [ -n "$line" ] && hosts+=("$line")
+                ;;
+            aliases)
+                alias_buf+="$line"$'\n'
+                ;;
+        esac
+    done <<< "$_wtw_state"
+    (( ${#cmds[@]} )) && _wtw_passthrough_commands=("${cmds[@]}")
+    _wtw_known_hosts=("${hosts[@]}")
+    _wtw_apply_alias_output "$alias_buf"
+}
+
+_wtw_register_aliases() {
+    [ ! -f "$_wtw_module" ] && return
+    local _wtw_output
+    _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
+        Import-Module '${_wtw_module}' -DisableNameChecking
+        Invoke-Wtw __shell_state --shell zsh
+    " 2>/dev/null) || true
+    if [[ "$_wtw_output" == *'#wtw-aliases'* ]]; then
+        _wtw_apply_shell_state "$_wtw_output"
+        return
+    fi
+    _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
+        Import-Module '${_wtw_module}' -DisableNameChecking
+        Invoke-Wtw __aliases --shell zsh
+    " 2>/dev/null) || return
+    [ -z "$_wtw_output" ] && return
+    _wtw_apply_alias_output "$_wtw_output"
 }
 
 # Register aliases on load (silently)

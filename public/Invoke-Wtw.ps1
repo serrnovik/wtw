@@ -357,6 +357,27 @@ function Invoke-Wtw {
         }
         'help'    { Invoke-Wtw }
         # Internal commands for shell integration (zsh/bash wrappers call these)
+        '__commands' {
+            # One name per line. Wrappers use this so zsh/bash/cmd cannot drift
+            # from the PowerShell CLI when deciding passthrough vs implicit go.
+            Get-WtwCliCommandNames | ForEach-Object { Write-Output $_ }
+        }
+        '__hosts' {
+            try { Get-WtwHostNames | ForEach-Object { Write-Output $_ } } catch { }
+        }
+        '__shell_state' {
+            $shellType = $splat['Shell'] ?? ''
+            Write-Output '#wtw-commands'
+            Get-WtwCliCommandNames | ForEach-Object { Write-Output $_ }
+            Write-Output '#wtw-hosts'
+            try { Get-WtwHostNames | ForEach-Object { Write-Output $_ } } catch { }
+            Write-Output '#wtw-aliases'
+            if ($shellType) {
+                Invoke-Wtw '__aliases' '--shell' $shellType
+            } else {
+                Invoke-Wtw '__aliases'
+            }
+        }
         '__resolve_path' {
             # Output: just the absolute path to the target (single line, no
             # tabs). Used by wtw.cmd so cmd.exe can `cd /d` to it cleanly

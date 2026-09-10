@@ -133,7 +133,11 @@ function Update-Wtw {
         if (Install-WtwStagedModule -StagedRoot $staged -InstallRoot $installRoot) {
             Write-WtwInstallRecord -InstallRoot $installRoot -Origin 'Gallery' -Version $status.LatestVersion
             Write-Host ("  wtw {0} installed to {1}" -f $status.LatestVersion, $installRoot) -ForegroundColor Green
-            Write-Host '  Restart your terminal to load it.' -ForegroundColor DarkGray
+            $modulePath = Join-Path $installRoot 'wtw.psm1'
+            if (Test-Path -LiteralPath $modulePath) {
+                Import-Module $modulePath -Global -Force -DisableNameChecking -Verbose:$false -Debug:$false 1>$null 4>$null 5>$null 6>$null
+                Write-Host '  Reloaded the module in this session.' -ForegroundColor DarkGray
+            }
         }
     } finally {
         Remove-Item -LiteralPath (Split-Path -Parent $staged) -Recurse -Force -ErrorAction SilentlyContinue

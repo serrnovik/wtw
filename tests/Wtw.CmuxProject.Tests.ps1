@@ -305,7 +305,7 @@ Describe 'Open-WtwCmuxWorkspace' {
             $ProjectPath -eq $script:projectPath -and
             $PrettyName -eq 'Denied Feature' -and
             $InitCommand -match '^clear; cd ' -and
-            $InitCommand -match 'wtw __cmux_apply_current' -and
+            $InitCommand -notmatch 'wtw ' -and
             $InitCommand -notmatch 'Set-Location' -and
             $InitCommand -notmatch 'Clear-Host'
         }
@@ -437,14 +437,25 @@ Describe 'cmux shell startup metadata hook' {
 }
 
 Describe 'cmux AppleScript POSIX init' {
-    It 'cds with POSIX quoting and applies cmux metadata instead of PowerShell' {
+    It 'cds with POSIX quoting and does not type PowerShell or wtw hooks' {
         InModuleScope wtw {
             $cmd = Get-WtwCmuxLocalAppleScriptInitCommand -ProjectPath $TestDrive
             $quoted = ConvertTo-WtwPosixSingleQuotedLiteral -Value ([System.IO.Path]::GetFullPath($TestDrive))
-            $cmd | Should -Be "clear; cd $quoted; wtw __cmux_apply_current"
+            $cmd | Should -Be "clear; cd $quoted"
             $cmd | Should -Not -Match 'Set-Location'
             $cmd | Should -Not -Match 'Clear-Host'
-            $cmd | Should -Not -Match '__cmux_init_current'
+            $cmd | Should -Not -Match 'wtw'
+            $cmd | Should -Not -Match '__cmux_'
+        }
+    }
+
+    It 'searches every cmux window and opens a new window on a miss' {
+        InModuleScope wtw {
+            $source = Get-WtwCmuxAppleScriptFallbackSource
+            $source | Should -Match 'repeat with candidateWindow in windows'
+            $source | Should -Match 'set createdWindow to new window'
+            $source | Should -Not -Match 'new tab in'
+            $source | Should -Not -Match 'front window'
         }
     }
 

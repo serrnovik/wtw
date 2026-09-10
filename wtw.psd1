@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.20'
+    ModuleVersion     = '0.2.22'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -40,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'cmux AppleScript fallback types POSIX into zsh (`cd` + `wtw __cmux_apply_current`) instead of PowerShell `Set-Location`. zsh/bash `wtw` passes `__*` hooks and `--on`/`--at` through to pwsh.'
+            ReleaseNotes = 'cmux AppleScript fallback searches every window, opens a new window instead of a tab in the front project, and types POSIX `cd` into zsh (no Set-Location, no wtw hook). `wtw update` reloads the module in the current session.'
         }
     }
 }

@@ -106,6 +106,7 @@ _wtw_go() {
     if [ -n "$startup_script" ]; then
         _wtw_run_script "${path}/${startup_script}"
     fi
+    _wtw_cmux_apply_current
 }
 
 # Helper: build a safe pwsh argument string by quoting each arg
@@ -118,48 +119,73 @@ _wtw_quote_args() {
     echo "$result"
 }
 
+_wtw_invoke() {
+    local cmd_args=$(_wtw_quote_args "$@")
+    "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
+}
+
+_wtw_list_has() {
+    local needle="$1"
+    shift
+    local item
+    for item in "$@"; do
+        [[ "$item" == "$needle" ]] && return 0
+    done
+    return 1
+}
+
+# Hardcoded fallback so bats (and a stale ~/.wtw/module) still route real
+# subcommands to pwsh. Get-WtwCliCommandNames is the source of truth; install
+# refreshes this list via `wtw __shell_state`. `go` stays native (parent cd).
+_wtw_passthrough_commands=(
+    init add create list ls info show open
+    remove rm delete del unregister unreg
+    edit rename ren workspace ws copy sync color clean
+    host agent install update skill sbx help run
+    connect conn ssh
+    sourcegit sgit sg
+    chatgpt cgpt codex droid factory
+    claude cowork claudecode ccode
+    t3 t3code cmux cm wmux wm
+    ss superset supersetsh
+    cursor cur code co antigravity anti ag windsurf wind codium vscodium
+)
+_wtw_refresh_commands=(init add create remove rm delete del unregister unreg edit rename ren host)
+_wtw_known_hosts=()
+
 # Main wtw function
 wtw() {
     case "$1" in
         go)
             shift; _wtw_go "$@" ;;
         "")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw" ;;
-        init|add|create|remove|rm|delete|del|unregister|unreg|edit|rename|ren|workspace|ws|copy|sync|color|clean|install|update|skill)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}"
-            case "$1" in
-                init|add|create|remove|rm|delete|del|unregister|unreg|edit|rename|ren) _wtw_register_aliases ;;
-            esac
-            ;;
-        list|ls|open|help|-h|--help)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
-        # Editor shortcuts — delegate to pwsh
-        cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
+            _wtw_invoke ;;
+        help|-h|--help)
+            _wtw_invoke "$@" ;;
         # Internal hooks (__cmux_*) and flag-first invocations (--on, --at)
         # must reach pwsh. Implicit go would treat them as worktree names.
         __*|-*|--*)
-            local cmd_args=$(_wtw_quote_args "$@")
-            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
+            _wtw_invoke "$@" ;;
         *)
-            _wtw_go "$1" ;;
+            if _wtw_list_has "$1" "${_wtw_passthrough_commands[@]}"; then
+                _wtw_invoke "$@"
+                if _wtw_list_has "$1" "${_wtw_refresh_commands[@]}"; then
+                    _wtw_register_aliases
+                fi
+            elif [ -n "${2:-}" ] && _wtw_list_has "$1" "${_wtw_known_hosts[@]}"; then
+                _wtw_invoke "$@"
+            else
+                _wtw_go "$1"
+            fi
+            ;;
     esac
 }
 
 # Register aliases from the registry
 _wtw_registered_aliases=()
 
-_wtw_register_aliases() {
-    [ ! -f "$_wtw_module" ] && return
-    local _wtw_output
-    _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
-        Import-Module '${_wtw_module}' -DisableNameChecking
-        Invoke-Wtw __aliases --shell bash
-    " 2>/dev/null) || return
-    [ -z "$_wtw_output" ] && return
+_wtw_apply_alias_output() {
+    local _wtw_output="$1"
 
     # Remove stale aliases
     local _wtw_new_names=()
@@ -196,11 +222,68 @@ _wtw_register_aliases() {
         if [ -n "$_wtw_s" ]; then
             _wtw_defs+="  _wtw_run_script '${_wtw_p}/${_wtw_s}'"$'\n'
         fi
+        _wtw_defs+="  _wtw_cmux_apply_current"$'\n'
         _wtw_defs+="}"$'\n'
         _wtw_registered_aliases+=("${_wtw_a}")
     done <<< "$_wtw_output"
 
     eval "$_wtw_defs"
+}
+
+_wtw_apply_shell_state() {
+    local _wtw_state="$1"
+    local section="" line
+    local cmds=()
+    local hosts=()
+    local alias_buf=""
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            '#wtw-commands') section=commands; continue ;;
+            '#wtw-hosts') section=hosts; continue ;;
+            '#wtw-aliases') section=aliases; continue ;;
+        esac
+        case "$section" in
+            commands)
+                if [ -n "$line" ] && [ "$line" != "go" ]; then
+                    cmds+=("$line")
+                fi
+                ;;
+            hosts)
+                [ -n "$line" ] && hosts+=("$line")
+                ;;
+            aliases)
+                alias_buf+="$line"$'\n'
+                ;;
+        esac
+    done <<< "$_wtw_state"
+    if [ ${#cmds[@]} -gt 0 ]; then
+        _wtw_passthrough_commands=("${cmds[@]}")
+    fi
+    if [ ${#hosts[@]} -gt 0 ]; then
+        _wtw_known_hosts=("${hosts[@]}")
+    else
+        _wtw_known_hosts=()
+    fi
+    _wtw_apply_alias_output "$alias_buf"
+}
+
+_wtw_register_aliases() {
+    [ ! -f "$_wtw_module" ] && return
+    local _wtw_output
+    _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
+        Import-Module '${_wtw_module}' -DisableNameChecking
+        Invoke-Wtw __shell_state --shell bash
+    " 2>/dev/null) || true
+    if [[ "$_wtw_output" == *'#wtw-aliases'* ]]; then
+        _wtw_apply_shell_state "$_wtw_output"
+        return
+    fi
+    _wtw_output=$("$_wtw_pwsh" -NoLogo -NoProfile -Command "
+        Import-Module '${_wtw_module}' -DisableNameChecking
+        Invoke-Wtw __aliases --shell bash
+    " 2>/dev/null) || return
+    [ -z "$_wtw_output" ] && return
+    _wtw_apply_alias_output "$_wtw_output"
 }
 
 _wtw_register_aliases 2>/dev/null

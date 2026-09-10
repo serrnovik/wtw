@@ -24,9 +24,12 @@ REM them through the resolve branch turned `wtw __aliases` into
 REM 'could not resolve "__aliases"'.
 if "%_FIRST:~0,2%"=="__" goto :passthrough
 
+REM Flag-first invocations (`--on`, `--at`, `-h`) always belong to pwsh.
+if "%_FIRST:~0,1%"=="-" goto :passthrough
+
 REM Known subcommands that don't need cmd-side cd. Pad with spaces so findstr
-REM can match whole tokens.
-set "_NOCD= init add create list ls open cursor cur code co antigravity anti ag windsurf wind ws codium vscodium sourcegit sgit sg codex droid factory cmux cm wmux wm claude cowork claudecode ccode t3 t3code remove rm delete del unregister unreg edit rename ren workspace copy color sync clean install update skill sbx help -h --help "
+REM can match whole tokens. Keep in sync with Get-WtwCliPassthroughCommandNames.
+set "_NOCD= init add create list ls info show open cursor cur code co antigravity anti ag windsurf wind ws codium vscodium sourcegit sgit sg chatgpt cgpt codex droid factory cmux cm wmux wm ss superset supersetsh claude cowork claudecode ccode t3 t3code remove rm delete del unregister unreg edit rename ren workspace copy color sync clean host agent install update skill sbx help run connect conn ssh -h --help "
 echo  %_NOCD% | findstr /I /C:" %_FIRST% " >nul
 if not errorlevel 1 goto :passthrough
 
@@ -35,6 +38,12 @@ REM pwsh handles the spawn; cmd.exe shouldn't cd.
 echo  %* | findstr /I /C:"--new-tab" >nul
 if not errorlevel 1 goto :passthrough
 
+REM `wtw go <name>` cds here. Any other multi-token form (host-first
+REM `wtw at cmux auth`, extra flags) belongs to pwsh.
+if /i "%_FIRST%"=="go" goto :resolve_cd
+if not "%~2"=="" goto :passthrough
+
+:resolve_cd
 REM Otherwise: resolve the target path via pwsh and cd /d to it.
 set "_NAME=%_FIRST%"
 if /i "%_FIRST%"=="go" set "_NAME=%~2"

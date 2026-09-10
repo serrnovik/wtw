@@ -106,20 +106,13 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     $familyNames = @(Get-WtwEditorFamily | ForEach-Object { $_.Prefixes } | ForEach-Object { $_ })
 
     $knownSubcommands = @(
-        'init', 'add', 'create', 'list', 'ls', 'go', 'open', 'remove', 'rm', 'unregister', 'unreg',
-        'edit', 'rename', 'ren',
-        'workspace', 'ws', 'copy', 'sync', 'color', 'clean', 'agent', 'install', 'update', 'skill', 'help',
-        'host',
-        '__resolve', '__resolve_json', '__aliases'
-    ) + $familyNames + @(
-        'sourcegit', 'sgit', 'sg',
-        'codex', 'droid', 'factory', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
-        'cmux', 'cm', 'wmux', 'wm',
-        'ss', 'superset', 'supersetsh'
+        (Get-WtwCliCommandNames)
+        '__resolve', '__resolve_json', '__aliases', '__commands', '__hosts', '__shell_state'
     )
 
     $targetSubcommands = @(
-        'go', 'open', 'remove', 'rm', 'unregister', 'unreg', 'edit', 'rename', 'ren', 'sync', 'color'
+        'go', 'open', 'info', 'show', 'remove', 'rm', 'unregister', 'unreg', 'edit', 'rename', 'ren', 'sync', 'color',
+        'chatgpt', 'cgpt', 'sbx', 'run', 'connect', 'conn', 'ssh'
     ) + $familyNames + @(
         'sourcegit', 'sgit', 'sg',
         'codex', 'droid', 'factory', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
@@ -146,6 +139,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'add';    Tip = 'Add existing repo/worktree to registry' }
             @{ Name = 'create'; Tip = 'Create worktree + workspace' }
             @{ Name = 'list';   Tip = 'List registered worktrees' }
+            @{ Name = 'info';   Tip = 'Show full details for a repo or worktree' }
+            @{ Name = 'show';   Tip = 'Alias for info' }
             @{ Name = 'go';     Tip = 'Switch to worktree' }
             @{ Name = 'open';   Tip = 'Open workspace in editor' }
             @{ Name = 'remove'; Tip = 'Remove worktree + workspace' }
@@ -157,6 +152,9 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'clean';       Tip = 'Clean stale AI worktrees' }
             @{ Name = 'agent';       Tip = 'Configure agentctl profile overlays' }
             @{ Name = 'skill';       Tip = 'Install AI skill into current repo' }
+            @{ Name = 'sbx';         Tip = 'Launch AI sandbox with workspace folders mounted' }
+            @{ Name = 'run';         Tip = 'With --on: run a wtw command on the remote' }
+            @{ Name = 'connect';     Tip = 'With --on: ssh into a remote worktree' }
             @{ Name = 'chatgpt';     Tip = 'Open in ChatGPT (aliases: cgpt, codex)' }
             @{ Name = 'cgpt';        Tip = 'Open in ChatGPT' }
             @{ Name = 'codex';       Tip = 'Open in ChatGPT' }

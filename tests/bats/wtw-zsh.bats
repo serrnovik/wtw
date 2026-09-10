@@ -151,6 +151,43 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     [[ "$output" != *"__resolve"* ]]
 }
 
+@test "wtw CLI commands and host-first shorthand reach pwsh instead of implicit go" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        unset CMUX_WORKSPACE_ID CMUX_SURFACE_ID
+        source '$SHELL_FILE' 2>/dev/null
+        function mock_pwsh() {
+            print -r -- \"\$*\"
+            [[ \"\$*\" == *'__resolve'* ]] && return 1
+            return 0
+        }
+        _wtw_pwsh=mock_pwsh
+        wtw info x
+        wtw show x
+        wtw host list
+        wtw chatgpt
+        wtw sbx demo
+        wtw run list
+        wtw ss
+        _wtw_known_hosts=(at)
+        wtw at cmux auth
+        wtw zzz-not-a-command || true
+        wtw go zzz-not-a-command || true
+    "
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Invoke-Wtw 'info' 'x'"* ]]
+    [[ "$output" == *"Invoke-Wtw 'show' 'x'"* ]]
+    [[ "$output" == *"Invoke-Wtw 'host' 'list'"* ]]
+    [[ "$output" == *"Invoke-Wtw 'chatgpt'"* ]]
+    [[ "$output" == *"Invoke-Wtw 'sbx' 'demo'"* ]]
+    [[ "$output" == *"Invoke-Wtw 'run' 'list'"* ]]
+    [[ "$output" == *"Invoke-Wtw 'ss'"* ]]
+    [[ "$output" == *"Invoke-Wtw 'at' 'cmux' 'auth'"* ]]
+    [[ "$output" == *"__resolve 'zzz-not-a-command'"* ]]
+    [[ "$output" != *"Invoke-Wtw 'zzz-not-a-command'"* ]]
+    [[ "$output" != *"Invoke-Wtw 'go'"* ]]
+}
+
 @test "no bare pwsh calls in wtw.zsh (uses \$_wtw_pwsh)" {
     local bad_lines
     bad_lines=$(grep -n 'pwsh' "$SHELL_FILE" \
