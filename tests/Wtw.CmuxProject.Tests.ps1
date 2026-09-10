@@ -303,7 +303,11 @@ Describe 'Open-WtwCmuxWorkspace' {
 
         Should -Invoke Open-WtwCmuxAppleScriptWorkspace -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
             $ProjectPath -eq $script:projectPath -and
-            $PrettyName -eq 'Denied Feature'
+            $PrettyName -eq 'Denied Feature' -and
+            $InitCommand -match '^clear; cd ' -and
+            $InitCommand -match 'wtw __cmux_apply_current' -and
+            $InitCommand -notmatch 'Set-Location' -and
+            $InitCommand -notmatch 'Clear-Host'
         }
         Should -Invoke Open-WtwCmuxAppPath -ModuleName wtw -Times 0 -Exactly
         $script:cmuxCalls | Should -Contain "new-workspace --name Denied Feature --cwd $script:projectPath --command pwsh -NoLogo -NoExit -Command `"Clear-Host; wtw __cmux_init_current`" --focus true --description wtw: repo/denied"
@@ -432,6 +436,25 @@ Describe 'cmux shell startup metadata hook' {
     }
 }
 
+Describe 'cmux AppleScript POSIX init' {
+    It 'cds with POSIX quoting and applies cmux metadata instead of PowerShell' {
+        InModuleScope wtw {
+            $cmd = Get-WtwCmuxLocalAppleScriptInitCommand -ProjectPath $TestDrive
+            $quoted = ConvertTo-WtwPosixSingleQuotedLiteral -Value ([System.IO.Path]::GetFullPath($TestDrive))
+            $cmd | Should -Be "clear; cd $quoted; wtw __cmux_apply_current"
+            $cmd | Should -Not -Match 'Set-Location'
+            $cmd | Should -Not -Match 'Clear-Host'
+            $cmd | Should -Not -Match '__cmux_init_current'
+        }
+    }
+
+    It 'escapes single quotes in the path for POSIX shells' {
+        InModuleScope wtw {
+            ConvertTo-WtwPosixSingleQuotedLiteral -Value "it's" | Should -Be "'it'\''s'"
+        }
+    }
+}
+
 Describe 'cmux remote SSH workspace' {
     BeforeEach {
         $script:cmuxCalls = [System.Collections.Generic.List[string]]::new()
@@ -466,6 +489,7 @@ Describe 'cmux remote SSH workspace' {
             $session.PrettyName | Should -Be '🧊AT.at'
             $session.StatusValue | Should -Be 'wtw-remote: at'
             $session.Command | Should -Be 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on at go"'
+            $session.ShellInitCommand | Should -Be 'clear; wtw --on at go'
             $session.RemotePath | Should -BeNullOrEmpty
         }
     }
@@ -486,6 +510,7 @@ Describe 'cmux remote SSH workspace' {
             $session.StatusValue | Should -Be 'wtw-remote: at/app/auth'
             $session.Color | Should -Be '#336699'
             $session.RemotePath | Should -Be '/remote/app_auth'
+            $session.ShellInitCommand | Should -Be 'clear; wtw --on at go auth'
         }
     }
 
@@ -577,6 +602,34 @@ Describe 'cmux remote SSH workspace' {
             $create | Should -Match '--name 🧊AT.at'
             $create | Should -Match '--command pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on at go"'
             $create | Should -Match '--description wtw-remote: at'
+        }
+    }
+
+    It 'types a POSIX remote command into AppleScript fallback, not PowerShell' {
+        InModuleScope wtw -Parameters @{ HostEntry = $script:remoteHost } {
+            Mock Get-WtwRemoteTarget {
+                @{
+                    Path       = '/remote/app_auth'
+                    Color      = $null
+                    Title      = 'app/auth'
+                    PrettyName = 'Auth'
+                }
+            }
+            Mock Test-WtwCmuxPresent { $true }
+            Mock Invoke-WtwCmuxCommand {
+                return [PSCustomObject]@{
+                    ExitCode = 1
+                    Output   = 'Error: ERROR: Access denied - only processes started inside cmux can connect'
+                }
+            }
+            Mock Open-WtwCmuxAppleScriptWorkspace { $true }
+
+            Open-WtwCmuxRemoteWorkspace -HostEntry $HostEntry -HostSelector 'at' -Name 'auth'
+
+            Should -Invoke Open-WtwCmuxAppleScriptWorkspace -Times 1 -Exactly -ParameterFilter {
+                $MatchByNameOnly -and
+                $InitCommand -eq 'clear; wtw --on at go auth'
+            }
         }
     }
 

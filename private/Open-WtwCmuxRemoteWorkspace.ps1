@@ -78,12 +78,13 @@ function Resolve-WtwCmuxRemoteSession {
 
     $inner = Get-WtwCmuxRemoteGoInnerCommand -HostSelector $HostSelector -Name $Name -Via $Via
     return [PSCustomObject]@{
-        PrettyName     = "$(Get-WtwHostTitlePrefix -HostEntry $HostEntry)$label"
-        StatusValue    = "wtw-remote: $statusKey"
-        Command        = "pwsh -NoLogo -NoExit -Command `"Clear-Host; $inner`""
-        TypedCommand   = "Clear-Host; $inner"
-        Color          = $color
-        RemotePath     = $remotePath
+        PrettyName        = "$(Get-WtwHostTitlePrefix -HostEntry $HostEntry)$label"
+        StatusValue       = "wtw-remote: $statusKey"
+        Command           = "pwsh -NoLogo -NoExit -Command `"Clear-Host; $inner`""
+        TypedCommand      = "Clear-Host; $inner"
+        ShellInitCommand  = "clear; $inner"
+        Color             = $color
+        RemotePath        = $remotePath
     }
 }
 
@@ -198,8 +199,7 @@ function Open-WtwCmuxRemoteWorkspace {
     )
     $createResult = Invoke-WtwCmuxCommand -ArgumentList $cmuxArgs
     if ($createResult.ExitCode -ne 0) {
-        $typed = $session.TypedCommand
-        if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $localCwd -PrettyName $session.PrettyName -InitCommand $typed -MatchByNameOnly) {
+        if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $localCwd -PrettyName $session.PrettyName -InitCommand $session.ShellInitCommand -MatchByNameOnly) {
             if (Test-WtwCmuxSocketPermissionDenied -Output $createResult.Output) {
                 Write-Host "  cmux: opened remote session via AppleScript fallback (socket access denied)." -ForegroundColor Green
             } else {

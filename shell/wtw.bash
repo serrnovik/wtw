@@ -139,6 +139,11 @@ wtw() {
         cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|claudecode|ccode|t3|t3code)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
+        # Internal hooks (__cmux_*) and flag-first invocations (--on, --at)
+        # must reach pwsh. Implicit go would treat them as worktree names.
+        __*|-*|--*)
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         *)
             _wtw_go "$1" ;;
     esac

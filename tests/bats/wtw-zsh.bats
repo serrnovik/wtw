@@ -133,6 +133,24 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     [ "$output" = "1" ]
 }
 
+@test "wtw internal hooks and --on reach pwsh instead of implicit go" {
+    command -v zsh &>/dev/null || skip "zsh not installed"
+    run zsh -dfc "
+        unset CMUX_WORKSPACE_ID CMUX_SURFACE_ID
+        source '$SHELL_FILE' 2>/dev/null
+        function mock_pwsh() { print -r -- \"\$*\"; }
+        _wtw_pwsh=mock_pwsh
+        wtw __cmux_init_current
+        wtw __cmux_apply_current
+        wtw --on at go auth
+    "
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Invoke-Wtw '__cmux_init_current'"* ]]
+    [[ "$output" == *"Invoke-Wtw '__cmux_apply_current'"* ]]
+    [[ "$output" == *"Invoke-Wtw '--on' 'at' 'go' 'auth'"* ]]
+    [[ "$output" != *"__resolve"* ]]
+}
+
 @test "no bare pwsh calls in wtw.zsh (uses \$_wtw_pwsh)" {
     local bad_lines
     bad_lines=$(grep -n 'pwsh' "$SHELL_FILE" \

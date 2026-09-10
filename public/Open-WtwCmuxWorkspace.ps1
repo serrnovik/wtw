@@ -145,6 +145,32 @@ function ConvertTo-WtwPowerShellSingleQuotedLiteral {
     return "'$($Value.Replace("'", "''"))'"
 }
 
+function ConvertTo-WtwPosixSingleQuotedLiteral {
+    [CmdletBinding()]
+    param([AllowNull()][string] $Value)
+
+    if ($null -eq $Value) { return "''" }
+    return "'" + $Value.Replace("'", "'\''") + "'"
+}
+
+function Get-WtwCmuxLocalAppleScriptInitCommand {
+    <#
+    .SYNOPSIS
+        POSIX command typed into cmux's existing tab during AppleScript fallback.
+    .DESCRIPTION
+        cmux's default macOS surface is zsh. PowerShell cmdlets like Set-Location
+        fail there, and the zsh ``wtw`` wrapper used to treat
+        ``__cmux_init_current`` as a worktree name. cd in the current shell, then
+        refresh cmux metadata through the same hook zsh already runs on go.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string] $ProjectPath)
+
+    $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
+    $quoted = ConvertTo-WtwPosixSingleQuotedLiteral -Value $fullPath
+    return "clear; cd $quoted; wtw __cmux_apply_current"
+}
+
 function Open-WtwCmuxAppleScriptWorkspace {
     [CmdletBinding()]
     param(
@@ -159,7 +185,7 @@ function Open-WtwCmuxAppleScriptWorkspace {
 
     $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
     if (-not $InitCommand) {
-        $InitCommand = "Clear-Host; Set-Location -LiteralPath $(ConvertTo-WtwPowerShellSingleQuotedLiteral -Value $fullPath); wtw __cmux_init_current"
+        $InitCommand = Get-WtwCmuxLocalAppleScriptInitCommand -ProjectPath $fullPath
     }
     $matchMode = if ($MatchByNameOnly) { 'name-only' } else { 'name-or-cwd' }
     $script = @'
@@ -291,7 +317,8 @@ function Open-WtwCmuxWorkspace {
     }
     $createResult = Invoke-WtwCmuxCommand -ArgumentList $cmuxArgs
     if ($createResult.ExitCode -ne 0) {
-        if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $fullDir -PrettyName $prettyName) {
+        $appleScriptInit = Get-WtwCmuxLocalAppleScriptInitCommand -ProjectPath $fullDir
+        if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $fullDir -PrettyName $prettyName -InitCommand $appleScriptInit) {
             if (Test-WtwCmuxSocketPermissionDenied -Output $createResult.Output) {
                 Write-Host "  cmux: opened via AppleScript fallback (socket access denied)." -ForegroundColor Green
             } else {

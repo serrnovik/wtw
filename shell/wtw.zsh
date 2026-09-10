@@ -286,6 +286,11 @@ wtw() {
         help|-h|--help)
             local cmd_args=$(_wtw_quote_args "$@")
             "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
+        # Internal hooks (__cmux_*) and flag-first invocations (--on, --at)
+        # must reach pwsh. Implicit go would treat them as worktree names.
+        __*|-*|--*)
+            local cmd_args=$(_wtw_quote_args "$@")
+            "$_wtw_pwsh" -NoLogo -NoProfile -Command "Import-Module '${_wtw_module}' -DisableNameChecking; Invoke-Wtw${cmd_args}" ;;
         # Unknown: try as implicit "go" (same as pwsh behavior)
         *)
             _wtw_go "$1" ;;
