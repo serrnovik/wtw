@@ -58,6 +58,8 @@ function Resolve-WtwTerminalWorkspaceMetadata {
         $baseName
     }
 
+    $prettyName = Format-WtwRepoDisplayName -Name $prettyName -RepoEntry $Target.RepoEntry
+
     return [PSCustomObject]@{
         Path        = $fullDir
         PrettyName  = $prettyName

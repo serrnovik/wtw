@@ -242,9 +242,12 @@ function Open-WtwCmuxWorkspace {
         $Target.WorktreeEntry.prettyName
     } elseif ($Target.TaskName) {
         $Target.TaskName
+    } elseif ($Target.RepoName) {
+        $prettyName = $Target.RepoName
     } else {
         Split-Path $fullDir -Leaf
     }
+    $prettyName = Format-WtwRepoDisplayName -Name $prettyName -RepoEntry $Target.RepoEntry
     $color = if ($Target.WorktreeEntry -and (Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'color') { $Target.WorktreeEntry.color } else { $null }
     $statusValue = if ($Target.TaskName) { "$($Target.RepoName)/$($Target.TaskName)" } else { $Target.RepoName }
 

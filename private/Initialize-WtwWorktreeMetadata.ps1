@@ -211,8 +211,11 @@ function Initialize-WtwWorktreeMetadata {
         }
     }
 
+    # Muxer titles include the repo emoji; SourceGit uses a folder for that instead.
+    $muxTitle = Format-WtwRepoDisplayName -Name $PrettyName -RepoEntry $RepoEntry
+
     # Register cmux Command Palette workspace metadata (no-op when cmux is absent).
-    $cmuxCommandKey = Register-WtwCmuxProject -ProjectPath $WorktreePath -PrettyName $PrettyName -Color $resolvedColor -RepoName $RepoName -TaskName $Task
+    $cmuxCommandKey = Register-WtwCmuxProject -ProjectPath $WorktreePath -PrettyName $muxTitle -Color $resolvedColor -RepoName $RepoName -TaskName $Task
     if ($cmuxCommandKey) {
         $registry.repos.$RepoName.worktrees.$Task.cmuxCommandKey = $cmuxCommandKey
         Save-WtwRegistry $registry
