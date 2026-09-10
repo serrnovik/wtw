@@ -28,17 +28,14 @@ function Open-WtwT3Workspace {
         [object] $Editor
     )
 
-    $dir = if ($Target.WorktreeEntry) { $Target.WorktreeEntry.path } else { $Target.RepoEntry.mainPath }
-    if (-not ($dir -and (Test-Path $dir))) {
+    $metadata = Resolve-WtwTerminalWorkspaceMetadata -Target $Target
+    if (-not ($metadata -and $metadata.Path -and (Test-Path $metadata.Path))) {
         Write-Error 'No directory found for T3 Code target.'
         return
     }
 
-    $fullDir = [System.IO.Path]::GetFullPath($dir)
-
-    $prettyName = Get-WtwPropertyValue -Object $Target.WorktreeEntry -Name 'prettyName'
-    if (-not $prettyName) { $prettyName = $Target.TaskName }
-    if (-not $prettyName) { $prettyName = Split-Path $fullDir -Leaf }
+    $fullDir = $metadata.Path
+    $prettyName = $metadata.PrettyName
 
     $candidates = Get-WtwPropertyValue -Object $Editor -Name 'appNameCandidates' `
         -DefaultValue @('T3 Code', 'T3 Code (Alpha)', 'T3 Code (Beta)')

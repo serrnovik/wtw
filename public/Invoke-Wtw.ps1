@@ -93,7 +93,8 @@ function Invoke-Wtw {
         Write-Host '    --on <host>       Open a worktree that lives on another machine over Remote-SSH.'
         Write-Host '    --at <host>       Alias of --on.'
         Write-Host '                      Shorthand: wtw <host> <editor> <name>'
-        Write-Host '                      Works with open/cursor/code/antigravity/windsurf/codium + list/info.'
+        Write-Host '                      Works with open/cursor/code/antigravity/windsurf/codium,'
+        Write-Host '                      list/info, go, and cmux.'
         Write-Host '                      Extra flags: --print-only, --folder, --skip-checks'
         Write-Host '    --via <transport> One-off: force this command over tailscale|zerotier|'
         Write-Host '                      mdns|lan. Changes nothing on disk.'
@@ -102,6 +103,8 @@ function Invoke-Wtw {
         Write-Host '    go <name>         With --on: ssh into that worktree — pwsh in the right'
         Write-Host '                      directory, local tab titled and coloured. (aliases:'
         Write-Host '                      connect, conn, ssh)'
+        Write-Host '    cmux [name]       With --on: local cmux workspace whose terminal is that'
+        Write-Host '                      same ssh session (alias: cm). Name omitted → remote home.'
         Write-Host ''
         return
     }
@@ -139,6 +142,7 @@ function Invoke-Wtw {
         # Per-invocation transport override. Unlike `wtw host add --via`, this
         # changes nothing on disk — it retargets this one command at a specific
         # address, which also becomes the editor's ssh-remote authority.
+        $requestedVia = $null
         if ($remoteSplat.Contains('Via')) {
             $requestedVia = [string]$remoteSplat['Via']
             $retargeted = Resolve-WtwHostVia -HostEntry $hostEntry -Via $requestedVia
@@ -159,6 +163,18 @@ function Invoke-Wtw {
             Connect-WtwRemoteWorktree `
                 -HostEntry $hostEntry `
                 -Name $connectName `
+                -PrintOnly:([bool]$remoteSplat.Contains('PrintOnly'))
+            return
+        }
+
+        # Local cmux workspace whose terminal is that same ssh session.
+        if ($remoteMode -eq 'cmux') {
+            $connectName = if ($remotePos.Count -gt 0) { Join-WtwTargetName $remotePos } else { '' }
+            Open-WtwCmuxRemoteWorkspace `
+                -HostEntry $hostEntry `
+                -HostSelector $targetHost `
+                -Name $connectName `
+                -Via $requestedVia `
                 -PrintOnly:([bool]$remoteSplat.Contains('PrintOnly'))
             return
         }
@@ -375,12 +391,13 @@ function Invoke-Wtw {
             } else {
                 Get-WtwPropertyValue -Object (Get-WtwColors).assignments -Name "$($target.RepoName)/main"
             }
+            $display = Resolve-WtwTerminalWorkspaceMetadata -Target $target
             [PSCustomObject]@{
                 path       = $p
                 workspace  = $ws
                 color      = $c
                 title      = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
-                prettyName = if ($target.WorktreeEntry) { Get-WtwPropertyValue -Object $target.WorktreeEntry -Name 'prettyName' } else { $null }
+                prettyName = if ($display) { $display.PrettyName } else { $null }
                 repo       = $target.RepoName
                 task       = $target.TaskName
             } | ConvertTo-Json -Compress -Depth 5 | Write-Output

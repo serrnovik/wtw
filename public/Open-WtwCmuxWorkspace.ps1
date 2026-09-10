@@ -149,19 +149,28 @@ function Open-WtwCmuxAppleScriptWorkspace {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string] $ProjectPath,
-        [Parameter(Mandatory)][string] $PrettyName
+        [Parameter(Mandatory)][string] $PrettyName,
+        [string] $InitCommand,
+        [switch] $MatchByNameOnly
     )
 
     if (-not $IsMacOS) { return $false }
     if (-not (Get-Command osascript -ErrorAction SilentlyContinue)) { return $false }
 
     $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
-    $initCommand = "Clear-Host; Set-Location -LiteralPath $(ConvertTo-WtwPowerShellSingleQuotedLiteral -Value $fullPath); wtw __cmux_init_current"
+    if (-not $InitCommand) {
+        $InitCommand = "Clear-Host; Set-Location -LiteralPath $(ConvertTo-WtwPowerShellSingleQuotedLiteral -Value $fullPath); wtw __cmux_init_current"
+    }
+    $matchMode = if ($MatchByNameOnly) { 'name-only' } else { 'name-or-cwd' }
     $script = @'
 on run argv
     set targetPath to item 1 of argv
     set targetName to item 2 of argv
     set initCommand to item 3 of argv
+    set matchByNameOnly to false
+    if (count of argv) ≥ 4 then
+        set matchByNameOnly to ((item 4 of argv) is "name-only")
+    end if
 
     tell application "cmux"
         activate
@@ -178,14 +187,16 @@ on run argv
                     return "selected"
                 end if
 
-                repeat with workspaceTerminal in terminals of workspaceTab
-                    try
-                        if (working directory of workspaceTerminal as text) is targetPath then
-                            select tab workspaceTab
-                            return "selected"
-                        end if
-                    end try
-                end repeat
+                if not matchByNameOnly then
+                    repeat with workspaceTerminal in terminals of workspaceTab
+                        try
+                            if (working directory of workspaceTerminal as text) is targetPath then
+                                select tab workspaceTab
+                                return "selected"
+                            end if
+                        end try
+                    end repeat
+                end if
             end try
         end repeat
 
@@ -199,7 +210,7 @@ on run argv
 end run
 '@
 
-    $result = & osascript @('-e', $script, '--', $fullPath, $PrettyName, $initCommand) 2>&1
+    $result = & osascript @('-e', $script, '--', $fullPath, $PrettyName, $InitCommand, $matchMode) 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Verbose "cmux AppleScript fallback failed: $($result -join [Environment]::NewLine)"
         return $false
@@ -231,22 +242,16 @@ function Open-WtwCmuxWorkspace {
         return
     }
 
-    $dir = if ($Target.WorktreeEntry) { $Target.WorktreeEntry.path } else { $Target.RepoEntry.mainPath }
-    if (-not ($dir -and (Test-Path $dir))) {
+    $metadata = Resolve-WtwTerminalWorkspaceMetadata -Target $Target
+    if (-not ($metadata -and $metadata.Path -and (Test-Path $metadata.Path))) {
         Write-Error 'No directory found for cmux target.'
         return
     }
 
-    $fullDir = [System.IO.Path]::GetFullPath($dir)
-    $prettyName = if ($Target.WorktreeEntry -and (Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'prettyName' -and $Target.WorktreeEntry.prettyName) {
-        $Target.WorktreeEntry.prettyName
-    } elseif ($Target.TaskName) {
-        $Target.TaskName
-    } else {
-        Split-Path $fullDir -Leaf
-    }
-    $color = if ($Target.WorktreeEntry -and (Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'color') { $Target.WorktreeEntry.color } else { $null }
-    $statusValue = if ($Target.TaskName) { "$($Target.RepoName)/$($Target.TaskName)" } else { $Target.RepoName }
+    $fullDir = $metadata.Path
+    $prettyName = $metadata.PrettyName
+    $color = $metadata.Color
+    $statusValue = $metadata.StatusValue
 
     Register-WtwCmuxProject `
         -ProjectPath $fullDir `

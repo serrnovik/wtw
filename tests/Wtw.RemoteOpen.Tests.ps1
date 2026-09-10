@@ -327,11 +327,17 @@ Describe 'Get-WtwRemoteCommandMode' {
         Get-WtwRemoteCommandMode -Command 'go' | Should -Be 'connect'
     }
 
+    It 'opens a local cmux whose terminal is that ssh session' {
+        foreach ($cmd in 'cmux', 'cm') {
+            Get-WtwRemoteCommandMode -Command $cmd | Should -Be 'cmux' -Because "$cmd is a local window over ssh"
+        }
+    }
+
     It 'refuses the ambiguous app launchers, leaving them to run' {
         # "open T3 here pointing at a remote path" is impossible; "register the
         # project over there" is meaningful — so the intent has to be stated via
-        # `run` rather than guessed.
-        foreach ($cmd in 'cmux', 'wmux', 't3', 'claudecode', 'ss', 'droid') {
+        # `run` rather than guessed. cmux is the multiplexer exception.
+        foreach ($cmd in 'wmux', 't3', 'claudecode', 'ss', 'droid') {
             Get-WtwRemoteCommandMode -Command $cmd | Should -Be 'none' -Because "$cmd is ambiguous under --on"
         }
     }

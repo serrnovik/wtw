@@ -382,9 +382,27 @@ function Get-WtwWmuxLiveWorkspaces {
 
 function Find-WtwWmuxWorkspace {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string] $PrettyName)
+    param(
+        [string] $PrettyName,
+        [string] $ProjectPath
+    )
 
-    foreach ($ws in (Get-WtwWmuxLiveWorkspaces)) {
+    $workspaces = @(Get-WtwWmuxLiveWorkspaces)
+    if ($ProjectPath) {
+        $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
+        $byCwd = $workspaces | Where-Object {
+            $cwd = Get-WtwWmuxObjectValue -Object $_ -Names @('cwd', 'path', 'workingDirectory')
+            $cwd -and [string]::Equals(
+                [System.IO.Path]::GetFullPath("$cwd"),
+                $fullPath,
+                [System.StringComparison]::OrdinalIgnoreCase)
+        } | Select-Object -First 1
+        if ($byCwd) { return $byCwd }
+    }
+
+    if (-not $PrettyName) { return $null }
+
+    foreach ($ws in $workspaces) {
         $name = Get-WtwWmuxObjectValue -Object $ws -Names @('title', 'name', 'displayName')
         if ([string]::Equals($name, $PrettyName, [System.StringComparison]::OrdinalIgnoreCase)) {
             return $ws
@@ -454,7 +472,7 @@ function Open-WtwWmuxProject {
         }
     }
 
-    $existing = Find-WtwWmuxWorkspace -PrettyName $PrettyName
+    $existing = Find-WtwWmuxWorkspace -PrettyName $PrettyName -ProjectPath $fullPath
     if ($existing) {
         $wsId = Get-WtwWmuxObjectValue -Object $existing -Names @('id', 'workspaceId', 'ref')
         if ($wsId) { Invoke-WtwWmuxCommand -ArgumentList @('select-workspace', "$wsId") | Out-Null }
@@ -508,7 +526,7 @@ function Register-WtwWmuxProject {
         return $null
     }
 
-    $existing = Find-WtwWmuxWorkspace -PrettyName $PrettyName
+    $existing = Find-WtwWmuxWorkspace -PrettyName $PrettyName -ProjectPath $ProjectPath
     if ($existing) {
         Write-Host "  wmux: workspace already exists '$PrettyName'." -ForegroundColor DarkGray
         return $PrettyName
@@ -530,14 +548,17 @@ function Unregister-WtwWmuxProject {
         Close the wmux workspace created for a worktree (called by `wtw remove`).
     #>
     [CmdletBinding()]
-    param([string] $PrettyName)
+    param(
+        [string] $PrettyName,
+        [string] $ProjectPath
+    )
 
     if (-not $IsWindows) { return }
-    if (-not $PrettyName) { return }
+    if (-not $PrettyName -and -not $ProjectPath) { return }
     if (-not (Test-WtwWmuxPresent)) { return }
     if (-not (Test-WtwWmuxRunning)) { return }
 
-    $workspace = Find-WtwWmuxWorkspace -PrettyName $PrettyName
+    $workspace = Find-WtwWmuxWorkspace -PrettyName $PrettyName -ProjectPath $ProjectPath
     if (-not $workspace) { return }
 
     $workspaceId = Get-WtwWmuxObjectValue -Object $workspace -Names @('id', 'workspaceId', 'ref')

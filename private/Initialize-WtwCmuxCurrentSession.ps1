@@ -20,18 +20,12 @@ function Initialize-WtwCmuxCurrentSession {
     $target = & { Resolve-WtwTarget $currentName } 6>$null
     if (-not $target) { return }
 
-    $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
-    if (-not ($dir -and (Test-Path $dir))) { return }
+    $metadata = Resolve-WtwTerminalWorkspaceMetadata -Target $target
+    if (-not ($metadata -and $metadata.Path -and (Test-Path $metadata.Path))) { return }
 
-    $prettyName = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'prettyName' -and $target.WorktreeEntry.prettyName) {
-        $target.WorktreeEntry.prettyName
-    } elseif ($target.TaskName) {
-        $target.TaskName
-    } else {
-        Split-Path ([System.IO.Path]::GetFullPath($dir)) -Leaf
-    }
-    $color = if ($target.WorktreeEntry -and (Get-WtwPropertyNames -Object $target.WorktreeEntry) -contains 'color') { $target.WorktreeEntry.color } else { $null }
-    $statusValue = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
+    $prettyName = $metadata.PrettyName
+    $color = $metadata.Color
+    $statusValue = $metadata.StatusValue
     $cmuxBin = Get-WtwCmuxBin
     $invokeRawCommand = Get-Command Invoke-WtwCmuxRawCommand -ErrorAction SilentlyContinue
     # Pre-resolve the tab-label helper NOW, before Enter-WtwWorktree's Restore-WtwInstalledModule

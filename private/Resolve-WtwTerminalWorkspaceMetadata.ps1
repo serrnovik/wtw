@@ -4,9 +4,13 @@ function Resolve-WtwTerminalWorkspaceMetadata {
         Resolve shared terminal workspace metadata for cmux/wmux-style launchers.
     .DESCRIPTION
         Produces a cwd, display title, color, and status value from a resolved wtw
-        target. The title includes the wtw color-circle prefix when a color is
-        available, which keeps terminal workspaces recognizable even for tools
-        that do not expose a separate color argument.
+        target.
+
+        Worktrees keep their stored pretty name (color-circle prefix included).
+        Main-repo titles use the registry key, prefixed with the optional repo
+        emoji (``🎸 snowmain1``) so cmux / wmux / T3 / SourceGit / ``wtw list``
+        all show the same identity. A main-checkout color assignment, when
+        present, still prepends the color-circle.
     #>
     [CmdletBinding()]
     param(
@@ -14,48 +18,52 @@ function Resolve-WtwTerminalWorkspaceMetadata {
         [psobject] $Target
     )
 
-    $dir = if ($Target.WorktreeEntry) { $Target.WorktreeEntry.path } else { $Target.RepoEntry.mainPath }
+    $worktreeEntry = Get-WtwPropertyValue -Object $Target -Name 'WorktreeEntry'
+    $repoEntry = Get-WtwPropertyValue -Object $Target -Name 'RepoEntry'
+    $taskName = Get-WtwPropertyValue -Object $Target -Name 'TaskName'
+    $repoName = Get-WtwPropertyValue -Object $Target -Name 'RepoName'
+
+    $dir = if ($worktreeEntry) {
+        Get-WtwPropertyValue -Object $worktreeEntry -Name 'path'
+    } else {
+        Get-WtwPropertyValue -Object $repoEntry -Name 'mainPath'
+    }
     if (-not $dir) { return $null }
 
     $fullDir = [System.IO.Path]::GetFullPath($dir)
     $color = $null
-    $baseName = $null
-    $statusValue = if ($Target.TaskName) { "$($Target.RepoName)/$($Target.TaskName)" } else { $Target.RepoName }
+    $prettyName = $null
+    $statusValue = if ($taskName) { "$repoName/$taskName" } else { $repoName }
 
-    if ($Target.WorktreeEntry) {
-        if ((Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'color') {
-            $color = $Target.WorktreeEntry.color
-        }
-
-        if ((Get-WtwPropertyNames -Object $Target.WorktreeEntry) -contains 'prettyName' -and $Target.WorktreeEntry.prettyName) {
-            $baseName = $Target.WorktreeEntry.prettyName
-        } elseif ($Target.TaskName) {
-            $baseName = $Target.TaskName
+    if ($worktreeEntry) {
+        $color = Get-WtwPropertyValue -Object $worktreeEntry -Name 'color'
+        $prettyName = Get-WtwPropertyValue -Object $worktreeEntry -Name 'prettyName'
+        if (-not $prettyName -and $taskName) {
+            $prettyName = $taskName
+            if ($color) {
+                $prettyName = Format-WtwPrettyNameWithCircle -Hex $color -Name $prettyName
+            }
         }
     } else {
-        $colorKey = "$($Target.RepoName)/main"
-        $colors = Get-WtwColors
-        $assignment = $colors.assignments.PSObject.Properties[$colorKey]
-        if ($assignment) {
-            $color = $assignment.Value
+        $colorKey = if ($repoName) { "$repoName/main" } else { $null }
+        if ($colorKey) {
+            $colors = Get-WtwColors
+            $assignments = Get-WtwPropertyValue -Object $colors -Name 'assignments'
+            $color = Get-WtwPropertyValue -Object $assignments -Name $colorKey
         }
 
-        $aliases = Get-WtwRepoAliases $Target.RepoEntry
-        if ($aliases -and $aliases.Count -gt 0) {
-            $baseName = @($aliases)[0]
-        } elseif ($Target.RepoName) {
-            $baseName = $Target.RepoName
+        $baseName = if ($repoName) { $repoName } else { Split-Path $fullDir -Leaf }
+        $prettyName = Format-WtwRepoDisplayName -Name $baseName -RepoEntry $repoEntry
+        if ($color) {
+            $prettyName = Format-WtwPrettyNameWithCircle -Hex $color -Name $prettyName
         }
     }
 
-    if (-not $baseName) {
-        $baseName = Split-Path $fullDir -Leaf
-    }
-
-    $prettyName = if ($color) {
-        Format-WtwPrettyNameWithCircle -Hex $color -Name $baseName
-    } else {
-        $baseName
+    if (-not $prettyName) {
+        $prettyName = Split-Path $fullDir -Leaf
+        if (-not $worktreeEntry) {
+            $prettyName = Format-WtwRepoDisplayName -Name $prettyName -RepoEntry $repoEntry
+        }
     }
 
     return [PSCustomObject]@{
