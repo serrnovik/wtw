@@ -123,3 +123,50 @@ Describe 'Get-WtwNameWithoutColorCircle' {
         }
     }
 }
+
+Describe 'Format-WtwDetailedList emoji field' {
+    It 'prints Emoji separately and keeps Name/Task unmerged' {
+        InModuleScope wtw {
+            $items = @(
+                [PSCustomObject]@{
+                    Kind         = 'repo'
+                    Repo         = '🎸 snowmain1'
+                    RepoName     = 'snowmain1'
+                    Emoji        = '🎸'
+                    Task         = '-'
+                    TaskName     = '-'
+                    Aliases      = "sn1`nsnowmain1"
+                    Branch       = 'main'
+                    Color        = '#aaaaaa'
+                    Path         = '/tmp/snowmain1'
+                    Workspace    = 'snowmain1.code-workspace'
+                    AgentProfile = 'solo'
+                }
+                [PSCustomObject]@{
+                    Kind         = 'wt'
+                    Repo         = '🎸 snowmain1'
+                    RepoName     = 'snowmain1'
+                    Emoji        = '🐕'
+                    Task         = '🐕 ntb_live_dogfood_fixes'
+                    TaskName     = 'ntb_live_dogfood_fixes'
+                    PrettyName   = '🟢 ntb_live_dogfood_fixes'
+                    Aliases      = 'sn1-ntb_live_dogfood_fixes'
+                    Branch       = 'fix/ntb-live-dogfood'
+                    Color        = '#dd2cdd'
+                    Path         = '/tmp/snowmain1_ntb_live_dogfood_fixes'
+                    Workspace    = '🎸🐕 ntb_live_dogfood_fixes.code-workspace'
+                    Created      = '2026-08-31'
+                    AgentProfile = 'solo'
+                    SupersetId   = $null
+                }
+            )
+            $output = Format-WtwDetailedList $items *>&1 | Out-String
+            $output | Should -Match 'Emoji     : 🎸'
+            $output | Should -Match 'Emoji     : 🐕'
+            $output | Should -Match 'Name      : 🟢 ntb_live_dogfood_fixes'
+            $output | Should -Match 'Task      : ntb_live_dogfood_fixes'
+            $output | Should -Not -Match 'Name      : 🎸🐕'
+            $output | Should -Not -Match 'Task      : 🐕 ntb_live_dogfood_fixes'
+        }
+    }
+}

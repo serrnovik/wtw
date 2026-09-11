@@ -111,6 +111,8 @@ Describe 'Edit-WtwEntry' {
         }
         $output | Should -Match 'Worktree'
         $output | Should -Match 'Task\s+:\s+auth'
+        $output | Should -Match 'Emoji\s+:'
+        $output | Should -Match 'Name\s+:\s+🟠 auth'
         $output | Should -Match '--name'
     }
 

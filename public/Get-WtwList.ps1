@@ -4,8 +4,9 @@ function Get-WtwList {
         List all registered repos and worktrees.
     .DESCRIPTION
         Displays a table of all repos and their worktrees with ANSI-colored
-        swatches. Detailed mode shows a card layout with clickable file links
-        and settings file paths.
+        swatches. The compact table composes identity emojis into Repo/Task.
+        Detailed mode (`wtw info`) shows a card layout with Emoji as its own
+        field, clickable file links, and settings file paths.
     .PARAMETER Repo
         Filter the listing to a specific repo by name or alias.
     .PARAMETER Detailed
@@ -75,13 +76,17 @@ function Get-WtwList {
             $branch = (& $gitCommand -C $repoEntry.mainPath branch --show-current 2>$null) ?? '?'
         }
 
+        $repoEmoji = Get-WtwRepoEmoji -RepoEntry $repoEntry
         $repoDisplay = Format-WtwRepoDisplayName -Name $name -RepoEntry $repoEntry
 
         # Main entry
         $items += [PSCustomObject]@{
             Kind      = 'repo'
             Repo      = $repoDisplay
+            RepoName  = $name
+            Emoji     = if ($repoEmoji) { $repoEmoji } else { '(none)' }
             Task      = '-'
+            TaskName  = '-'
             Aliases   = ($aliases -join "`n")
             Branch    = $branch
             Color     = Get-WtwPropertyValue -Object (Get-WtwColors).assignments -Name "$name/main" -DefaultValue '-'
@@ -118,18 +123,17 @@ function Get-WtwList {
                     }
                 }
 
-                $wtEmoji = Get-WtwWorktreeEmoji -WorktreeEntry $wt -TaskName $taskName -Name (Get-WtwPropertyValue -Object $wt -Name 'prettyName')
+                $storedPretty = Get-WtwPropertyValue -Object $wt -Name 'prettyName'
+                $wtEmoji = Get-WtwWorktreeEmoji -WorktreeEntry $wt -TaskName $taskName -Name $storedPretty
                 $taskDisplay = if ($wtEmoji) { "$wtEmoji $taskName" } else { $taskName }
-                $displayName = Format-WtwWorktreeDisplayName `
-                    -Name (Get-WtwPropertyValue -Object $wt -Name 'prettyName') `
-                    -TaskName $taskName `
-                    -WorktreeEntry $wt `
-                    -RepoEntry $repoEntry
 
                 $items += [PSCustomObject]@{
                     Kind      = 'wt'
                     Repo      = $repoDisplay
+                    RepoName  = $name
+                    Emoji     = if ($wtEmoji) { $wtEmoji } else { '(none)' }
                     Task      = $taskDisplay
+                    TaskName  = $taskName
                     Aliases   = $wtAliases
                     Branch    = $wt.branch
                     Color     = Get-WtwPropertyValue -Object $wt -Name 'color' -DefaultValue '-'
@@ -137,7 +141,7 @@ function Get-WtwList {
                     Workspace = $wtWsDisplay
                     Created   = $createdStr
                     AgentProfile = $agentProfile
-                    PrettyName = $displayName
+                    PrettyName = $storedPretty
                     SupersetId = Get-WtwPropertyValue -Object $wt -Name 'supersetWorkspaceId'
                 }
             }
@@ -223,6 +227,7 @@ function Format-WtwDetailedList {
 
         if ($isRepo) {
             # Repo header with color swatch
+            $repoLabel = if ($item.RepoName) { $item.RepoName } else { $item.Repo }
             $swatch = ''
             if ($color -match '^#[0-9a-fA-F]{6}$') {
                 $r = [convert]::ToInt32($color.Substring(1, 2), 16)
@@ -232,15 +237,16 @@ function Format-WtwDetailedList {
                 $fr = [convert]::ToInt32($fg.Substring(1, 2), 16)
                 $fg2 = [convert]::ToInt32($fg.Substring(3, 2), 16)
                 $fb = [convert]::ToInt32($fg.Substring(5, 2), 16)
-                $swatch = "${esc}[38;2;${fr};${fg2};${fb}m${esc}[48;2;${r};${g};${b}m  $($item.Repo)  ${esc}[0m"
+                $swatch = "${esc}[38;2;${fr};${fg2};${fb}m${esc}[48;2;${r};${g};${b}m  $repoLabel  ${esc}[0m"
             } else {
-                $swatch = "  $($item.Repo)"
+                $swatch = "  $repoLabel"
             }
             Write-Host "  $swatch" -NoNewline
             if ($color -match '^#[0-9a-fA-F]{6}$') {
                 Write-Host " $color" -ForegroundColor DarkGray -NoNewline
             }
             Write-Host "  $($item.Branch)" -ForegroundColor Yellow
+            Write-Host "    Emoji     : $($item.Emoji)" -ForegroundColor Gray
             Write-WtwDetailedAliasesBlock -Indent '    ' -Aliases $item.Aliases -ForegroundColor Gray
             Write-Host "    Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor Gray
             Write-Host "    Workspace : $($item.Workspace)" -ForegroundColor Gray
@@ -265,7 +271,9 @@ function Format-WtwDetailedList {
             if ($item.PrettyName) {
                 Write-Host "      Name      : $($item.PrettyName)" -ForegroundColor DarkGray
             }
-            Write-Host "      Task      : $($item.Task)" -ForegroundColor DarkGray
+            $taskLabel = if ($item.TaskName -and $item.TaskName -ne '-') { $item.TaskName } else { $item.Task }
+            Write-Host "      Task      : $taskLabel" -ForegroundColor DarkGray
+            Write-Host "      Emoji     : $($item.Emoji)" -ForegroundColor DarkGray
             Write-WtwDetailedAliasesBlock -Indent '      ' -Aliases $item.Aliases -ForegroundColor DarkGray
             Write-Host "      Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor DarkGray
             Write-Host "      Workspace : $($item.Workspace)" -ForegroundColor DarkGray

@@ -654,28 +654,35 @@ Example (values abbreviated; alias cells may span several screen lines):
 
 ### Detailed view
 
-`wtw list --detailed` (or `wtw list -d`) shows a card-style layout with:
-- Repo names rendered as full-width colored badges
+`wtw list --detailed` (or `wtw list -d`) and `wtw info` show a card-style layout with:
+- Repo names rendered as full-width colored badges (emoji is a separate field, not merged into the name)
 - Worktree entries with color dot indicators
 - Clickable `file://` hyperlinks on paths (in terminals that support OSC 8)
 - A **Settings** section at the bottom with clickable links to all config files
+
+The compact table still composes glyphs (`🎸 snowmain1`, `🐕 ntb_live_dogfood_fixes`).
 
 ```
   ╔══════════════════════════════════════════╗
   ║  wtw — Worktree & Workspace Registry     ║
   ╚══════════════════════════════════════════╝
 
-    my-app    main
-    Aliases   : app
-                my-app
-    Path      : /home/user/projects/my-app
-    Workspace : my-app.code-workspace
+    snowmain1   #aaaaaa  main
+    Emoji     : 🎸
+    Aliases   : sn1
+                snowmain1
+    Path      : /home/user/projects/snowmain1
+    Workspace : snowmain1.code-workspace
+    Agent     : solo
 
-      ██ auth
-      Aliases   : app-auth
-                my-app-auth
-      Path      : /home/user/projects/my-app_auth
-      Workspace : my-app_auth.code-workspace
+      ██ #dd2cdd  fix/ntb-live-dogfood
+      Name      : 🟢 ntb_live_dogfood_fixes
+      Task      : ntb_live_dogfood_fixes
+      Emoji     : 🐕
+      Aliases   : sn1-ntb_live_dogfood_fixes
+      Path      : /home/user/projects/snowmain1_ntb_live_dogfood_fixes
+      Workspace : 🎸🐕 ntb_live_dogfood_fixes.code-workspace
+      Created   : 2026-08-31
 
   ─── Settings ───
     Registry : ~/.wtw/registry.json

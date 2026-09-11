@@ -177,7 +177,6 @@ function Show-WtwEditableRecord {
     if ($Target.TaskName) {
         $wt = $Target.WorktreeEntry
         $pretty = Get-WtwPropertyValue -Object $wt -Name 'prettyName'
-        $display = Format-WtwWorktreeDisplayName -Name $pretty -TaskName $Target.TaskName -WorktreeEntry $wt -RepoEntry $repoEntry
         $glyph = Get-WtwWorktreeEmoji -WorktreeEntry $wt -TaskName $Target.TaskName -Name $pretty
         $color = Get-WtwPropertyValue -Object $wt -Name 'color'
         $ws = Get-WtwPropertyValue -Object $wt -Name 'workspace'
@@ -185,9 +184,9 @@ function Show-WtwEditableRecord {
         $custom = @(Get-WtwWorktreeAliases $wt)
         $shownAliases = @($custom + @($derived | Where-Object { $_ })) -join ', '
         Write-Host "  Worktree  $repoName / $($Target.TaskName)" -ForegroundColor Cyan
-        if ($display) { Write-Host "    Name      : $display" }
+        if ($pretty) { Write-Host "    Name      : $pretty" }
         Write-Host "    Task      : $($Target.TaskName)"
-        if ($glyph) { Write-Host "    Emoji     : $glyph" }
+        Write-Host "    Emoji     : $(if ($glyph) { $glyph } else { '(none)' })"
         Write-Host "    Branch    : $(Get-WtwPropertyValue -Object $wt -Name 'branch')"
         Write-Host "    Path      : $(Get-WtwPropertyValue -Object $wt -Name 'path')"
         if ($ws) { Write-Host "    Workspace : $ws" }
@@ -201,8 +200,7 @@ function Show-WtwEditableRecord {
         Write-Host "  wtw edit $($Target.TaskName) --emoji auto      restore name-derived glyph" -ForegroundColor DarkGray
     } else {
         $emoji = Get-WtwRepoEmoji -RepoEntry $repoEntry
-        $display = Format-WtwRepoDisplayName -Name $repoName -RepoEntry $repoEntry
-        Write-Host "  Repo  $display" -ForegroundColor Cyan
+        Write-Host "  Repo  $repoName" -ForegroundColor Cyan
         Write-Host "    Key       : $repoName"
         Write-Host "    Emoji     : $(if ($emoji) { $emoji } else { '(none)' })"
         $folderOn = $false
