@@ -118,10 +118,18 @@ function Get-WtwList {
                     }
                 }
 
+                $wtEmoji = Get-WtwWorktreeEmoji -WorktreeEntry $wt -TaskName $taskName -Name (Get-WtwPropertyValue -Object $wt -Name 'prettyName')
+                $taskDisplay = if ($wtEmoji) { "$wtEmoji $taskName" } else { $taskName }
+                $displayName = Format-WtwWorktreeDisplayName `
+                    -Name (Get-WtwPropertyValue -Object $wt -Name 'prettyName') `
+                    -TaskName $taskName `
+                    -WorktreeEntry $wt `
+                    -RepoEntry $repoEntry
+
                 $items += [PSCustomObject]@{
                     Kind      = 'wt'
                     Repo      = $repoDisplay
-                    Task      = $taskName
+                    Task      = $taskDisplay
                     Aliases   = $wtAliases
                     Branch    = $wt.branch
                     Color     = Get-WtwPropertyValue -Object $wt -Name 'color' -DefaultValue '-'
@@ -129,7 +137,7 @@ function Get-WtwList {
                     Workspace = $wtWsDisplay
                     Created   = $createdStr
                     AgentProfile = $agentProfile
-                    PrettyName = Get-WtwPropertyValue -Object $wt -Name 'prettyName'
+                    PrettyName = $displayName
                     SupersetId = Get-WtwPropertyValue -Object $wt -Name 'supersetWorkspaceId'
                 }
             }
@@ -204,9 +212,9 @@ function Format-WtwDetailedList {
     $esc = [char]27
 
     Write-Host ''
-    Write-Host '  ╔══════════════════════════════════════════╗' -ForegroundColor DarkGray
+    Write-Host '  ╔╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╗' -ForegroundColor DarkGray
     Write-Host '  ║  wtw — Worktree & Workspace Registry     ║' -ForegroundColor DarkGray
-    Write-Host '  ╚══════════════════════════════════════════╝' -ForegroundColor DarkGray
+    Write-Host '  ╚╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝' -ForegroundColor DarkGray
     Write-Host ''
 
     foreach ($item in $Items) {

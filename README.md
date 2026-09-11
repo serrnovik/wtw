@@ -194,8 +194,8 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 | Command | Description |
 |---------|-------------|
 | `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X] [--emoji X] [--sourcegit-folder]` | Register current repo with aliases, template, per-shell session scripts, optional SourceGit / list / cmux / wmux / T3 prefix, and optional SourceGit group folder |
-| `wtw add [path] [--repo X --task X] [--alias a,b] [--sourcegit-folder]` | Import an existing worktree into the registry |
-| `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b]` | Create worktree + workspace + branch |
+| `wtw add [path] [--repo X --task X] [--alias a,b] [--emoji X] [--sourcegit-folder]` | Import an existing worktree into the registry |
+| `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b] [--emoji X]` | Create worktree + workspace + branch |
 | `wtw list [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`--wide` = full aliases and paths) |
 | `wtw <name>` | Switch to repo/worktree — implicit `go` (cd + session init) |
 | `wtw go <name>` | Same as above, explicit |
@@ -213,7 +213,7 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 | `wtw wmux [name]` | Open the worktree as a wmux workspace on Windows (aliases: `wm`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
-| `wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X] [--emoji X] [--sourcegit-folder]` | Edit a registry record (aliases: `rename`, `ren`). `--emoji` and `--sourcegit-folder` are repo-only; `--alias` on a worktree adds extra typed names |
+| `wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X] [--emoji X] [--sourcegit-folder]` | Edit a registry record (aliases: `rename`, `ren`). `--emoji` on a repo is the SourceGit / list prefix; on a worktree it overrides the derived identity glyph. `--sourcegit-folder` is repo-only |
 | `wtw workspace <name> [--main] [--worktree-path X]` | Generate workspace file only (no git worktree) |
 | `wtw copy <name> [--code-folder X]` | Standalone workspace copy from template |
 | `wtw color [name] [hex\|random]` | Set workspace color |
@@ -842,14 +842,17 @@ them and `wtw remove` cleans that registration up:
   Repo-level `--emoji` prefixes the main checkout
   (and any SourceGit group named after the registry key), e.g. `🎸 snowmain1`.
   The same prefix is reused for cmux / wmux / T3 / ChatGPT main-checkout titles
-  and `wtw list`. Worktrees keep their own color-circle pretty names.
+  and `wtw list`. Worktrees get a deterministic identity emoji from the task
+  name (override with `--emoji`); titles compose as `🎸🦔 auth` with no space
+  between the two glyphs. The main checkout stays repo-only.
   Before every write, wtw copies `preference.json` into `~/.wtw/backups/sourcegit/`
   (last 3 copies plus one snapshot each at 3 / 7 / 30 days). The same rotating
   backup is used for cmux, Codex, Claude, Cursor, and T3 configs wtw edits.
 - **cmux** — `wtw cmux <name>` (alias `wtw cm <name>`) selects an existing live
   cmux workspace for the worktree's path, or creates one via
   `cmux new-workspace --name <pretty> --cwd <path>`. Main-repo titles include
-  the repo `--emoji` when set. `wtw --on <host> cmux [name]` opens a local cmux
+  the repo `--emoji` when set; worktrees compose repo + worktree glyphs.
+  `wtw --on <host> cmux [name]` opens a local cmux
   workspace whose terminal is `wtw --on <host> go [name]`. `wtw create`
   registers a Command-Palette workspace entry in `~/.config/cmux/cmux.json`,
   and `wtw remove` cleans that entry up. Inside cmux terminals, the `wtw.bash` /
@@ -862,7 +865,8 @@ them and `wtw remove` cleans that registration up:
   duplicate the tab), or creates one via
   `wmux new-workspace --title <pretty> --cwd <path> --shell pwsh` (starting wmux
   if it isn't running — this is the only command that launches the app).
-  Main-repo titles include the repo `--emoji` when set.
+  Main-repo titles include the repo `--emoji` when set; worktrees compose
+  repo + worktree glyphs.
   `wtw create` / `wtw add` create the live workspace only when wmux is already
   open; otherwise they skip and print `wtw wmux <name>`. `wtw remove` closes it.
   wmux workspaces are live (daemon-backed) rather than a static config registry,

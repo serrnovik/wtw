@@ -15,7 +15,7 @@ function ConvertTo-WtwNormalizedRepoEmoji {
 
     $trimmed = ("$Emoji" -replace '\s+', ' ').Trim()
     if ([string]::IsNullOrWhiteSpace($trimmed)) { return $null }
-    if ($trimmed -in @('-', 'none', 'off', 'clear')) { return $null }
+    if ($trimmed -in @('-', 'none', 'off', 'clear', 'auto')) { return $null }
     return $trimmed
 }
 
@@ -28,7 +28,7 @@ function Test-WtwEmojiArgument {
     param([AllowNull()] [object] $Emoji)
 
     if ($Emoji -is [switch]) {
-        Write-Error '--emoji requires a value (emoji string, or - / none to clear).'
+        Write-Error '--emoji requires a value (emoji string, or - / none / auto to clear).'
         return $false
     }
     return $true
@@ -53,9 +53,8 @@ function Format-WtwRepoDisplayName {
     .SYNOPSIS
         Prefix a repo registry key with its optional emoji (SourceGit / list / muxers).
     .DESCRIPTION
-        Worktrees keep their color-circle pretty names. This is repo-only:
-        ``🎸 snowmain1``, ``🎭 ☸️ tn1-gitops``. Same string is reused for cmux,
-        wmux, and T3 main-checkout titles.
+        Main checkout only: ``🎸 snowmain1``, ``🎭 ☸️ tn1-gitops``. Worktree
+        titles compose repo + worktree glyphs via Format-WtwWorktreeDisplayName.
     #>
     [CmdletBinding()]
     param(

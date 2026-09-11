@@ -27,7 +27,7 @@ Run all commands via `pwsh -Command`:
 
 ```bash
 # Create a worktree + workspace + branch + optional AI-tool project metadata
-pwsh -Command "wtw create <task> [--branch X] [--open]"
+pwsh -Command "wtw create <task> [--branch X] [--open] [--emoji X]"
 
 # Switch to a worktree
 pwsh -Command "wtw go <name>"

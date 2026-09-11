@@ -3,6 +3,22 @@ BeforeAll {
     Get-ChildItem -Path "$PSScriptRoot/../private" -Filter '*.ps1' -Recurse | ForEach-Object { . $_.FullName }
     $script:originalBackupRoot = $env:WTW_BACKUP_ROOT
     $env:WTW_BACKUP_ROOT = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-bak-cmux-" + [guid]::NewGuid())
+
+    function script:Get-WtwExpectedWorktreeTitle {
+        param(
+            [Parameter(Mandatory)][string]$PrettyName,
+            [string]$TaskName,
+            [string]$RepoEmoji
+        )
+        InModuleScope wtw -Parameters @{
+            PrettyName = $PrettyName
+            TaskName   = $TaskName
+            RepoEmoji  = $RepoEmoji
+        } {
+            $repo = if ($RepoEmoji) { [PSCustomObject]@{ emoji = $RepoEmoji } } else { $null }
+            Format-WtwWorktreeDisplayName -Name $PrettyName -TaskName $TaskName -RepoEntry $repo
+        }
+    }
 }
 
 AfterAll {
@@ -161,9 +177,10 @@ Describe 'Open-WtwCmuxWorkspace' {
 
         Open-WtwCmuxWorkspace -Target $target
 
+        $expectedTitle = Get-WtwExpectedWorktreeTitle -PrettyName 'Blue Feature' -TaskName 'feature'
         $script:cmuxCalls | Should -Contain 'select-workspace --workspace workspace:2'
         ($script:cmuxCalls | Where-Object { $_ -like 'new-workspace*' }).Count | Should -Be 0
-        $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:2 --action rename --title Blue Feature'
+        $script:cmuxCalls | Should -Contain "workspace-action --workspace workspace:2 --action rename --title $expectedTitle"
         $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:2 --action set-color --color #336699'
         $script:cmuxCalls | Should -Contain 'set-status wtw repo/feature --workspace workspace:2 --icon git-branch --color #336699 --priority 90'
     }
@@ -233,8 +250,9 @@ Describe 'Open-WtwCmuxWorkspace' {
 
         Open-WtwCmuxWorkspace -Target $target
 
-        $script:cmuxCalls | Should -Contain "new-workspace --name Green Feature --cwd $script:projectPath --command pwsh -NoLogo -NoExit -Command `"Clear-Host; wtw __cmux_init_current`" --focus true --description wtw: repo/green"
-        ($script:cmuxCalls | Where-Object { $_ -eq 'workspace-action --workspace workspace:4 --action rename --title Green Feature' }).Count | Should -Be 0
+        $expectedTitle = Get-WtwExpectedWorktreeTitle -PrettyName 'Green Feature' -TaskName 'green'
+        $script:cmuxCalls | Should -Contain "new-workspace --name $expectedTitle --cwd $script:projectPath --command pwsh -NoLogo -NoExit -Command `"Clear-Host; wtw __cmux_init_current`" --focus true --description wtw: repo/green"
+        ($script:cmuxCalls | Where-Object { $_ -eq "workspace-action --workspace workspace:4 --action rename --title $expectedTitle" }).Count | Should -Be 0
         $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:4 --action set-color --color #228833'
     }
 
@@ -301,16 +319,17 @@ Describe 'Open-WtwCmuxWorkspace' {
 
         Open-WtwCmuxWorkspace -Target $target
 
+        $expectedTitle = Get-WtwExpectedWorktreeTitle -PrettyName 'Denied Feature' -TaskName 'denied'
         Should -Invoke Open-WtwCmuxAppleScriptWorkspace -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
             $ProjectPath -eq $script:projectPath -and
-            $PrettyName -eq 'Denied Feature' -and
+            $PrettyName -eq $expectedTitle -and
             $InitCommand -match '^clear; cd ' -and
             $InitCommand -notmatch 'wtw ' -and
             $InitCommand -notmatch 'Set-Location' -and
             $InitCommand -notmatch 'Clear-Host'
         }
         Should -Invoke Open-WtwCmuxAppPath -ModuleName wtw -Times 0 -Exactly
-        $script:cmuxCalls | Should -Contain "new-workspace --name Denied Feature --cwd $script:projectPath --command pwsh -NoLogo -NoExit -Command `"Clear-Host; wtw __cmux_init_current`" --focus true --description wtw: repo/denied"
+        $script:cmuxCalls | Should -Contain "new-workspace --name $expectedTitle --cwd $script:projectPath --command pwsh -NoLogo -NoExit -Command `"Clear-Host; wtw __cmux_init_current`" --focus true --description wtw: repo/denied"
         ($script:cmuxCalls | Where-Object { $_ -eq $script:projectPath }).Count | Should -Be 0
     }
 
@@ -369,10 +388,13 @@ Describe 'cmux shell startup metadata hook' {
             Mock Get-WtwCmuxBin { 'cmux' } -ModuleName wtw
             Mock Invoke-WtwCmuxRawCommand { [PSCustomObject]@{ ExitCode = 0; Output = '' } } -ModuleName wtw
 
+            $expectedTitle = Get-WtwExpectedWorktreeTitle -PrettyName '🟢 Feature' -TaskName 'feature'
+            $expectedTab = "🖥️🌳 $expectedTitle"
+
             Invoke-Wtw __cmux_apply_current
 
             Should -Invoke Invoke-WtwCmuxRawCommand -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
-                ($ArgumentList -join ' ') -eq 'workspace-action --workspace workspace:9 --action rename --title 🟢 Feature'
+                ($ArgumentList -join ' ') -eq "workspace-action --workspace workspace:9 --action rename --title $expectedTitle"
             }
             Should -Invoke Invoke-WtwCmuxRawCommand -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
                 ($ArgumentList -join ' ') -eq 'workspace-action --workspace workspace:9 --action set-color --color #96dd2c'
@@ -381,7 +403,7 @@ Describe 'cmux shell startup metadata hook' {
                 ($ArgumentList -join ' ') -eq 'set-status wtw repo/feature --workspace workspace:9 --icon git-branch --color #96dd2c --priority 90'
             }
             Should -Invoke Invoke-WtwCmuxRawCommand -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
-                ($ArgumentList -join ' ') -eq 'rename-tab --workspace workspace:9 --surface surface:9 🖥️🌳 🟢 Feature'
+                ($ArgumentList -join ' ') -eq "rename-tab --workspace workspace:9 --surface surface:9 $expectedTab"
             }
         } finally {
             $env:CMUX_WORKSPACE_ID = $oldWorkspaceId
@@ -412,13 +434,16 @@ Describe 'cmux shell startup metadata hook' {
             Mock Get-WtwCmuxBin { 'cmux' } -ModuleName wtw
             Mock Invoke-WtwCmuxRawCommand { [PSCustomObject]@{ ExitCode = 0; Output = '' } } -ModuleName wtw
 
+            $expectedTitle = Get-WtwExpectedWorktreeTitle -PrettyName '🟢 Feature' -TaskName 'feature'
+            $expectedTab = "🖥️🌳 $expectedTitle"
+
             Invoke-Wtw __cmux_init_current
 
             Should -Invoke Enter-WtwWorktree -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
                 $Name -eq 'feature'
             }
             Should -Invoke Invoke-WtwCmuxRawCommand -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
-                ($ArgumentList -join ' ') -eq 'workspace-action --workspace workspace:10 --action rename --title 🟢 Feature'
+                ($ArgumentList -join ' ') -eq "workspace-action --workspace workspace:10 --action rename --title $expectedTitle"
             }
             Should -Invoke Invoke-WtwCmuxRawCommand -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
                 ($ArgumentList -join ' ') -eq 'workspace-action --workspace workspace:10 --action set-color --color #96dd2c'
@@ -427,7 +452,7 @@ Describe 'cmux shell startup metadata hook' {
                 ($ArgumentList -join ' ') -eq 'set-status wtw repo/feature --workspace workspace:10 --icon git-branch --color #96dd2c --priority 90'
             }
             Should -Invoke Invoke-WtwCmuxRawCommand -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
-                ($ArgumentList -join ' ') -eq 'rename-tab --workspace workspace:10 --surface surface:10 🖥️🌳 🟢 Feature'
+                ($ArgumentList -join ' ') -eq "rename-tab --workspace workspace:10 --surface surface:10 $expectedTab"
             }
         } finally {
             $env:CMUX_WORKSPACE_ID = $oldWorkspaceId

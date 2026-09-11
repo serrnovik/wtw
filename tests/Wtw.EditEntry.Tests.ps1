@@ -171,6 +171,7 @@ Describe 'Edit-WtwEntry' {
         InModuleScope wtw {
             Mock Sync-WtwWorkspace {}
             Mock Sync-WtwSourceGitRepoDisplayName {}
+            Mock Sync-WtwSourceGitWorktreeDisplayNames {}
             Edit-WtwEntry -Name 'demo' -Key 'snow'
             $reg = Get-WtwRegistry
             (Get-WtwPropertyNames -Object $reg.repos) | Should -Contain 'snow'

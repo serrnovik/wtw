@@ -6,11 +6,10 @@ function Resolve-WtwTerminalWorkspaceMetadata {
         Produces a cwd, display title, color, and status value from a resolved wtw
         target.
 
-        Worktrees keep their stored pretty name (color-circle prefix included).
-        Main-repo titles use the registry key, prefixed with the optional repo
-        emoji (``🎸 snowmain1``) so cmux / wmux / T3 / SourceGit / ``wtw list``
-        all show the same identity. A main-checkout color assignment, when
-        present, still prepends the color-circle.
+        Worktrees compose ``{repoEmoji}{worktreeEmoji} {name}`` (no space
+        between glyphs). Main-repo titles use the registry key, prefixed with
+        the optional repo emoji (``🎸 snowmain1``). A main-checkout color
+        assignment, when present, still prepends the color-circle.
     #>
     [CmdletBinding()]
     param(
@@ -44,6 +43,11 @@ function Resolve-WtwTerminalWorkspaceMetadata {
                 $prettyName = Format-WtwPrettyNameWithCircle -Hex $color -Name $prettyName
             }
         }
+        $prettyName = Format-WtwWorktreeDisplayName `
+            -Name $prettyName `
+            -TaskName $taskName `
+            -WorktreeEntry $worktreeEntry `
+            -RepoEntry $repoEntry
     } else {
         $colorKey = if ($repoName) { "$repoName/main" } else { $null }
         if ($colorKey) {

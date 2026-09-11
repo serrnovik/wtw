@@ -149,10 +149,13 @@ Describe 'Open-WtwWorkspace editor launchers' {
 
         Open-WtwWorkspace -Name 'cursor-worktree' -Editor 'cursor'
 
+        $expectedTitle = InModuleScope wtw -Parameters @{ PrettyName = 'Blue Cursor Worktree'; TaskName = 'cursor-worktree' } {
+            Format-WtwWorktreeDisplayName -Name $PrettyName -TaskName $TaskName
+        }
         Should -Invoke Register-WtwCursorProject -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
             $WorkspacePath -eq $workspaceFile -and
             $ProjectPath -eq $worktreeDir -and
-            $PrettyName -eq 'Blue Cursor Worktree' -and
+            $PrettyName -eq $expectedTitle -and
             $Color -eq '#336699'
         }
         Should -Invoke Invoke-WtwEditorCli -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
@@ -201,9 +204,12 @@ Describe 'Open-WtwWorkspace editor launchers' {
         Open-WtwWorkspace -Name 'legacy-cursor-worktree' -Editor 'cursor'
 
         $worktreeEntry.workspace | Should -Be $prettyWorkspace
+        $expectedTitle = InModuleScope wtw -Parameters @{ PrettyName = 'Blue Cursor Worktree'; TaskName = 'legacy-cursor-worktree' } {
+            Format-WtwWorktreeDisplayName -Name $PrettyName -TaskName $TaskName
+        }
         Should -Invoke Move-WtwCursorWorkspaceForAgents -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
             $WorkspacePath -eq $legacyWorkspace -and
-            $PrettyName -eq 'Blue Cursor Worktree' -and
+            $PrettyName -eq $expectedTitle -and
             $RepoName -eq 'sample'
         }
         Should -Invoke Save-WtwRegistry -ModuleName wtw -Times 1 -Exactly
@@ -246,8 +252,11 @@ Describe 'Open-WtwWorkspace editor launchers' {
         Open-WtwWorkspace -Name 'codex-worktree' -Editor @{ type = 'codex'; appName = 'Codex'; cmd = 'codex' }
 
         Should -Invoke Start-WtwCodexApp -ModuleName wtw -Times 1 -Exactly -ParameterFilter { $ProjectPath -eq $worktreeDir }
+        $expectedTitle = InModuleScope wtw -Parameters @{ PrettyName = 'Blue Codex Worktree' } {
+            Format-WtwWorktreeDisplayName -Name $PrettyName
+        }
         Should -Invoke Set-WtwCodexProjectLabel -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
-            $ProjectPath -eq $worktreeDir -and $PrettyName -eq 'Blue Codex Worktree'
+            $ProjectPath -eq $worktreeDir -and $PrettyName -eq $expectedTitle
         }
         Should -Invoke Resolve-WtwCodexStateConflict -ModuleName wtw -Times 1 -Exactly
         Should -Invoke Invoke-WtwEditorCli -ModuleName wtw -Times 0

@@ -72,16 +72,19 @@ Describe 'Edit-WtwEntry repo emoji' {
         Remove-Item -Path $script:tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    It 'stores a repo emoji and rejects it on a worktree' {
+    It 'stores a repo emoji and allows it on a worktree' {
         InModuleScope wtw {
             Mock Sync-WtwSourceGitRepoDisplayName {}
+            Mock Sync-WtwSourceGitWorktreeDisplayNames {}
             Edit-WtwEntry -Name 'demo' -Emoji '🎸' -NoSync
             $reg = Get-WtwRegistry
             $reg.repos.demo.emoji | Should -Be '🎸'
             Format-WtwRepoDisplayName -Name 'demo' -RepoEntry $reg.repos.demo | Should -Be '🎸 demo'
 
-            { Edit-WtwEntry -Name 'auth' -Emoji '🎸' -NoSync -ErrorAction Stop } |
-                Should -Throw -ExpectedMessage '*--emoji is for repos*'
+            Edit-WtwEntry -Name 'auth' -Emoji '🦔' -NoSync
+            $reg = Get-WtwRegistry
+            $reg.repos.demo.worktrees.auth.emoji | Should -Be '🦔'
+            $reg.repos.demo.worktrees.auth.prettyName | Should -Be '🟠 auth'
         }
     }
 
@@ -98,20 +101,33 @@ Describe 'Edit-WtwEntry repo emoji' {
     It 'syncs SourceGit when emoji changes' {
         InModuleScope wtw {
             Mock Sync-WtwSourceGitRepoDisplayName {}
+            Mock Sync-WtwSourceGitWorktreeDisplayNames {}
             Edit-WtwEntry -Name 'demo' -Emoji '🎸'
             Should -Invoke Sync-WtwSourceGitRepoDisplayName -Times 1 -Exactly
+            Should -Invoke Sync-WtwSourceGitWorktreeDisplayNames -Times 1 -Exactly
         }
     }
 }
 
-Describe 'Invoke-Wtw edit --emoji' {
-    It 'rejects --emoji without a value' {
+Describe 'Invoke-Wtw --emoji without a value' {
+    It 'rejects --emoji without a value on edit, create, and add' {
         InModuleScope wtw {
             Mock Edit-WtwEntry { }
+            Mock New-WtwWorktree { }
+            Mock Add-WtwEntry { }
             Mock Write-WtwUpdateNotice { }
-            $output = Invoke-Wtw 'edit' 'demo' '--emoji' 2>&1 | Out-String
-            $output | Should -Match '--emoji requires a value'
+
+            $editOutput = Invoke-Wtw 'edit' 'demo' '--emoji' 2>&1 | Out-String
+            $editOutput | Should -Match '--emoji requires a value'
             Should -Invoke Edit-WtwEntry -Times 0 -Exactly
+
+            $createOutput = Invoke-Wtw 'create' 'auth' '--emoji' 2>&1 | Out-String
+            $createOutput | Should -Match '--emoji requires a value'
+            Should -Invoke New-WtwWorktree -Times 0 -Exactly
+
+            $addOutput = Invoke-Wtw 'add' '/tmp/demo_auth' '--emoji' 2>&1 | Out-String
+            $addOutput | Should -Match '--emoji requires a value'
+            Should -Invoke Add-WtwEntry -Times 0 -Exactly
         }
     }
 }
@@ -164,7 +180,7 @@ Describe 'Resolve-WtwTerminalWorkspaceMetadata repo emoji' {
         }
     }
 
-    It 'leaves a worktree pretty name unchanged' {
+    It 'composes a worktree title from repo + derived glyphs' {
         InModuleScope wtw {
             $target = [PSCustomObject]@{
                 RepoName      = 'snowmain1'
@@ -180,8 +196,14 @@ Describe 'Resolve-WtwTerminalWorkspaceMetadata repo emoji' {
                 }
             }
 
+            $expected = Format-WtwWorktreeDisplayName `
+                -Name 'Blue Feature' `
+                -TaskName 'feature' `
+                -RepoEntry $target.RepoEntry
             $meta = Resolve-WtwTerminalWorkspaceMetadata -Target $target
-            $meta.PrettyName | Should -Be 'Blue Feature'
+            $meta.PrettyName | Should -Be $expected
+            $meta.PrettyName | Should -Match '^🎸'
+            $meta.PrettyName | Should -Match 'Blue Feature$'
             $meta.StatusValue | Should -Be 'snowmain1/feature'
         }
     }

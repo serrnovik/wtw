@@ -535,6 +535,37 @@ function Sync-WtwSourceGitRepoDisplayName {
     }
 }
 
+function Sync-WtwSourceGitWorktreeDisplayNames {
+    <#
+    .SYNOPSIS
+        Refresh SourceGit node titles for every worktree under a repo.
+    .DESCRIPTION
+        Used after a repo emoji or key change so worktree titles pick up the
+        compact repo prefix (``🎸🦔 auth``).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $RepoName,
+        [Parameter(Mandatory)] $RepoEntry
+    )
+
+    $worktrees = Get-WtwPropertyValue -Object $RepoEntry -Name 'worktrees'
+    if (-not $worktrees) { return }
+
+    foreach ($task in (Get-WtwPropertyNames -Object $worktrees)) {
+        $wt = $worktrees.$task
+        $path = Get-WtwPropertyValue -Object $wt -Name 'path'
+        if (-not $path) { continue }
+        $hex = Get-WtwPropertyValue -Object $wt -Name 'color'
+        $display = Format-WtwWorktreeDisplayName `
+            -Name (Get-WtwPropertyValue -Object $wt -Name 'prettyName') `
+            -TaskName $task `
+            -WorktreeEntry $wt `
+            -RepoEntry $RepoEntry
+        Add-WtwSourceGitRepository -Path $path -Name $display -Hex $hex -RepoName $RepoName
+    }
+}
+
 function Resolve-WtwSourceGitRepoOwner {
     param(
         [string] $Path,

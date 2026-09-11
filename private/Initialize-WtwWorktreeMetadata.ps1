@@ -42,6 +42,9 @@ function Initialize-WtwWorktreeMetadata {
     .PARAMETER Color
         Optional palette/hex/'random' input passed to Resolve-WtwColorInput.
         Defaults to 'random' (max-contrast pick).
+    .PARAMETER Emoji
+        Optional worktree identity glyph. Stored as an override; omit to derive
+        a deterministic emoji from the task name. ``none`` / ``auto`` means derived.
     .PARAMETER Alias
         Optional extra typed names for this worktree (``wtw go``, completions).
     #>
@@ -55,6 +58,8 @@ function Initialize-WtwWorktreeMetadata {
         [Parameter(Mandatory)] [string] $FolderSuffix,
         [string] $PrettyName,
         [string] $Color,
+        [AllowEmptyString()]
+        [object] $Emoji,
         [string[]] $Alias
     )
 
@@ -62,6 +67,8 @@ function Initialize-WtwWorktreeMetadata {
         Success             = $false
         Color               = $null
         PrettyName          = $null
+        DisplayName         = $null
+        WorktreeEmoji       = $null
         WorkspaceFile       = $null
         SupersetWorkspaceId = $null
         CodexProjectPath    = $null
@@ -72,6 +79,10 @@ function Initialize-WtwWorktreeMetadata {
     }
 
     $aliasArray = @()
+    if ($PSBoundParameters.ContainsKey('Emoji') -and -not (Test-WtwEmojiArgument $Emoji)) {
+        return $result
+    }
+
     if (@($Alias | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -and -not (Test-WtwAliasClearToken -Value $Alias)) {
         [string[]] $aliasArray = Split-WtwAliasList -Value $Alias
         if ($aliasArray.Count -gt 0) {
@@ -101,13 +112,33 @@ function Initialize-WtwWorktreeMetadata {
     Save-WtwColors $colorsState
     Write-Host "  Color:    $resolvedColor" -ForegroundColor Green
 
-    # Pretty name: default to the folder suffix (i.e. path without the `${RepoName}_` prefix);
-    # always prepend a color-circle emoji that matches the assigned color so it surfaces in
-    # SourceGit/Superset and any other UI that reads `prettyName`.
+    # Stored pretty name: folder suffix (or --name) with a color-circle prefix.
+    # Identity emojis are composed at display time so existing worktrees pick up
+    # a glyph without a registry rewrite.
     if (-not $PrettyName) { $PrettyName = $FolderSuffix }
     $PrettyName = Format-WtwPrettyNameWithCircle -Hex $resolvedColor -Name $PrettyName
     $result.PrettyName = $PrettyName
-    Write-Host "  Pretty:   $PrettyName" -ForegroundColor Green
+
+    $emojiOverride = $null
+    if ($PSBoundParameters.ContainsKey('Emoji')) {
+        $emojiOverride = ConvertTo-WtwNormalizedRepoEmoji $Emoji
+    }
+    $emojiScratch = [PSCustomObject]@{}
+    if ($emojiOverride) {
+        $emojiScratch | Add-Member -NotePropertyName 'emoji' -NotePropertyValue $emojiOverride -Force
+    }
+    $displayName = Format-WtwWorktreeDisplayName `
+        -Name $PrettyName `
+        -TaskName $Task `
+        -WorktreeEntry $emojiScratch `
+        -RepoEntry $RepoEntry
+    $wtEmoji = Get-WtwWorktreeEmoji -WorktreeEntry $emojiScratch -TaskName $Task -Name $PrettyName
+    $result.DisplayName = $displayName
+    $result.WorktreeEmoji = $wtEmoji
+    if ($wtEmoji) {
+        Write-Host "  Emoji:    $wtEmoji" -ForegroundColor Green
+    }
+    Write-Host "  Pretty:   $displayName" -ForegroundColor Green
 
     # Generate workspace file from the repo's template, when one is configured.
     $wsFile = $null
@@ -126,16 +157,16 @@ function Initialize-WtwWorktreeMetadata {
         # Cursor's Workspaces sidebar renders the .code-workspace file name.
         # New files can therefore use the human label without touching an
         # existing workspace identity or its chat history.
-        $workspaceFileStem = ConvertTo-WtwWorkspaceFileStem -Name $PrettyName
+        $workspaceFileStem = ConvertTo-WtwWorkspaceFileStem -Name $displayName
         $wsFile = Join-Path $wsDir "${workspaceFileStem}.code-workspace"
         if (Test-Path $wsFile) {
-            $workspaceFileStem = ConvertTo-WtwWorkspaceFileStem -Name "$RepoName — $PrettyName"
+            $workspaceFileStem = ConvertTo-WtwWorkspaceFileStem -Name "$RepoName — $displayName"
             $wsFile = Join-Path $wsDir "${workspaceFileStem}.code-workspace"
         }
 
         New-WtwWorkspaceFile `
             -RepoName $RepoName `
-            -Name $PrettyName `
+            -Name $displayName `
             -CodeFolderPath $WorktreePath `
             -TemplatePath $templatePath `
             -OutputPath $wsFile `
@@ -171,11 +202,14 @@ function Initialize-WtwWorktreeMetadata {
     if ($aliasArray.Count -gt 0) {
         $wtEntry | Add-Member -NotePropertyName 'aliases' -NotePropertyValue $aliasArray -Force
     }
+    if ($emojiOverride) {
+        Set-WtwWorktreeEmojiProperty -WorktreeEntry $wtEntry -Emoji $emojiOverride | Out-Null
+    }
     $registry.repos.$RepoName.worktrees | Add-Member -NotePropertyName $Task -NotePropertyValue $wtEntry -Force
     Save-WtwRegistry $registry
 
     # Create Superset workspace (no-op when CLI absent or project not found).
-    $supersetWsId = New-WtwSupersetWorkspace -RepoName $RepoName -Branch $Branch -PrettyName $PrettyName -MainRepoPath $registry.repos.$RepoName.mainPath
+    $supersetWsId = New-WtwSupersetWorkspace -RepoName $RepoName -Branch $Branch -PrettyName $displayName -MainRepoPath $registry.repos.$RepoName.mainPath
     if ($supersetWsId) {
         $registry.repos.$RepoName.worktrees.$Task.supersetWorkspaceId = $supersetWsId
         Save-WtwRegistry $registry
@@ -183,7 +217,7 @@ function Initialize-WtwWorktreeMetadata {
     }
 
     # Register Codex Desktop project metadata (no-op when Codex is absent).
-    $codexProjectPath = Register-WtwCodexProject -ProjectPath $WorktreePath -PrettyName $PrettyName
+    $codexProjectPath = Register-WtwCodexProject -ProjectPath $WorktreePath -PrettyName $displayName
     if ($codexProjectPath) {
         $registry.repos.$RepoName.worktrees.$Task.codexProjectPath = $codexProjectPath
         Save-WtwRegistry $registry
@@ -203,7 +237,7 @@ function Initialize-WtwWorktreeMetadata {
     # file. Cursor displays workspace names from the .code-workspace path, and
     # the file already carries the per-worktree color settings.
     if ($wsFile) {
-        $cursorWorkspacePath = Register-WtwCursorProject -WorkspacePath $wsFile -ProjectPath $WorktreePath -PrettyName $PrettyName -Color $resolvedColor
+        $cursorWorkspacePath = Register-WtwCursorProject -WorkspacePath $wsFile -ProjectPath $WorktreePath -PrettyName $displayName -Color $resolvedColor
         if ($cursorWorkspacePath) {
             $registry.repos.$RepoName.worktrees.$Task.cursorWorkspacePath = $cursorWorkspacePath
             Save-WtwRegistry $registry
@@ -212,7 +246,7 @@ function Initialize-WtwWorktreeMetadata {
     }
 
     # Register cmux Command Palette workspace metadata (no-op when cmux is absent).
-    $cmuxCommandKey = Register-WtwCmuxProject -ProjectPath $WorktreePath -PrettyName $PrettyName -Color $resolvedColor -RepoName $RepoName -TaskName $Task
+    $cmuxCommandKey = Register-WtwCmuxProject -ProjectPath $WorktreePath -PrettyName $displayName -Color $resolvedColor -RepoName $RepoName -TaskName $Task
     if ($cmuxCommandKey) {
         $registry.repos.$RepoName.worktrees.$Task.cmuxCommandKey = $cmuxCommandKey
         Save-WtwRegistry $registry
@@ -221,7 +255,7 @@ function Initialize-WtwWorktreeMetadata {
 
     # Register wmux live workspace when the Windows wmux CLI is installed and
     # reachable. wmux has no SourceGit-style static repository registry today.
-    $wmuxWorkspaceName = Register-WtwWmuxProject -ProjectPath $WorktreePath -PrettyName $PrettyName -RepoName $RepoName -TaskName $Task
+    $wmuxWorkspaceName = Register-WtwWmuxProject -ProjectPath $WorktreePath -PrettyName $displayName -RepoName $RepoName -TaskName $Task
     if ($wmuxWorkspaceName) {
         $registry.repos.$RepoName.worktrees.$Task.wmuxWorkspaceName = $wmuxWorkspaceName
         Save-WtwRegistry $registry
@@ -229,7 +263,7 @@ function Initialize-WtwWorktreeMetadata {
     }
 
     # Register in SourceGit's managed repository list (no-op when app absent).
-    Add-WtwSourceGitRepository -Path $WorktreePath -Name $PrettyName -Hex $resolvedColor -RepoName $RepoName
+    Add-WtwSourceGitRepository -Path $WorktreePath -Name $displayName -Hex $resolvedColor -RepoName $RepoName
 
     # Attach the user's local AI-agent overlay when the optional personal
     # `agentctl` helper is installed. Best-effort: must not block setup.

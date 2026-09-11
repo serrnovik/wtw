@@ -10,6 +10,7 @@ function Edit-WtwEntry {
           --name / second positional   display (pretty) name
           --task                       registry key used by ``wtw go`` and derived aliases
           --alias                      extra typed names (e.g. ``onboarding video``)
+          --emoji                      identity glyph override; ``none`` / ``auto`` restores derived
 
         Repo:
           --alias / --name / second positional   replace the alias list
@@ -35,7 +36,8 @@ function Edit-WtwEntry {
     .PARAMETER Key
         New repo registry key.
     .PARAMETER Emoji
-        Repo-only display prefix (e.g. ``🎸``, ``🎭 ☸️``). ``-`` / ``none`` clears it.
+        Repo: display prefix (e.g. ``🎸``, ``🎭 ☸️``). Worktree: identity glyph
+        override. ``-`` / ``none`` / ``auto`` clears (repo: no prefix; worktree: derived).
     .PARAMETER Repo
         Disambiguate when the same task exists in multiple repos.
     .PARAMETER NoSync
@@ -55,6 +57,9 @@ function Edit-WtwEntry {
     .EXAMPLE
         wtw edit snowmain1 --emoji 🎸
         Prefix SourceGit and ``wtw list`` with a repo emoji.
+    .EXAMPLE
+        wtw edit auth --emoji 🦔
+        Override the derived worktree identity glyph.
     .EXAMPLE
         wtw edit t3code-ad4f13f1 --alias 'onboarding video,onboarding'
         After adopting an agent worktree, ``wtw go onboarding`` resolves to it.
@@ -121,10 +126,6 @@ function Edit-WtwEntry {
             Write-Error "--key is for repos. To rename this worktree's registry key, use --task."
             return
         }
-        if ($emojiBound) {
-            Write-Error "--emoji is for repos. Worktree names already get a color-circle prefix."
-            return
-        }
         if ($folderBound) {
             Write-Error "--sourcegit-folder is for repos. New worktrees follow the parent repo's folder."
             return
@@ -134,6 +135,8 @@ function Edit-WtwEntry {
             -PrettyName $prettyText `
             -Task $Task `
             -Alias $Alias `
+            -Emoji $Emoji `
+            -EmojiSpecified:$emojiBound `
             -NoSync:$NoSync
         return
     }
@@ -174,14 +177,17 @@ function Show-WtwEditableRecord {
     if ($Target.TaskName) {
         $wt = $Target.WorktreeEntry
         $pretty = Get-WtwPropertyValue -Object $wt -Name 'prettyName'
+        $display = Format-WtwWorktreeDisplayName -Name $pretty -TaskName $Target.TaskName -WorktreeEntry $wt -RepoEntry $repoEntry
+        $glyph = Get-WtwWorktreeEmoji -WorktreeEntry $wt -TaskName $Target.TaskName -Name $pretty
         $color = Get-WtwPropertyValue -Object $wt -Name 'color'
         $ws = Get-WtwPropertyValue -Object $wt -Name 'workspace'
         $derived = ($aliases | ForEach-Object { "$_-$($Target.TaskName)" }) -join ', '
         $custom = @(Get-WtwWorktreeAliases $wt)
         $shownAliases = @($custom + @($derived | Where-Object { $_ })) -join ', '
         Write-Host "  Worktree  $repoName / $($Target.TaskName)" -ForegroundColor Cyan
-        if ($pretty) { Write-Host "    Name      : $pretty" }
+        if ($display) { Write-Host "    Name      : $display" }
         Write-Host "    Task      : $($Target.TaskName)"
+        if ($glyph) { Write-Host "    Emoji     : $glyph" }
         Write-Host "    Branch    : $(Get-WtwPropertyValue -Object $wt -Name 'branch')"
         Write-Host "    Path      : $(Get-WtwPropertyValue -Object $wt -Name 'path')"
         if ($ws) { Write-Host "    Workspace : $ws" }
@@ -191,6 +197,8 @@ function Show-WtwEditableRecord {
         Write-Host "  wtw edit $($Target.TaskName) --name <pretty>   display name" -ForegroundColor DarkGray
         Write-Host "  wtw edit $($Target.TaskName) --task <key>      go-target / derived aliases" -ForegroundColor DarkGray
         Write-Host "  wtw edit $($Target.TaskName) --alias 'onboarding video'   extra typed name" -ForegroundColor DarkGray
+        Write-Host "  wtw edit $($Target.TaskName) --emoji 🦔         override identity glyph" -ForegroundColor DarkGray
+        Write-Host "  wtw edit $($Target.TaskName) --emoji auto      restore name-derived glyph" -ForegroundColor DarkGray
     } else {
         $emoji = Get-WtwRepoEmoji -RepoEntry $repoEntry
         $display = Format-WtwRepoDisplayName -Name $repoName -RepoEntry $repoEntry
@@ -221,6 +229,9 @@ function Edit-WtwWorktreeRecord {
         [string] $PrettyName,
         [string] $Task,
         [string[]] $Alias,
+        [AllowEmptyString()]
+        [object] $Emoji,
+        [switch] $EmojiSpecified,
         [switch] $NoSync
     )
 
@@ -296,6 +307,16 @@ function Edit-WtwWorktreeRecord {
         }
     }
 
+    if ($EmojiSpecified) {
+        $oldEmoji = ConvertTo-WtwNormalizedRepoEmoji (Get-WtwPropertyValue -Object $entry -Name 'emoji')
+        $newEmoji = Set-WtwWorktreeEmojiProperty -WorktreeEntry $entry -Emoji $Emoji
+        if ($oldEmoji -ne $newEmoji) {
+            $oldShown = if ($oldEmoji) { $oldEmoji } else { '(auto)' }
+            $newShown = if ($newEmoji) { $newEmoji } else { '(auto)' }
+            $changed += "emoji '$oldShown' → '$newShown'"
+        }
+    }
+
     if ($newTask -ne $oldTask) {
         $worktrees = Rename-WtwObjectProperty -Object $worktrees -OldName $oldTask -NewName $newTask
         $registry.repos.$repoName.worktrees = $worktrees
@@ -316,24 +337,30 @@ function Edit-WtwWorktreeRecord {
     $prettyNow = Get-WtwPropertyValue -Object $saved -Name 'prettyName'
     $wsFile = Get-WtwPropertyValue -Object $saved -Name 'workspace'
     $wtPath = Get-WtwPropertyValue -Object $saved -Name 'path'
+    $repoEntry = $registry.repos.$repoName
+    $displayNow = Format-WtwWorktreeDisplayName `
+        -Name $prettyNow `
+        -TaskName $newTask `
+        -WorktreeEntry $saved `
+        -RepoEntry $repoEntry
 
     if (-not $NoSync) {
         if ($wsFile -and (Test-Path $wsFile)) {
             Update-WtwWorkspaceIdentity `
                 -Path $wsFile `
-                -PrettyName $prettyNow `
+                -PrettyName $displayNow `
                 -TaskName $newTask
 
-            if ($prettyNow) {
-                $newWsPath = Get-WtwCursorPrettyWorkspacePath -WorkspacePath $wsFile -PrettyName $prettyNow -RepoName $repoName
+            if ($displayNow) {
+                $newWsPath = Get-WtwCursorPrettyWorkspacePath -WorkspacePath $wsFile -PrettyName $displayNow -RepoName $repoName
                 $newWsPath = [System.IO.Path]::GetFullPath($newWsPath)
                 $oldWsPath = [System.IO.Path]::GetFullPath($wsFile)
                 if ($newWsPath -ne $oldWsPath) {
-                    $canMigrate = Resolve-WtwCursorStateConflict -PrettyName $prettyNow
+                    $canMigrate = Resolve-WtwCursorStateConflict -PrettyName $displayNow
                     if ($canMigrate) {
                         $migratedWorkspace = Move-WtwCursorWorkspaceForAgents `
                             -WorkspacePath $wsFile `
-                            -PrettyName $prettyNow `
+                            -PrettyName $displayNow `
                             -RepoName $repoName
                         if ($migratedWorkspace -and $migratedWorkspace -ne $wsFile) {
                             $saved | Add-Member -NotePropertyName 'workspace' -NotePropertyValue $migratedWorkspace -Force
@@ -352,8 +379,8 @@ function Edit-WtwWorktreeRecord {
             Sync-WtwWorkspace -Target $wsFile -ColorSource Json
         }
 
-        if ($wtPath -and $prettyNow) {
-            Add-WtwSourceGitRepository -Path $wtPath -Name $prettyNow -Hex $color -RepoName $repoName
+        if ($wtPath -and $displayNow) {
+            Add-WtwSourceGitRepository -Path $wtPath -Name $displayNow -Hex $color -RepoName $repoName
         }
     }
 
@@ -506,6 +533,7 @@ function Edit-WtwRepoRecord {
                 -RepoName $newKey `
                 -RepoEntry $saved `
                 -PreviousDisplayName $previousDisplay
+            Sync-WtwSourceGitWorktreeDisplayNames -RepoName $newKey -RepoEntry $saved
         }
     }
 

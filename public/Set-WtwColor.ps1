@@ -99,8 +99,12 @@ function Set-WtwColor {
         $registry.repos.$($target.RepoName).worktrees.$($target.TaskName) = $target.WorktreeEntry
         Save-WtwRegistry $registry
 
-        # Keep SourceGit's bookmark + display name in sync with the new color
-        Add-WtwSourceGitRepository -Path $target.WorktreeEntry.path -Name $newPretty -Hex $newColor -RepoName $target.RepoName
+        $displayName = Format-WtwWorktreeDisplayName `
+            -Name $newPretty `
+            -TaskName $target.TaskName `
+            -WorktreeEntry $target.WorktreeEntry `
+            -RepoEntry $target.RepoEntry
+        Add-WtwSourceGitRepository -Path $target.WorktreeEntry.path -Name $displayName -Hex $newColor -RepoName $target.RepoName
     }
 
     Write-Host ''

@@ -54,7 +54,7 @@ function Invoke-Wtw {
         Write-Host '  Commands:' -ForegroundColor Yellow
         Write-Host '    init [aliases]    Initialise current repo as a main repo (--template, --startup-script, --emoji)'
         Write-Host '    add [path]        Adopt an existing on-disk worktree with full registration (workspace + color + cmux/SourceGit/etc.)'
-        Write-Host '    create <task>     Create worktree + branch (pass --branch <existing-ref> or --adopt to attach to an existing branch)'
+        Write-Host '    create <task>     Create worktree + branch (--emoji for identity glyph; --branch / --adopt to attach an existing branch)'
         Write-Host '    list [repo] [-d|--detailed] [--wide]  List repos/worktrees'
         Write-Host '    info <name>       Show full details for a repo or worktree  (alias: show)'
         Write-Host '    go <name>         Switch to worktree (cd + session init)'
@@ -267,6 +267,10 @@ function Invoke-Wtw {
     switch ($Command) {
         'init'    { if ($pos.Count -gt 0) { $splat['Alias'] = $pos[0] }; Initialize-WtwConfig @splat }
         'add'     {
+            if ($splat.Contains('Emoji') -and $splat['Emoji'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '--emoji requires a value.'
+                return
+            }
             if ($pos.Count -gt 0) { $splat['Path'] = $pos[0] }
             # Match `wtw create --name <pretty>` ergonomics — splat-key 'Name'
             # → PrettyName param so the same user-facing flag works here.
@@ -277,6 +281,10 @@ function Invoke-Wtw {
             Add-WtwEntry @splat
         }
         'create'  {
+            if ($splat.Contains('Emoji') -and $splat['Emoji'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '--emoji requires a value.'
+                return
+            }
             if ($pos.Count -gt 0) {
                 $splat['Task'] = if ($pos.Count -eq 1) { $pos[0] } else { $pos -join ' ' }
             }

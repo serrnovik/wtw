@@ -65,6 +65,9 @@ function New-WtwWorktree {
         (`gt init` + `gt repo sync`).
     .PARAMETER Alias
         Extra typed names for ``wtw go`` (spaces allowed).
+    .PARAMETER Emoji
+        Optional worktree identity glyph. Omit to derive one from the task
+        name. ``none`` / ``auto`` keeps the derived glyph.
     .EXAMPLE
         wtw create auth
         Create a worktree and branch named "auth" for the current repo.
@@ -115,8 +118,14 @@ function New-WtwWorktree {
         [switch] $NoBranch,
         [switch] $Adopt,
         [switch] $GtTrack,
-        [string[]] $Alias
+        [string[]] $Alias,
+        [AllowEmptyString()]
+        [object] $Emoji
     )
+
+    if ($PSBoundParameters.ContainsKey('Emoji') -and -not (Test-WtwEmojiArgument $Emoji)) {
+        return
+    }
 
     # --adopt is a friendlier alias for --no-branch (both opt into "adopt
     # an existing branch instead of creating one"). Collapse to a single
@@ -288,12 +297,19 @@ function New-WtwWorktree {
 
     # All post-worktree-add setup (color, pretty name, workspace file, registry,
     # Superset/Codex/cmux/wmux/SourceGit/agentctl) is shared with `wtw add`.
-    $meta = Initialize-WtwWorktreeMetadata `
-        -RepoName $repoName -RepoEntry $repoEntry `
-        -Task $Task -Branch $Branch `
-        -WorktreePath $worktreePath -FolderSuffix $folderSuffix `
-        -PrettyName $PrettyName -Color $Color `
-        -Alias $Alias
+    $metaSplat = @{
+        RepoName     = $repoName
+        RepoEntry    = $repoEntry
+        Task         = $Task
+        Branch        = $Branch
+        WorktreePath = $worktreePath
+        FolderSuffix = $folderSuffix
+        PrettyName   = $PrettyName
+        Color        = $Color
+        Alias        = $Alias
+    }
+    if ($PSBoundParameters.ContainsKey('Emoji')) { $metaSplat['Emoji'] = $Emoji }
+    $meta = Initialize-WtwWorktreeMetadata @metaSplat
 
     if (-not $meta.Success) {
         # The only failure mode today is a bad --color. We just created the

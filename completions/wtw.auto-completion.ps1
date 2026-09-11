@@ -254,8 +254,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
         $flags = switch ($subCommand) {
             'init'   { @('--template', '--startup-script', '--startup-script-zsh', '--startup-script-bash', '--workspaces-dir', '--name', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder') }
             'skill'  { @('--agent') }
-            'add'    { @('--repo', '--task', '--branch', '--name', '--color', '--alias', '--sourcegit-folder', '--no-sourcegit-folder') }
-            'create' { @('--name', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track', '--alias') }
+            'add'    { @('--repo', '--task', '--branch', '--name', '--emoji', '--color', '--alias', '--sourcegit-folder', '--no-sourcegit-folder') }
+            'create' { @('--name', '--emoji', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track', '--alias') }
             'clean'  { @('--dry-run', '--force', '--all', '--worktrees', '--branches') }
             'remove' { @('--repo', '--force') }
             'rm'     { @('--repo', '--force') }

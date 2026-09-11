@@ -1,3 +1,49 @@
+function Get-WtwColorCircleCodepoints {
+    <#
+    .SYNOPSIS
+        Color-circle codepoints used as Peacock swatches (not worktree identity).
+    #>
+    @(
+        0x1F534, # 🔴
+        0x1F7E0, # 🟠
+        0x1F7E1, # 🟡
+        0x1F7E2, # 🟢
+        0x1F535, # 🔵
+        0x1F7E3, # 🟣
+        0x1F7E4, # 🟤
+        0x26AB,  # ⚫
+        0x26AA   # ⚪
+    )
+}
+
+function Get-WtwUnicodeScalarLength {
+    param([int] $Codepoint)
+    if ($Codepoint -gt 0xFFFF) { return 2 }
+    return 1
+}
+
+function Get-WtwNameWithoutColorCircle {
+    <#
+    .SYNOPSIS
+        Strip leading color-circle swatches (and following spaces) only.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()] [AllowEmptyString()] [string] $Name)
+
+    if ([string]::IsNullOrWhiteSpace($Name)) { return $Name }
+    $circles = @(Get-WtwColorCircleCodepoints)
+    $i = 0
+    $len = $Name.Length
+    while ($i -lt $len) {
+        $cp = [char]::ConvertToUtf32($Name, $i)
+        if ($circles -notcontains $cp) { break }
+        $i += Get-WtwUnicodeScalarLength $cp
+        while ($i -lt $len -and [char]::IsWhiteSpace($Name[$i])) { $i++ }
+    }
+    if ($i -ge $len) { return '' }
+    return $Name.Substring($i)
+}
+
 function Get-WtwColorCircleEmoji {
     <#
     .SYNOPSIS
@@ -73,15 +119,7 @@ function Format-WtwPrettyNameWithCircle {
     $circle = Get-WtwColorCircleEmoji -Hex $Hex
     if ([string]::IsNullOrWhiteSpace($Name)) { return $circle }
 
-    $circleCps = @(0x1F534, 0x1F7E0, 0x1F7E1, 0x1F7E2, 0x1F535, 0x1F7E3, 0x1F7E4, 0x26AB, 0x26AA)
-    $stripped = $Name
-    if ($Name.Length -ge 2) {
-        $cp = [Char]::ConvertToUtf32($Name, 0)
-        if ($circleCps -contains $cp) {
-            # surrogate pair (1F5xx / 1F7xx range) → 2 chars; symbols (26AB / 26AA) → 1 char
-            $skip = if ($cp -gt 0xFFFF) { 2 } else { 1 }
-            $stripped = $Name.Substring($skip).TrimStart()
-        }
-    }
+    $stripped = Get-WtwNameWithoutColorCircle -Name $Name
+    if ([string]::IsNullOrWhiteSpace($stripped)) { return $circle }
     return "$circle $stripped"
 }

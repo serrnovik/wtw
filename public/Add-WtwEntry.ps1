@@ -32,6 +32,9 @@ function Add-WtwEntry {
     .PARAMETER Alias
         Extra typed names for ``wtw go`` (spaces allowed). Same as
         ``wtw edit <task> --alias``.
+    .PARAMETER Emoji
+        Optional worktree identity glyph. Omit to derive one from the task
+        name. ``none`` / ``auto`` keeps the derived glyph.
     .PARAMETER SourceGitFolder
         Create a SourceGit group for the parent repo and nest this worktree in it.
     .PARAMETER NoSourceGitFolder
@@ -55,9 +58,15 @@ function Add-WtwEntry {
         [string] $PrettyName,
         [string] $Color,
         [string[]] $Alias,
+        [AllowEmptyString()]
+        [object] $Emoji,
         [switch] $SourceGitFolder,
         [switch] $NoSourceGitFolder
     )
+
+    if ($PSBoundParameters.ContainsKey('Emoji') -and -not (Test-WtwEmojiArgument $Emoji)) {
+        return
+    }
 
     if (-not $Path) { $Path = (Get-Location).Path }
     $Path = [System.IO.Path]::GetFullPath($Path)
@@ -164,12 +173,19 @@ function Add-WtwEntry {
         }
     }
 
-    $meta = Initialize-WtwWorktreeMetadata `
-        -RepoName $Repo -RepoEntry $repoEntry `
-        -Task $Task -Branch $Branch `
-        -WorktreePath $Path -FolderSuffix $folderSuffix `
-        -PrettyName $PrettyName -Color $Color `
-        -Alias $Alias
+    $metaSplat = @{
+        RepoName     = $Repo
+        RepoEntry    = $repoEntry
+        Task         = $Task
+        Branch        = $Branch
+        WorktreePath = $Path
+        FolderSuffix = $folderSuffix
+        PrettyName   = $PrettyName
+        Color        = $Color
+        Alias        = $Alias
+    }
+    if ($PSBoundParameters.ContainsKey('Emoji')) { $metaSplat['Emoji'] = $Emoji }
+    $meta = Initialize-WtwWorktreeMetadata @metaSplat
 
     if (-not $meta.Success) { return }
 
