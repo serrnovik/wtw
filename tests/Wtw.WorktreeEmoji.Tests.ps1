@@ -113,6 +113,46 @@ Describe 'Format-WtwWorktreeDisplayName' {
                 Should -Be $composed
         }
     }
+
+    It 'humanizes a derived task slug unless --name was custom' {
+        InModuleScope wtw {
+            Format-WtwWorktreeDisplayName -Name '🔴 NTB-real-dogfood' -TaskName 'NTB-real-dogfood' -WorktreeEmoji '🐕' |
+                Should -Be '🐕 NTB real dogfood'
+
+            $repo = [PSCustomObject]@{ emoji = '🎸' }
+            Format-WtwWorktreeDisplayName `
+                -Name '🎸🐕 NTB-real-dogfood' `
+                -TaskName 'NTB-real-dogfood' `
+                -WorktreeEmoji '🐕' `
+                -RepoEntry $repo |
+                Should -Be '🎸🐕 NTB real dogfood'
+
+            Format-WtwWorktreeDisplayName -Name 'Login flow' -TaskName 'auth' -WorktreeEmoji '🐕' |
+                Should -Be '🐕 Login flow'
+            Format-WtwWorktreeDisplayName -Name 'Blue Feature' -TaskName 'feature' -WorktreeEmoji '🐕' |
+                Should -Be '🐕 Blue Feature'
+            Format-WtwWorktreeDisplayName `
+                -Name 'hetzner1 cluster server 02' `
+                -TaskName 'hetzner1-cluster-resilience-2026-09-refresh' `
+                -WorktreeEmoji '🐕' |
+                Should -Be '🐕 hetzner1 cluster server 02'
+        }
+    }
+}
+
+Describe 'ConvertTo-WtwHumanizedLabel' {
+    It 'replaces dashes and underscores on slug-equivalent labels' {
+        InModuleScope wtw {
+            ConvertTo-WtwHumanizedLabel -Name 'NTB-real-dogfood' -Slug 'NTB-real-dogfood' |
+                Should -Be 'NTB real dogfood'
+            ConvertTo-WtwHumanizedLabel -Name 'ntb_live_dogfood_fixes' -Slug 'ntb_live_dogfood_fixes' |
+                Should -Be 'ntb live dogfood fixes'
+            ConvertTo-WtwHumanizedLabel -Name 'Login flow' -Slug 'auth' |
+                Should -Be 'Login flow'
+            ConvertTo-WtwHumanizedLabel -Name 'keep-dashes' -Specified |
+                Should -Be 'keep-dashes'
+        }
+    }
 }
 
 Describe 'Get-WtwNameWithoutColorCircle' {

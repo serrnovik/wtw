@@ -851,7 +851,9 @@ them and `wtw remove` cleans that registration up:
   The same prefix is reused for cmux / wmux / T3 / ChatGPT main-checkout titles
   and `wtw list`. Worktrees get a deterministic identity emoji from the task
   name (override with `--emoji`); titles compose as `🎸🦔 auth` with no space
-  between the two glyphs. The main checkout stays repo-only.
+  between the two glyphs, using the form name (not an alias). Derived slugs
+  such as `NTB-real-dogfood` display as `NTB real dogfood`; a custom `--name`
+  is left as typed. The main checkout stays repo-only.
   Before every write, wtw copies `preference.json` into `~/.wtw/backups/sourcegit/`
   (last 3 copies plus one snapshot each at 3 / 7 / 30 days). The same rotating
   backup is used for cmux, Codex, Claude, Cursor, and T3 configs wtw edits.
@@ -868,12 +870,17 @@ them and `wtw remove` cleans that registration up:
   this is a no-op when the cmux CLI is not installed.
 - **wmux** — `wtw wmux <name>` (alias `wtw wm <name>`) on Windows selects an
   existing [wmux](https://github.com/amirlehmam/wmux) workspace for the
-  worktree's path (cwd first, then title — so a repo-emoji rename does not
-  duplicate the tab), or creates one via
+  worktree's path (cwd first, then title — so a title/emoji rename does not
+  duplicate the tab), **renames** it to the composed pretty title, and
+  **selects** it so the tab is visible. Otherwise it creates one via
   `wmux new-workspace --title <pretty> --cwd <path> --shell pwsh` (starting wmux
   if it isn't running — this is the only command that launches the app).
-  Main-repo titles include the repo `--emoji` when set; worktrees compose
-  repo + worktree glyphs.
+  Main-repo titles use the registry key plus the optional repo `--emoji`
+  (`🎸 snowmain`); worktrees compose `{repoEmoji}{worktreeEmoji} {form name}`
+  (`🎸🐕 NTB real dogfood`). Derived slugs get `-` / `_` turned into spaces
+  unless you passed a custom `--name`. Packaged Electron rejects jax/pnpm
+  `NODE_OPTIONS`; wtw clears that for CLI and GUI launch and strips the
+  leftover log line so JSON parsing and `$LASTEXITCODE` stay clean.
   `wtw create` / `wtw add` create the live workspace only when wmux is already
   open; otherwise they skip and print `wtw wmux <name>`. `wtw remove` closes it.
   wmux workspaces are live (daemon-backed) rather than a static config registry,

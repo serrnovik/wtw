@@ -260,9 +260,10 @@ function Show-WtwCommandHelp {
                 '',
                 'Main-repo titles use the registry key plus the optional repo --emoji',
                 '(e.g. 🎸 snowmain1). Worktrees compose repo + worktree glyphs',
-                '(e.g. 🎸🦔 auth).',
-                'Existing workspaces are matched by cwd so an emoji rename does not',
-                'create a duplicate tab.'
+                'plus the form name (e.g. 🎸🐕 NTB real dogfood) — dashes in derived',
+                'slugs become spaces unless you passed --name. Existing tabs are',
+                'matched by cwd, renamed to that title, and selected so the',
+                'workspace is visible.'
             )
         }
         { $_ -in 't3', 't3code' } {

@@ -7,9 +7,12 @@ function Resolve-WtwTerminalWorkspaceMetadata {
         target.
 
         Worktrees compose ``{repoEmoji}{worktreeEmoji} {name}`` (no space
-        between glyphs). Main-repo titles use the registry key, prefixed with
-        the optional repo emoji (``🎸 snowmain1``). A main-checkout color
-        assignment, when present, still prepends the color-circle.
+        between glyphs), using the worktree's form name (not an alias). Derived
+        slugs get dashes/underscores turned into spaces unless ``--name`` was
+        set (``🎸🐕 NTB real dogfood``). Main-repo titles use the registry key,
+        prefixed with the optional repo emoji (``🎸 snowmain1``). A
+        main-checkout color assignment, when present, still prepends the
+        color-circle.
     #>
     [CmdletBinding()]
     param(
