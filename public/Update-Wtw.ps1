@@ -81,16 +81,22 @@ function Update-Wtw {
     Write-WtwShadowWarning -Info $info -Yes:$Yes -Check:$Check
 
     $current = $installed.Version
+    $galleryOlder = $installedPresent -and $null -ne $current -and $null -ne $status.LatestVersion -and $status.LatestVersion -lt $current
     $upToDate = $installedPresent -and $null -ne $current -and $status.LatestVersion -le $current
 
-    if ($upToDate -and -not $Force) {
-        # Equal, or a local build ahead of the Gallery. Neither is a problem, so
-        # neither gets a warning.
-        if ($status.LatestVersion -lt $current) {
-            Write-Host ("    {0} is newer than the published {1} — nothing to do." -f $current, $status.LatestVersion) -ForegroundColor Green
-        } else {
-            Write-Host '    Up to date.' -ForegroundColor Green
+    if ($galleryOlder) {
+        # A stale Gallery "latest" (or --force) must not replace a newer local
+        # copy. That is how 0.2.27 was overwritten with 0.2.26.
+        Write-Host ("    {0} is newer than the published {1} — nothing to do." -f $current, $status.LatestVersion) -ForegroundColor Green
+        if ($Force) {
+            Write-Host '    --force will not install an older Gallery copy over this one.' -ForegroundColor DarkGray
         }
+        Write-Host ''
+        return
+    }
+
+    if ($upToDate -and -not $Force) {
+        Write-Host '    Up to date.' -ForegroundColor Green
         Write-Host ''
         return
     }

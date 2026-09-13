@@ -186,3 +186,18 @@ Describe 'Get-WtwUpdateStatus' {
         $status.UpdateAvailable | Should -BeTrue
     }
 }
+
+Describe 'Get-WtwGalleryLatestVersionText' {
+    It 'reads IsLatestVersion from Packages() rather than the lagging FindPackagesById filter' {
+        InModuleScope wtw {
+            Mock Invoke-WebRequest {
+                [pscustomobject]@{ Content = '<entry><d:Version>0.2.28</d:Version></entry>' }
+            }
+
+            Get-WtwGalleryLatestVersionText | Should -Be '0.2.28'
+            Should -Invoke Invoke-WebRequest -Times 1 -Exactly -ParameterFilter {
+                [string]$Uri -like '*Packages()*' -and [string]$Uri -like '*IsLatestVersion*'
+            }
+        }
+    }
+}

@@ -247,7 +247,7 @@ Describe 'Invoke-Wtw session-reload wiring' {
 Describe 'wtw module load snapshot' {
     It 'records the manifest version of the imported copy' {
         InModuleScope wtw {
-            $script:WtwLoadedManifestVersion | Should -Be ([version]'0.2.28')
+            $script:WtwLoadedManifestVersion | Should -Be (Get-WtwManifestVersion -ModuleRoot $script:WtwModuleRoot)
         }
     }
 }
