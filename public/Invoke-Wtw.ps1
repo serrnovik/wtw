@@ -40,10 +40,16 @@ function Invoke-Wtw {
         $rawArgs = $effectiveArgs[1..($effectiveArgs.Count - 1)]
     }
 
-    # Newer-version hint. Emitted up front because the dispatch below returns
-    # from many branches. Cache-only, silent on failure, and skipped for the
-    # internal `__*` commands whose stdout the shell wrappers parse.
+    # Session freshness, then the Gallery hint. Both skipped for the internal
+    # `__*` commands whose stdout the shell wrappers parse. A stale in-memory
+    # copy (files on disk newer than this import) reloads and re-runs the
+    # original command; Confirm returns $true in that case so we stop here.
     if ([string]$Command -notlike '__*') {
+        if ([string]$Command -ne 'reload') {
+            if (Confirm-WtwSessionModuleCurrent -OriginalArgs @($args)) {
+                return
+            }
+        }
         Write-WtwUpdateNotice
     }
 
@@ -83,6 +89,7 @@ function Invoke-Wtw {
         Write-Host '    agent profile ... Configure agentctl profile overlays'
         Write-Host '    install           Install wtw globally from this checkout (~/.wtw/module/)'
         Write-Host '    update [--check]  Update the global install to the latest PowerShell Gallery release'
+        Write-Host '    reload [--check]  Re-import the installed (or current) module in this session'
         Write-Host '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
         Write-Host '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
         Write-Host '                      Launch AI sandbox (sbx) with workspace folders mounted'
@@ -358,6 +365,7 @@ function Invoke-Wtw {
         # release. Aliasing them meant `wtw update` from a normal shell hit
         # Install-Wtw's self-install guard and refused to do anything.
         'update'    { Update-Wtw @splat }
+        'reload'    { Invoke-WtwReloadSession @splat }
         'skill'     { Install-WtwSkill @splat }
         'sbx'       {
             if ($pos.Count -gt 0) { $splat['Instruction'] = $pos -join ' ' }

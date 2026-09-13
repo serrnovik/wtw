@@ -105,6 +105,8 @@ Set-StrictMode -Version Latest
 $script:WtwCmuxApplyingFromInit = $false
 $script:WtwSourceGitForce = $false
 $script:WtwBackupRoot = $null
+$script:WtwLoadedManifestVersion = $null
+$script:WtwSessionStaleHintShown = $false
 
 $dotSourceParams = @{
     Filter      = '*.ps1'
@@ -131,6 +133,11 @@ Export-ModuleMember -Function $public.BaseName
 
 Set-Alias -Name wtw -Value Invoke-Wtw -Scope Global -Force
 Export-ModuleMember -Alias wtw
+
+# Snapshot the manifest we actually imported. Profile loaders name wtw.psm1 by
+# path, so (Get-Module wtw).Version is often 0.0 and cannot detect a stale
+# session after wtw update / wtw install overwrites ~/.wtw/module.
+$script:WtwLoadedManifestVersion = Get-WtwManifestVersion -ModuleRoot $PSScriptRoot
 
 # Load tab completion
 $completionPath = Join-Path $PSScriptRoot 'completions' 'wtw.auto-completion.ps1'

@@ -343,7 +343,8 @@ if (Test-Path $_wtwModule) {
     }
 
     Write-Host ''
-    Write-Host '  Done! Restart your terminal or run:' -ForegroundColor Green
+    Write-Host '  Done! Reload this session or restart the terminal:' -ForegroundColor Green
+    Write-Host '    wtw reload' -ForegroundColor DarkGray
     Write-Host "    Import-Module $(Join-Path $installDir 'wtw.psm1') -Force" -ForegroundColor DarkGray
     Write-Host ''
 }

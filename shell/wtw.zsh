@@ -152,7 +152,7 @@ _wtw_passthrough_commands=(
     init add create list ls info show open
     remove rm delete del unregister unreg
     edit rename ren workspace ws copy sync color clean
-    host agent install update skill sbx help run
+    host agent install update reload skill sbx help run
     connect conn ssh
     sourcegit sgit sg
     chatgpt cgpt codex droid factory
@@ -192,6 +192,8 @@ _wtw_completion() {
         'host:Manage remote machines for --on'
         'agent:Configure agent profiles'
         'install:Install or update WTW'
+        'update:Update the global install from the PowerShell Gallery'
+        'reload:Re-import WTW in this session'
         'skill:Install the WTW agent skill'
         'sbx:Launch an AI sandbox'
         'run:Run a wtw command on a remote host'

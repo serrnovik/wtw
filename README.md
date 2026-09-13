@@ -128,6 +128,29 @@ and the subcommands whose output the shell wrappers parse — and when
 `WTW_NO_UPDATE_NOTICE=1` is set. `Get-WtwUpdateStatus` reports the same
 comparison on demand.
 
+### Stale session (imported older than installed)
+
+PowerShell keeps the functions from `Import-Module` in memory. After `wtw
+update`, `wtw install`, or an overwrite of `~/.wtw/module` in another window,
+this shell can still be running the previous copy — `(Get-Module wtw).Version`
+is often `0.0` because the profile imports `wtw.psm1` by path, so that is not a
+reliable signal.
+
+On the next ordinary `wtw` command, wtw compares the manifest version it
+snapshotted at import with the files next to that module. If the on-disk copy
+is newer, it `Import-Module -Force`s that path and re-runs the command you
+typed. A session that imported a **checkout** older than `~/.wtw/module` is not
+switched automatically (that would surprise local wtw development); it prints
+`wtw reload` once instead.
+
+```text
+wtw reload          # re-import the copy this session should be running
+wtw reload --check  # loaded vs this copy vs ~/.wtw/module, change nothing
+```
+
+`WTW_NO_SESSION_RELOAD=1` skips the automatic check. `WTW_USE_REPO_MODULE=1`
+keeps a checkout loaded (same as after `wtw go` session scripts).
+
 ## Quick Start
 
 ### 1. Register your repos
@@ -221,6 +244,7 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 | `wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]` | Clean stale AI / detached worktrees and leftover merged local branches |
 | `wtw install [--skip-profile]` | Install this checkout globally to `~/.wtw/module/` |
 | `wtw update [--check] [--yes] [--force]` | Update the global install to the latest PowerShell Gallery release |
+| `wtw reload [--check]` | Re-import the installed (or current) module in this session |
 | `wtw skill [--agent claude\|agents\|all]` | Install AI skill into current repo for agent support |
 | `wtw host [list\|discover\|add\|remove\|sync\|trust\|test]` | Manage remote machines for `--on` |
 | `wtw --on <host> <editor> <name>` | Open a worktree that lives on another machine (see [Remote worktrees](#remote-worktrees)) |
