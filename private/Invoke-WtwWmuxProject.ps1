@@ -242,6 +242,62 @@ function Restore-WtwEnvVar {
     }
 }
 
+function Get-WtwWmuxProcessEnvSnapshot {
+    <#
+    .SYNOPSIS
+        Capture env vars wtw mutates around wmux CLI / GUI launch.
+    #>
+    [CmdletBinding()]
+    param()
+
+    [ordered]@{
+        ELECTRON_RUN_AS_NODE = $env:ELECTRON_RUN_AS_NODE
+        NODE_OPTIONS         = $env:NODE_OPTIONS
+        WSLENV               = $env:WSLENV
+        WSL_DISTRO_NAME      = $env:WSL_DISTRO_NAME
+    }
+}
+
+function Reset-WtwWmuxProcessEnv {
+    <#
+    .SYNOPSIS
+        Strip inherited env that makes packaged Electron / wmux.js mis-detect WSL.
+    .DESCRIPTION
+        Windows Terminal sets ``WSLENV`` on native pwsh so WSL children inherit
+        ``WT_*`` variables. wmux.js treats any ``WSLENV`` as "we are in WSL" and
+        requires npiperelay — so ``wmux ping`` fails while the GUI is running.
+        jax/pnpm ``NODE_OPTIONS`` also breaks packaged Electron.
+    #>
+    [CmdletBinding()]
+    param(
+        [switch] $ElectronAsNode,
+        [switch] $GuiLaunch
+    )
+
+    Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue
+    if ($IsWindows) {
+        Remove-Item Env:WSLENV -ErrorAction SilentlyContinue
+        Remove-Item Env:WSL_DISTRO_NAME -ErrorAction SilentlyContinue
+    }
+
+    if ($GuiLaunch) {
+        Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+    } elseif ($ElectronAsNode) {
+        $env:ELECTRON_RUN_AS_NODE = '1'
+    } else {
+        Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+    }
+}
+
+function Restore-WtwWmuxProcessEnv {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Snapshot)
+
+    foreach ($name in @($Snapshot.Keys)) {
+        Restore-WtwEnvVar -Name $name -Previous $Snapshot[$name]
+    }
+}
+
 function ConvertTo-WtwWmuxCliOutput {
     <#
     .SYNOPSIS
@@ -281,16 +337,10 @@ function Invoke-WtwWmuxCommand {
     $allArgs = @($invoker.Prefix) + $ArgumentList
     Write-Verbose "wmux command: $($invoker.Exe) $($allArgs -join ' ')"
 
-    $previousElectron = $env:ELECTRON_RUN_AS_NODE
-    $previousNodeOptions = $env:NODE_OPTIONS
+    $snapshot = Get-WtwWmuxProcessEnvSnapshot
     $previousNative = Get-Variable -Name PSNativeCommandUseErrorActionPreference -ValueOnly -ErrorAction SilentlyContinue
     try {
-        if ($invoker.ElectronAsNode) {
-            $env:ELECTRON_RUN_AS_NODE = '1'
-            # Packaged Electron logs (and can fail) when NODE_OPTIONS is set —
-            # jax/pnpm leave ``--max-old-space-size`` on the interactive shell.
-            Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue
-        }
+        Reset-WtwWmuxProcessEnv -ElectronAsNode:$invoker.ElectronAsNode
         if ($null -ne $previousNative) { $PSNativeCommandUseErrorActionPreference = $false }
         $raw = & $invoker.Exe @allArgs 2>&1
         $outputText = ConvertTo-WtwWmuxCliOutput -Raw $raw
@@ -301,8 +351,7 @@ function Invoke-WtwWmuxCommand {
         return [PSCustomObject]@{ ExitCode = 1; Output = "$($_.Exception.Message)" }
     } finally {
         if ($null -ne $previousNative) { $PSNativeCommandUseErrorActionPreference = $previousNative }
-        Restore-WtwEnvVar -Name 'ELECTRON_RUN_AS_NODE' -Previous $previousElectron
-        Restore-WtwEnvVar -Name 'NODE_OPTIONS' -Previous $previousNodeOptions
+        Restore-WtwWmuxProcessEnv -Snapshot $snapshot
     }
 }
 
@@ -373,26 +422,30 @@ function Start-WtwWmuxApp {
 
     $exe = Get-WtwWmuxExe
     if (-not $exe) { return $false }
+    $exeDir = Split-Path -Parent $exe
 
-    $previousElectron = $env:ELECTRON_RUN_AS_NODE
-    $previousNodeOptions = $env:NODE_OPTIONS
+    $snapshot = Get-WtwWmuxProcessEnvSnapshot
     try {
-        # GUI launch must not inherit ELECTRON_RUN_AS_NODE from a prior CLI call,
-        # or jax/pnpm NODE_OPTIONS (packaged Electron logs that as a hard error).
-        Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
-        Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue
-        # UseShellExecute detaches from this console so packaged-Electron logs
-        # do not spill into the parent pwsh / Starship prompt.
-        $psi = [System.Diagnostics.ProcessStartInfo]::new($exe)
-        $psi.UseShellExecute = $true
-        $exeDir = Split-Path -Parent $exe
-        if ($exeDir) { $psi.WorkingDirectory = $exeDir }
-        [void][System.Diagnostics.Process]::Start($psi)
+        # GUI launch must not inherit ELECTRON_RUN_AS_NODE, jax NODE_OPTIONS, or
+        # Windows Terminal WSLENV (wmux.js would then demand npiperelay).
+        Reset-WtwWmuxProcessEnv -GuiLaunch
+        # Redirect stdio so the console-subsystem Electron binary does not dump
+        # hook/update logs into the parent pwsh / Starship prompt.
+        $stdoutLog = Join-Path ([System.IO.Path]::GetTempPath()) 'wtw-wmux-launch.out.log'
+        $stderrLog = Join-Path ([System.IO.Path]::GetTempPath()) 'wtw-wmux-launch.err.log'
+        $startParams = @{
+            FilePath               = $exe
+            RedirectStandardOutput = $stdoutLog
+            RedirectStandardError  = $stderrLog
+            WindowStyle            = 'Normal'
+            ErrorAction            = 'Stop'
+        }
+        if ($exeDir) { $startParams.WorkingDirectory = $exeDir }
+        Start-Process @startParams | Out-Null
     } catch {
         return $false
     } finally {
-        Restore-WtwEnvVar -Name 'ELECTRON_RUN_AS_NODE' -Previous $previousElectron
-        Restore-WtwEnvVar -Name 'NODE_OPTIONS' -Previous $previousNodeOptions
+        Restore-WtwWmuxProcessEnv -Snapshot $snapshot
     }
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)

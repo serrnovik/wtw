@@ -219,6 +219,35 @@ Describe 'ConvertTo-WtwWmuxCliOutput' {
     }
 }
 
+Describe 'Reset-WtwWmuxProcessEnv' {
+    It 'clears Windows Terminal WSLENV so wmux CLI uses the native named pipe' {
+        InModuleScope wtw {
+            $savedWslEnv = $env:WSLENV
+            $savedDistro = $env:WSL_DISTRO_NAME
+            $savedNodeOptions = $env:NODE_OPTIONS
+            try {
+                $env:WSLENV = 'WT_SESSION:WT_PROFILE_ID:'
+                $env:WSL_DISTRO_NAME = 'should-not-leak'
+                $env:NODE_OPTIONS = '--max-old-space-size=4096'
+                $snapshot = Get-WtwWmuxProcessEnvSnapshot
+                Reset-WtwWmuxProcessEnv
+                if ($IsWindows) {
+                    $env:WSLENV | Should -BeNullOrEmpty
+                    $env:WSL_DISTRO_NAME | Should -BeNullOrEmpty
+                }
+                $env:NODE_OPTIONS | Should -BeNullOrEmpty
+                Restore-WtwWmuxProcessEnv -Snapshot $snapshot
+                $env:WSLENV | Should -Be 'WT_SESSION:WT_PROFILE_ID:'
+                $env:NODE_OPTIONS | Should -Be '--max-old-space-size=4096'
+            } finally {
+                if ($null -eq $savedWslEnv -or $savedWslEnv -eq '') { Remove-Item Env:WSLENV -ErrorAction SilentlyContinue } else { $env:WSLENV = $savedWslEnv }
+                if ($null -eq $savedDistro -or $savedDistro -eq '') { Remove-Item Env:WSL_DISTRO_NAME -ErrorAction SilentlyContinue } else { $env:WSL_DISTRO_NAME = $savedDistro }
+                if ($null -eq $savedNodeOptions -or $savedNodeOptions -eq '') { Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue } else { $env:NODE_OPTIONS = $savedNodeOptions }
+            }
+        }
+    }
+}
+
 Describe 'ConvertFrom-WtwWmuxJsonOutput' {
     It 'parses JSON after mixed Electron log lines' {
         InModuleScope wtw {

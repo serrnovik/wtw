@@ -880,7 +880,9 @@ them and `wtw remove` cleans that registration up:
   (`🎸🐕 NTB real dogfood`). Derived slugs get `-` / `_` turned into spaces
   unless you passed a custom `--name`. Packaged Electron rejects jax/pnpm
   `NODE_OPTIONS`; wtw clears that for CLI and GUI launch and strips the
-  leftover log line so JSON parsing and `$LASTEXITCODE` stay clean.
+  leftover log line so JSON parsing and `$LASTEXITCODE` stay clean. Native
+  Windows pwsh also strips Windows Terminal `WSLENV` for the CLI — wmux.js
+  otherwise assumes WSL and fails `ping` while the GUI is already running.
   `wtw create` / `wtw add` create the live workspace only when wmux is already
   open; otherwise they skip and print `wtw wmux <name>`. `wtw remove` closes it.
   wmux workspaces are live (daemon-backed) rather than a static config registry,

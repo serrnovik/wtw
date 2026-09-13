@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.26'
+    ModuleVersion     = '0.2.27'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -40,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'wtw wmux now renames and selects the cwd-matched tab so the workspace is visible. Derived slugs get dashes/underscores turned into spaces; worktree titles are {repoEmoji}{worktreeEmoji} {form name}. Packaged Electron NODE_OPTIONS noise no longer breaks the CLI or leaks ERROR 1 into the prompt.'
+            ReleaseNotes = 'wtw wmux ping no longer treats Windows Terminal WSLENV as WSL, so a running wmux is detected and the tab can be renamed/selected. Derived titles still humanize slugs and compose repo+worktree emoji.'
         }
     }
 }
