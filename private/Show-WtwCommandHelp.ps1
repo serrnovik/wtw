@@ -225,7 +225,33 @@ function Show-WtwCommandHelp {
         ) }
         'agent'       { @('wtw agent profile set <repo> <profile>', 'Configure which agentctl profile wtw create applies for a repo.', '', 'Examples:', '  wtw agent profile set snowmain1 solo', '  wtw agent profile default team', '  wtw agent profile get snowmain1', '  wtw agent profile list') }
         'install'     { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }
-        'update'      { @('wtw install', 'Install or update wtw globally to ~/.wtw/module/.', '', 'Options:', '  --skip-profile  Skip modifying shell profile') }
+        'update'      { @(
+            'wtw update [--check] [--yes] [--force]',
+            'Replace ~/.wtw/module with the latest PowerShell Gallery release.',
+            'Different from `wtw install`, which copies this checkout.',
+            '',
+            'Options:',
+            '  --check   Report current vs published versions; change nothing',
+            '  --yes     Install without prompting',
+            '  --force   Reinstall even when the versions already match'
+        ) }
+        'reload'      { @(
+            'wtw reload [--check]',
+            'Re-import wtw in this PowerShell session so in-memory functions match',
+            'the files on disk. Use after `wtw update` / `wtw install` in another',
+            'window, or when this session still has an older copy loaded.',
+            '',
+            'wtw also does this automatically on the next command when the copy',
+            'you imported is older than the files next to it (typically',
+            '~/.wtw/module after an in-place update). A checkout that is older',
+            'than the install is not yanked automatically; run `wtw reload`.',
+            '',
+            'Options:',
+            '  --check   Print loaded vs on-disk vs installed versions',
+            '',
+            'Skip the automatic check: WTW_NO_SESSION_RELOAD=1',
+            'Keep a checkout loaded:   WTW_USE_REPO_MODULE=1'
+        ) }
         'skill'       { @('wtw skill [--agent claude|agents|all]', 'Install the wtw AI skill into the current repo.', '', 'Copies skill definitions so AI agents (Claude, Codex, Cursor, Gemini)', 'can discover and use wtw commands.', '', 'Options:', '  --agent claude    Claude Code only (.claude/skills/)', '  --agent agents    Cross-agent format (.agents/skills/)', '  --agent all       Both (default)') }
         { $_ -in 'claudecode', 'ccode' } {
             @('wtw claudecode [name] [--prompt <text>]', 'Start a new Claude Code chat in the Claude desktop app, rooted at the target.', '', 'Arguments:', '  name    Target to open (default: detected from cwd)', '', 'Options:', '  --prompt <text>   Pre-fill the new chat''s composer (not submitted)', '', 'Uses the app''s claude://code/new deep link. The desktop app names sessions', 'itself (auto-titled from the first message, renameable in the UI), so wtw', 'cannot set a chat title the way it labels Cursor/ChatGPT projects.', '', 'Use `wtw claude` to just bring the Claude app forward instead.')
@@ -267,9 +293,10 @@ function Show-WtwCommandHelp {
                 '',
                 'Main-repo titles use the registry key plus the optional repo --emoji',
                 '(e.g. 🎸 snowmain1). Worktrees compose repo + worktree glyphs',
-                '(e.g. 🎸🦔 auth).',
-                'Existing workspaces are matched by cwd so an emoji rename does not',
-                'create a duplicate tab.'
+                'plus the form name (e.g. 🎸🐕 NTB real dogfood) — dashes in derived',
+                'slugs become spaces unless you passed --name. Existing tabs are',
+                'matched by cwd, renamed to that title, and selected so the',
+                'workspace is visible.'
             )
         }
         { $_ -in 't3', 't3code' } {

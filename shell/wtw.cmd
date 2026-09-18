@@ -29,7 +29,7 @@ if "%_FIRST:~0,1%"=="-" goto :passthrough
 
 REM Known subcommands that don't need cmd-side cd. Pad with spaces so findstr
 REM can match whole tokens. Keep in sync with Get-WtwCliPassthroughCommandNames.
-set "_NOCD= init add create list ls info show open cursor cur code co antigravity anti ag windsurf wind ws codium vscodium sourcegit sgit sg chatgpt cgpt codex droid factory cmux cm wmux wm ss superset supersetsh claude cowork claudecode ccode t3 t3code remove rm delete del unregister unreg edit rename ren workspace copy color sync clean host agent install update skill sbx help run connect conn ssh -h --help "
+set "_NOCD= init add create list ls info show open cursor cur code co antigravity anti ag windsurf wind ws codium vscodium sourcegit sgit sg chatgpt cgpt codex droid factory cmux cm wmux wm ss superset supersetsh claude cowork claudecode ccode t3 t3code remove rm delete del unregister unreg edit rename ren workspace copy color sync clean host agent install update reload skill sbx help run connect conn ssh -h --help "
 echo  %_NOCD% | findstr /I /C:" %_FIRST% " >nul
 if not errorlevel 1 goto :passthrough
 

@@ -1,3 +1,37 @@
+function Get-WtwManifestVersion {
+    <#
+    .SYNOPSIS
+        Read ModuleVersion from the wtw.psd1 next to a module root.
+    .DESCRIPTION
+        Profile loaders import ``wtw.psm1`` by path, so ``(Get-Module wtw).Version``
+        is often 0.0. The manifest next to that file is the version the copy
+        actually is. Missing or unreadable manifests return ``$null`` rather
+        than throwing: callers treat that as "unknown", not "fatal".
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $ModuleRoot
+    )
+
+    $manifestPath = Join-Path $ModuleRoot 'wtw.psd1'
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        return $null
+    }
+
+    try {
+        $parsed = $null
+        $text = [string](Import-PowerShellDataFile -LiteralPath $manifestPath).ModuleVersion
+        if ([version]::TryParse($text, [ref] $parsed)) {
+            return $parsed
+        }
+    } catch {
+        # Unknown is a valid answer; do not take wtw down for a bad manifest.
+    }
+
+    return $null
+}
+
 function Get-WtwInstallInfo {
     <#
     .SYNOPSIS
@@ -45,18 +79,7 @@ function Get-WtwInstallInfo {
     $resolvedRoot = try { [IO.Path]::GetFullPath($ModuleRoot) } catch { $ModuleRoot }
     $resolvedInstall = try { [IO.Path]::GetFullPath($InstallRoot) } catch { $InstallRoot }
 
-    $version = $null
-    $manifestPath = Join-Path $resolvedRoot 'wtw.psd1'
-    if (Test-Path -LiteralPath $manifestPath -PathType Leaf) {
-        try {
-            $parsed = $null
-            $text = [string](Import-PowerShellDataFile -LiteralPath $manifestPath).ModuleVersion
-            if ([version]::TryParse($text, [ref] $parsed)) { $version = $parsed }
-        } catch {
-            # A manifest we cannot read is reported as an unknown version rather
-            # than taking wtw down.
-        }
-    }
+    $version = Get-WtwManifestVersion -ModuleRoot $resolvedRoot
 
     $record = Read-WtwJsonFile -Path (Join-Path $resolvedRoot 'INSTALLATION.json')
 
