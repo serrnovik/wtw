@@ -53,7 +53,8 @@ function Format-WtwRepoDisplayName {
     .SYNOPSIS
         Prefix a repo registry key with its optional emoji (SourceGit / list / muxers).
     .DESCRIPTION
-        Main checkout only: ``🎸 snowmain1``, ``🎭 ☸️ tn1-gitops``. Worktree
+        Main checkout only: ``🎸 snowmain1``, ``🎭 ☸️ tn1 gitops``. Derived
+        registry keys get dashes/underscores turned into spaces. Worktree
         titles compose repo + worktree glyphs via Format-WtwWorktreeDisplayName.
     #>
     [CmdletBinding()]
@@ -73,9 +74,12 @@ function Format-WtwRepoDisplayName {
         $Emoji = Get-WtwRepoEmoji -RepoEntry $RepoEntry
     }
 
+    $label = ConvertTo-WtwHumanizedLabel -Name $Name -Slug $Name
+    if ([string]::IsNullOrWhiteSpace($label)) { $label = $Name }
+
     $normalized = ConvertTo-WtwNormalizedRepoEmoji $Emoji
-    if (-not $normalized) { return $Name }
-    return "$normalized $Name"
+    if (-not $normalized) { return $label }
+    return "$normalized $label"
 }
 
 function Set-WtwRepoEmojiProperty {
