@@ -98,6 +98,9 @@ elsewhere updates a copy none of them ever load. If such a copy already exists,
 resolves to that one instead.
 
 ```text
+wtw --version           # running module version and where it was loaded from
+wtw -v                  # same
+wtw version             # same
 wtw update --check      # report versions and where they came from, change nothing
 wtw update              # prompt, then replace the install with the latest release
 wtw update --yes        # no prompt
@@ -197,6 +200,7 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 | `wtw add [path] [--repo X --task X] [--alias a,b] [--emoji X] [--sourcegit-folder]` | Import an existing worktree into the registry |
 | `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b] [--emoji X]` | Create worktree + workspace + branch |
 | `wtw list [-f\|--filter text] [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`-f kul` = substring; `--wide` = full aliases and paths) |
+| `wtw --version` / `-v` / `version` | Print the running module version and where it was loaded from |
 | `wtw <name>` | Switch to repo/worktree — implicit `go` (cd + session init) |
 | `wtw go <name>` | Same as above, explicit |
 | `wtw open [name] [--editor X]` | Open workspace in editor (defaults to current repo/worktree) |

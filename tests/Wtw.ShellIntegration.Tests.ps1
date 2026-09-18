@@ -27,7 +27,7 @@ Describe 'Terminal escape sequences' {
 Describe 'CLI command names for shell wrappers' {
     It 'includes the commands zsh used to swallow as implicit go' {
         $names = @(Get-WtwCliCommandNames)
-        foreach ($name in @('info', 'show', 'host', 'agent', 'chatgpt', 'cgpt', 'sbx', 'ss', 'run', 'connect', 'conn', 'ssh', 'superset', 'supersetsh')) {
+        foreach ($name in @('info', 'show', 'host', 'self', 'version', 'agent', 'chatgpt', 'cgpt', 'sbx', 'ss', 'run', 'connect', 'conn', 'ssh', 'superset', 'supersetsh')) {
             $names | Should -Contain $name
         }
     }

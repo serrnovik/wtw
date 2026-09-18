@@ -179,6 +179,13 @@ function Show-WtwCommandHelp {
             'Alias of `wtw host self`. Sets this machine''s cmux group badge',
             '(🍏SP in 🍏SP/🎸 snowmain1). Omit both flags to print the current badge.'
         ) }
+        { $_ -in 'version', '--version', '-v' } {
+            @(
+                'wtw --version',
+                'Print the running module version and where it was loaded from.',
+                'Aliases: wtw -v, wtw version'
+            )
+        }
         'host'        { @(
             'wtw host [list|self|show|discover|add|remove|sync|trust|test] [name] [options]',
             'Manage the remote machines `wtw --on <host>` can open worktrees on.',

@@ -289,3 +289,13 @@ Describe 'Invoke-Wtw update dispatch' {
         }
     }
 }
+
+Describe 'Invoke-Wtw version dispatch' {
+    It 'prints the module version for --version, -v, and version' {
+        foreach ($token in @('--version', '-v', 'version')) {
+            $out = @(& { Invoke-Wtw $token } 6>$null)
+            $out[0] | Should -Match '^wtw \d+\.\d+\.\d+'
+            $out[1] | Should -BeLike '*worktree-workspace*'
+        }
+    }
+}

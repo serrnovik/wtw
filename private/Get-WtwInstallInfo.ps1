@@ -111,6 +111,23 @@ function Get-WtwInstallInfo {
     }
 }
 
+function Show-WtwVersion {
+    <#
+    .SYNOPSIS
+        Print the running wtw module version (``wtw --version`` / ``wtw -v`` / ``wtw version``).
+    #>
+    [CmdletBinding()]
+    param()
+
+    $info = Get-WtwInstallInfo
+    $version = if ($info.Version) { $info.Version.ToString() } else { 'unknown' }
+    Write-Output "wtw $version"
+    if ($info.ModuleRoot) {
+        $origin = if ($info.Flavour) { "  ($($info.Flavour))" } else { '' }
+        Write-Output "  $($info.ModuleRoot)$origin"
+    }
+}
+
 function Test-WtwPathUnderModulePath {
     <#
     .SYNOPSIS

@@ -12,13 +12,25 @@ function Initialize-WtwCmuxCurrentSession {
         [switch] $ApplyTerminalSession
     )
 
+    # Capture private helpers before any session work. Enter-WtwWorktree's
+    # Restore-WtwInstalledModule does a -Force re-import, which invalidates
+    # by-name resolution of module-private functions for this stack frame.
+    $getTabLabel = Get-Command Get-WtwCmuxTabLabel -ErrorAction SilentlyContinue
+    $setOverride = Get-Command Set-WtwCmuxTabTitleOverride -ErrorAction SilentlyContinue
+    $setTabLabel = Get-Command Set-WtwCmuxCurrentTabLabel -ErrorAction SilentlyContinue
+    $invokeRawCommand = Get-Command Invoke-WtwCmuxRawCommand -ErrorAction SilentlyContinue
+    $cmuxBin = Get-WtwCmuxBin
+
     $remote = Get-WtwCmuxCurrentRemoteSession
     if ($remote) {
-        Set-WtwCmuxCurrentTabLabel `
-            -PrettyName (Get-WtwCmuxRemoteSessionPrettyName -Remote $remote) `
-            -GetTabLabel (Get-Command Get-WtwCmuxTabLabel -ErrorAction SilentlyContinue) `
-            -InvokeRawCommand (Get-Command Invoke-WtwCmuxRawCommand -ErrorAction SilentlyContinue) `
-            -CmuxBin (Get-WtwCmuxBin)
+        if ($setTabLabel) {
+            & $setTabLabel `
+                -PrettyName (Get-WtwCmuxRemoteSessionPrettyName -Remote $remote) `
+                -GetTabLabel $getTabLabel `
+                -SetOverride $setOverride `
+                -InvokeRawCommand $invokeRawCommand `
+                -CmuxBin $cmuxBin
+        }
         if ($ApplyTerminalSession) {
             Connect-WtwRemoteWorktree -HostEntry $remote.HostEntry -Name $remote.Name
         }
@@ -39,12 +51,6 @@ function Initialize-WtwCmuxCurrentSession {
     $prettyName = $metadata.PrettyName
     $color = $metadata.Color
     $statusValue = $metadata.StatusValue
-    $cmuxBin = Get-WtwCmuxBin
-    $invokeRawCommand = Get-Command Invoke-WtwCmuxRawCommand -ErrorAction SilentlyContinue
-    # Pre-resolve the tab-label helper NOW, before Enter-WtwWorktree's Restore-WtwInstalledModule
-    # does a -Force re-import (which invalidates by-name resolution of module-private functions
-    # for the still-running code). Same reason $invokeRawCommand is captured up here.
-    $getTabLabel = Get-Command Get-WtwCmuxTabLabel -ErrorAction SilentlyContinue
 
     if ($ApplyTerminalSession) {
         # Enter-WtwWorktree (at its end) also pushes cmux metadata on the plain `wtw go`
@@ -64,13 +70,14 @@ function Initialize-WtwCmuxCurrentSession {
             & $invokeRawCommand -CmuxBin $cmuxBin -ArgumentList @('set-status', 'wtw', $statusValue, '--workspace', $env:CMUX_WORKSPACE_ID, '--icon', 'git-branch', '--color', ($color ?? '#7A4FD8'), '--priority', '90') | Out-Null
         }
     }
-    if ($env:CMUX_SURFACE_ID -and $prettyName) {
+    if ($env:CMUX_SURFACE_ID -and $prettyName -and $setTabLabel) {
         # Tab label gets the console+tree wtw icon prefix; the workspace title (above)
         # stays as the bare pretty name for the sidebar/switcher. Also pin the label
         # so agent-action.ps1's title guard cannot stomp it back to 🌴 wtw.
-        Set-WtwCmuxCurrentTabLabel `
+        & $setTabLabel `
             -PrettyName $prettyName `
             -GetTabLabel $getTabLabel `
+            -SetOverride $setOverride `
             -InvokeRawCommand $invokeRawCommand `
             -CmuxBin $cmuxBin
     }

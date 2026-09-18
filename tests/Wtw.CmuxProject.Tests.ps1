@@ -480,6 +480,58 @@ Describe 'cmux shell startup metadata hook' {
             $env:CMUX_SURFACE_ID = $oldSurfaceId
         }
     }
+
+    It 'renames the tab after Enter-WtwWorktree re-imports the module' {
+        $oldWorkspaceId = $env:CMUX_WORKSPACE_ID
+        $oldSurfaceId = $env:CMUX_SURFACE_ID
+        try {
+            $env:CMUX_WORKSPACE_ID = 'workspace:11'
+            $env:CMUX_SURFACE_ID = 'surface:11'
+            $expectedTitle = Get-WtwExpectedWorktreeTitle -PrettyName '🟢 Feature' -TaskName 'feature'
+            $expectedTab = "🖥️🌳 $expectedTitle"
+            InModuleScope wtw -Parameters @{
+                TestDrive = $TestDrive
+                ExpectedTitle = $expectedTitle
+                ExpectedTab = $expectedTab
+            } {
+                Mock Get-WtwCmuxCurrentRemoteSession { $null }
+                Mock Resolve-WtwCurrentTarget { 'feature' }
+                Mock Resolve-WtwTarget {
+                    [PSCustomObject]@{
+                        RepoName      = 'repo'
+                        TaskName      = 'feature'
+                        WorktreeEntry = [PSCustomObject]@{
+                            path       = $TestDrive
+                            prettyName = '🟢 Feature'
+                            color      = '#96dd2c'
+                        }
+                        RepoEntry     = [PSCustomObject]@{ mainPath = $TestDrive }
+                    }
+                }
+                Mock Enter-WtwWorktree {
+                    foreach ($name in @(
+                        'Set-WtwCmuxCurrentTabLabel',
+                        'Set-WtwCmuxTabTitleOverride',
+                        'Get-WtwCmuxTabTitleOverridePath',
+                        'Get-WtwCmuxTabLabel'
+                    )) {
+                        Remove-Item -Path "Function:$name" -ErrorAction SilentlyContinue
+                    }
+                }
+                Mock Get-WtwCmuxBin { 'cmux' }
+                Mock Invoke-WtwCmuxRawCommand { [PSCustomObject]@{ ExitCode = 0; Output = '' } }
+
+                Invoke-Wtw __cmux_init_current
+
+                Should -Invoke Invoke-WtwCmuxRawCommand -Times 1 -Exactly -ParameterFilter {
+                    ($ArgumentList -join ' ') -eq "rename-tab --workspace workspace:11 --surface surface:11 $ExpectedTab"
+                }
+            }
+        } finally {
+            if ($null -eq $oldWorkspaceId) { Remove-Item Env:CMUX_WORKSPACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_WORKSPACE_ID = $oldWorkspaceId }
+            if ($null -eq $oldSurfaceId) { Remove-Item Env:CMUX_SURFACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_SURFACE_ID = $oldSurfaceId }
+        }
+    }
 }
 
 Describe 'cmux AppleScript POSIX init' {
@@ -880,45 +932,6 @@ Describe 'cmux remote status and current-session helpers' {
         }
     }
 
-    It 'SSHs from __cmux_init_current when the workspace is remote' {
-        $oldWorkspaceId = $env:CMUX_WORKSPACE_ID
-        $oldSurfaceId = $env:CMUX_SURFACE_ID
-        $oldHost = $env:WTW_REMOTE_HOST
-        $oldName = $env:WTW_REMOTE_NAME
-        try {
-            $env:CMUX_WORKSPACE_ID = 'workspace:remote'
-            $env:CMUX_SURFACE_ID = 'surface:remote'
-            $env:WTW_REMOTE_HOST = 'at'
-            $env:WTW_REMOTE_NAME = 'scoring'
-            InModuleScope wtw {
-                Mock Resolve-WtwHost {
-                    @{ Name = 'arctictroll'; User = 'sno'; Emoji = '🧊'; Label = 'AT'; Separator = ' ' }
-                }
-                Mock Get-WtwCmuxCurrentWorkspaceObject {
-                    [PSCustomObject]@{ name = '🧊AT 🐇 scoring-system-that-works' }
-                }
-                Mock Get-WtwCmuxBin { 'cmux' }
-                Mock Invoke-WtwCmuxRawCommand { [PSCustomObject]@{ ExitCode = 0; Output = '' } }
-                Mock Connect-WtwRemoteWorktree {}
-                Mock Enter-WtwWorktree { throw 'remote init must not enter a local worktree' }
-
-                Invoke-Wtw __cmux_init_current
-
-                Should -Invoke Connect-WtwRemoteWorktree -Times 1 -Exactly -ParameterFilter {
-                    $Name -eq 'scoring'
-                }
-                Should -Invoke Invoke-WtwCmuxRawCommand -Times 1 -Exactly -ParameterFilter {
-                    ($ArgumentList -join ' ') -eq 'rename-tab --workspace workspace:remote --surface surface:remote 🖥️🌳 🧊AT 🐇 scoring-system-that-works'
-                }
-            }
-        } finally {
-            if ($null -eq $oldWorkspaceId) { Remove-Item Env:CMUX_WORKSPACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_WORKSPACE_ID = $oldWorkspaceId }
-            if ($null -eq $oldSurfaceId) { Remove-Item Env:CMUX_SURFACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_SURFACE_ID = $oldSurfaceId }
-            if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
-            if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
-        }
-    }
-
     It 'SSHs from __cmux_init_current without CMUX_WORKSPACE_ID when the tab is remote' {
         $oldWorkspaceId = $env:CMUX_WORKSPACE_ID
         $oldHost = $env:WTW_REMOTE_HOST
@@ -940,6 +953,45 @@ Describe 'cmux remote status and current-session helpers' {
             }
         } finally {
             if ($null -eq $oldWorkspaceId) { Remove-Item Env:CMUX_WORKSPACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_WORKSPACE_ID = $oldWorkspaceId }
+            if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
+            if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
+        }
+    }
+}
+
+Describe 'cmux remote init tab label' {
+    It 'SSHs from __cmux_init_current when the workspace is remote' {
+        $oldWorkspaceId = $env:CMUX_WORKSPACE_ID
+        $oldSurfaceId = $env:CMUX_SURFACE_ID
+        $oldHost = $env:WTW_REMOTE_HOST
+        $oldName = $env:WTW_REMOTE_NAME
+        try {
+            $env:CMUX_WORKSPACE_ID = 'workspace:remote'
+            $env:CMUX_SURFACE_ID = 'surface:remote'
+            $env:WTW_REMOTE_HOST = 'at'
+            $env:WTW_REMOTE_NAME = 'scoring'
+            Mock Resolve-WtwHost {
+                @{ Name = 'arctictroll'; User = 'sno'; Emoji = '🧊'; Label = 'AT'; Separator = ' ' }
+            } -ModuleName wtw
+            Mock Get-WtwCmuxCurrentWorkspaceObject {
+                [PSCustomObject]@{ name = '🧊AT 🐇 scoring-system-that-works' }
+            } -ModuleName wtw
+            Mock Get-WtwCmuxBin { 'cmux' } -ModuleName wtw
+            Mock Invoke-WtwCmuxRawCommand { [PSCustomObject]@{ ExitCode = 0; Output = '' } } -ModuleName wtw
+            Mock Connect-WtwRemoteWorktree {} -ModuleName wtw
+            Mock Enter-WtwWorktree { throw 'remote init must not enter a local worktree' } -ModuleName wtw
+
+            Invoke-Wtw __cmux_init_current
+
+            Should -Invoke Connect-WtwRemoteWorktree -ModuleName wtw -Times 1 -Exactly -ParameterFilter {
+                $Name -eq 'scoring'
+            }
+            $overridePath = Get-WtwCmuxTabTitleOverridePath -WorkspaceId 'workspace:remote' -SurfaceId 'surface:remote'
+            (Get-Content -LiteralPath $overridePath -Raw) | Should -Be '🖥️🌳 🧊AT 🐇 scoring-system-that-works'
+            Remove-Item -LiteralPath $overridePath -Force -ErrorAction SilentlyContinue
+        } finally {
+            if ($null -eq $oldWorkspaceId) { Remove-Item Env:CMUX_WORKSPACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_WORKSPACE_ID = $oldWorkspaceId }
+            if ($null -eq $oldSurfaceId) { Remove-Item Env:CMUX_SURFACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_SURFACE_ID = $oldSurfaceId }
             if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
             if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
         }

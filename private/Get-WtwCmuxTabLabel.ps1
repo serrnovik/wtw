@@ -61,7 +61,10 @@ function Set-WtwCmuxTabTitleOverride {
         [Parameter(Mandatory)][string] $Title
     )
 
-    $path = Get-WtwCmuxTabTitleOverridePath -WorkspaceId $WorkspaceId -SurfaceId $SurfaceId
+    # Inline the path so this still works after Restore-WtwInstalledModule
+    # invalidates by-name lookup of other private helpers.
+    $safe = ($WorkspaceId + '.' + $SurfaceId) -replace '[^\w:.-]', '_'
+    $path = Join-Path ([System.IO.Path]::GetTempPath()) "wtw-cmux-tab-$safe"
     Set-Content -LiteralPath $path -Value $Title -Encoding utf8 -NoNewline
     return $path
 }
@@ -75,6 +78,7 @@ function Set-WtwCmuxCurrentTabLabel {
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string] $PrettyName,
         $GetTabLabel,
+        $SetOverride,
         $InvokeRawCommand,
         [string] $CmuxBin
     )
@@ -82,7 +86,11 @@ function Set-WtwCmuxCurrentTabLabel {
     if (-not ($PrettyName -and $env:CMUX_WORKSPACE_ID -and $env:CMUX_SURFACE_ID)) { return }
 
     $tabLabel = if ($GetTabLabel) { & $GetTabLabel -PrettyName $PrettyName } else { Get-WtwCmuxTabLabel -PrettyName $PrettyName }
-    Set-WtwCmuxTabTitleOverride -WorkspaceId $env:CMUX_WORKSPACE_ID -SurfaceId $env:CMUX_SURFACE_ID -Title $tabLabel | Out-Null
+    if ($SetOverride) {
+        & $SetOverride -WorkspaceId $env:CMUX_WORKSPACE_ID -SurfaceId $env:CMUX_SURFACE_ID -Title $tabLabel | Out-Null
+    } else {
+        Set-WtwCmuxTabTitleOverride -WorkspaceId $env:CMUX_WORKSPACE_ID -SurfaceId $env:CMUX_SURFACE_ID -Title $tabLabel | Out-Null
+    }
 
     if ($InvokeRawCommand) {
         & $InvokeRawCommand -CmuxBin $CmuxBin -ArgumentList @(

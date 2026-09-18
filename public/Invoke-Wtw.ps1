@@ -43,8 +43,13 @@ function Invoke-Wtw {
     # Newer-version hint. Emitted up front because the dispatch below returns
     # from many branches. Cache-only, silent on failure, and skipped for the
     # internal `__*` commands whose stdout the shell wrappers parse.
-    if ([string]$Command -notlike '__*') {
+    if ([string]$Command -notlike '__*' -and $Command -notin @('--version', '-v', 'version')) {
         Write-WtwUpdateNotice
+    }
+
+    if ($Command -in @('--version', '-v', 'version')) {
+        Show-WtwVersion
+        return
     }
 
     # `wtw --on at` with no subcommand: open the remote machine as a cmux
@@ -112,9 +117,11 @@ function Invoke-Wtw {
         Write-WtwHost '                      Launch AI sandbox (sbx) with workspace folders mounted'
         Write-WtwHost '    host [list|self|add|remove|sync|test]  Manage remote machines for --on'
         Write-WtwHost '    self [--emoji X] [--label X]  This machine''s cmux group badge (🍏SP)'
+        Write-WtwHost '    version           Print the installed module version'
         Write-WtwHost ''
         Write-WtwHost '  Options:' -ForegroundColor Yellow
         Write-WtwHost '    --help, -h        Show this help'
+        Write-WtwHost '    --version, -v     Print the installed module version (alias: wtw version)'
         Write-WtwHost '    --on <host>       Open a worktree that lives on another machine over Remote-SSH.'
         Write-WtwHost '    --at <host>       Alias of --on.'
         Write-WtwHost '                      Shorthand: wtw <host> <editor> <name>'
