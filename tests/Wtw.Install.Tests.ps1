@@ -183,6 +183,31 @@ Describe 'Update-Wtw' {
         }
     }
 
+    It 'does not let --force downgrade to an older Gallery copy' {
+        InModuleScope wtw {
+            Mock Get-WtwInstallInfo { [pscustomobject]@{
+                    Flavour = 'Gallery'; ModuleRoot = (Join-Path $HOME '.wtw/module')
+                    InstallRoot = (Join-Path $HOME '.wtw/module'); Version = [version]'0.2.27'
+                    SourcePath = ''; SourceCommit = ''; InstalledAtUtc = $null
+                    GalleryCopies = @(); ShadowedBy = $null; UpdateCommand = 'wtw update'
+                } }
+            Mock Get-WtwUpdateStatus { [pscustomobject]@{
+                    CurrentVersion = [version]'0.2.27'; LatestVersion = [version]'0.2.26'
+                    UpdateAvailable = $false; Status = 'Available'; CheckedAtUtc = [DateTime]::UtcNow; Source = 'gallery'
+                } } -ParameterFilter { $Force }
+            Mock Test-Path { $true } -ParameterFilter { $LiteralPath -like '*wtw.psm1' }
+            Mock Save-WtwGalleryPackage { }
+            Mock Read-Host { 'y' }
+
+            $output = (Update-Wtw -Force 6>&1 | Out-String)
+
+            $output | Should -Match 'nothing to do'
+            $output | Should -Match 'will not install an older'
+            Should -Invoke Save-WtwGalleryPackage -Times 0 -Exactly
+            Should -Invoke Read-Host -Times 0 -Exactly
+        }
+    }
+
     It 'reports the pending update under --check without downloading it' {
         InModuleScope wtw {
             Mock Get-WtwInstallInfo { [pscustomobject]@{

@@ -192,6 +192,8 @@ _wtw_completion() {
         'host:Manage remote machines for --on'
         'agent:Configure agent profiles'
         'install:Install or update WTW'
+        'update:Update the global install from the PowerShell Gallery'
+        'reload:Re-import WTW in this session'
         'skill:Install the WTW agent skill'
         'sbx:Launch an AI sandbox'
         'run:Run a wtw command on a remote host'

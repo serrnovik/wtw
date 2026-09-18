@@ -1,3 +1,47 @@
+function Get-WtwGalleryLatestVersionText {
+    <#
+    .SYNOPSIS
+        Read the latest published wtw version from the PowerShell Gallery.
+    .DESCRIPTION
+        ``FindPackagesById()?id='wtw'&$filter=IsLatestVersion`` lags behind
+        newly published versions — it kept returning 0.2.26 after 0.2.28 was
+        already ``IsLatestVersion`` on ``Packages()``. Prefer ``Packages()``
+        filtered to the latest package; if that fails, take the max version
+        from the unfiltered ``FindPackagesById`` list.
+    #>
+    [CmdletBinding()]
+    param(
+        [ValidateRange(1, 30)]
+        [int] $TimeoutSec = 5
+    )
+
+    $versionPattern = '<d:Version>(?<version>[^<]+)</d:Version>'
+    $regexOptions = [Text.RegularExpressions.RegexOptions]::CultureInvariant
+
+    $latestUri = "https://www.powershellgallery.com/api/v2/Packages()?`$filter=Id eq 'wtw' and IsLatestVersion eq true"
+    $response = Invoke-WebRequest -Uri $latestUri -TimeoutSec $TimeoutSec -ErrorAction Stop
+    $match = [regex]::Match([string]$response.Content, $versionPattern, $regexOptions)
+    if ($match.Success) {
+        $text = $match.Groups['version'].Value
+        [version]$text | Out-Null
+        return $text
+    }
+
+    $allUri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id='wtw'"
+    $all = Invoke-WebRequest -Uri $allUri -TimeoutSec $TimeoutSec -ErrorAction Stop
+    $parsed = foreach ($hit in [regex]::Matches([string]$all.Content, $versionPattern, $regexOptions)) {
+        $parsedVersion = $null
+        if ([version]::TryParse($hit.Groups['version'].Value, [ref] $parsedVersion)) {
+            $parsedVersion
+        }
+    }
+    $best = @($parsed) | Sort-Object -Descending | Select-Object -First 1
+    if ($null -eq $best) {
+        throw 'The PowerShell Gallery response did not contain a wtw version.'
+    }
+    return $best.ToString()
+}
+
 function Get-WtwUpdateStatus {
     <#
     .SYNOPSIS
@@ -50,18 +94,7 @@ function Get-WtwUpdateStatus {
         $source = 'gallery'
         $status = 'Unavailable'
         try {
-            $uri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id='wtw'&%24filter=IsLatestVersion"
-            $response = Invoke-WebRequest -Uri $uri -TimeoutSec $TimeoutSec -ErrorAction Stop
-            $match = [regex]::Match(
-                [string]$response.Content,
-                '<d:Version>(?<version>[^<]+)</d:Version>',
-                [Text.RegularExpressions.RegexOptions]::CultureInvariant
-            )
-            if (-not $match.Success) {
-                throw 'The PowerShell Gallery response did not contain a wtw version.'
-            }
-            $latestText = $match.Groups['version'].Value
-            [version]$latestText | Out-Null
+            $latestText = Get-WtwGalleryLatestVersionText -TimeoutSec $TimeoutSec
             $status = 'Available'
         } catch {
             # Offline is normal. The failed attempt is cached below so wtw does

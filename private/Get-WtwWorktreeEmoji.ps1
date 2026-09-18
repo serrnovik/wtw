@@ -240,28 +240,36 @@ function Format-WtwWorktreeDisplayName {
         $base = $TaskName
     }
 
-    if (-not $WorktreeEmoji) {
-        if (-not [string]::IsNullOrWhiteSpace($Name)) { return $Name }
-        return $base
-    }
-
     $repoCompact = if ($PSBoundParameters.ContainsKey('RepoEmoji')) {
         Get-WtwCompactRepoEmoji -Emoji $RepoEmoji
     } else {
         Get-WtwCompactRepoEmoji -RepoEntry $RepoEntry
     }
 
-    $prefix = if ($repoCompact) { "$repoCompact$WorktreeEmoji " } else { "$WorktreeEmoji " }
-    if (-not [string]::IsNullOrWhiteSpace($base) -and $base.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
-        return $base
+    $prefix = if ($WorktreeEmoji) {
+        if ($repoCompact) { "$repoCompact$WorktreeEmoji " } else { "$WorktreeEmoji " }
+    } else {
+        $null
     }
-    if ($repoCompact -and -not [string]::IsNullOrWhiteSpace($base)) {
+
+    $remainder = $base
+    if ($prefix -and -not [string]::IsNullOrWhiteSpace($base) -and $base.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
+        $remainder = $base.Substring($prefix.Length)
+    } elseif ($WorktreeEmoji -and $repoCompact -and -not [string]::IsNullOrWhiteSpace($base)) {
         $tight = "$repoCompact$WorktreeEmoji"
         if ($base.StartsWith($tight, [System.StringComparison]::Ordinal)) {
-            return $base
+            $remainder = $base.Substring($tight.Length).TrimStart()
         }
     }
 
-    if ([string]::IsNullOrWhiteSpace($base)) { return $prefix.TrimEnd() }
-    return "$prefix$base"
+    $remainder = ConvertTo-WtwHumanizedLabel -Name $remainder -Slug $TaskName
+
+    if (-not $WorktreeEmoji) {
+        if (-not [string]::IsNullOrWhiteSpace($remainder)) { return $remainder }
+        if (-not [string]::IsNullOrWhiteSpace($Name)) { return $Name }
+        return $base
+    }
+
+    if ([string]::IsNullOrWhiteSpace($remainder)) { return $prefix.TrimEnd() }
+    return "$prefix$remainder"
 }
