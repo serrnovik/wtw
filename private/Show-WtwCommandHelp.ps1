@@ -174,8 +174,13 @@ function Show-WtwCommandHelp {
             '  wtw clean --branches --dry-run',
             '  wtw clean --all --force'
         ) }
+        'self'        { @(
+            'wtw self [--emoji <char>] [--label <short>]',
+            'Alias of `wtw host self`. Sets this machine''s cmux group badge',
+            '(🍏SP in 🍏SP/🎸 snowmain1). Omit both flags to print the current badge.'
+        ) }
         'host'        { @(
-            'wtw host [list|show|discover|add|remove|sync|trust|test] [name] [options]',
+            'wtw host [list|self|show|discover|add|remove|sync|trust|test] [name] [options]',
             'Manage the remote machines `wtw --on <host>` can open worktrees on.',
             '',
             'Hosts live in ~/.wtw/config.json and are mirrored into ~/.ssh/config.d/wtw,',
@@ -183,7 +188,10 @@ function Show-WtwCommandHelp {
             'client rather than through wtw.',
             '',
             'Subcommands:',
-            '  list              One line per host: active address, transport, ssh status',
+            '  list              This machine''s cmux badge, then one line per remote host',
+            '  self              Local machine badge for cmux groups (🍏SP/🎸 snowmain1)',
+            '                    --emoji <char> and --label <short>; omit both to show',
+            '                    Alias: wtw self',
             '  show [name]       Full config: every candidate, its transport and whether',
             '                    it is up, which one is active, and ssh-config conflicts',
             '  discover          Register machines found on your tailnet (Tailscale)',
@@ -246,6 +254,11 @@ function Show-WtwCommandHelp {
                 'SSH tabs (🌴 wtw + pwsh), the same session as `wtw --on <host> go [name]`.',
                 'Further 🌴 wtw / pwsh actions in that workspace SSH to the same target.',
                 'Omit the name to land in the remote home directory.',
+                '',
+                'Each open lands in a cmux sidebar group per machine/project:',
+                '  🍏SP/🎸 snowmain1          local snowmain1 worktrees',
+                '  🧊AT/🎭 kulissa-landing   remote AT worktrees in that repo',
+                'Set this machine''s badge with `wtw host self --emoji 🍏 --label SP`.',
                 '',
                 'Each configured host is also registered as a cmux Command Palette /',
                 'sidebar project (`wtw remote: <host>`). `wtw --on <host>` with no',

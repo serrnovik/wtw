@@ -33,3 +33,78 @@ function Get-WtwCmuxTabLabel {
 
     return "$Icon $name"
 }
+
+function Get-WtwCmuxTabTitleOverridePath {
+    <#
+    .SYNOPSIS
+        Temp file the cmux ``agent-action.ps1`` title guard reads instead of 🌴 wtw.
+    .DESCRIPTION
+        The Command Palette / tab-bar launcher starts a job that re-applies its
+        action title for several seconds. wtw writes the real tab label here so
+        that guard keeps the worktree name instead of stomping it back to 🌴.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $SurfaceId
+    )
+
+    $safe = ($WorkspaceId + '.' + $SurfaceId) -replace '[^\w:.-]', '_'
+    return Join-Path ([System.IO.Path]::GetTempPath()) "wtw-cmux-tab-$safe"
+}
+
+function Set-WtwCmuxTabTitleOverride {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $SurfaceId,
+        [Parameter(Mandatory)][string] $Title
+    )
+
+    $path = Get-WtwCmuxTabTitleOverridePath -WorkspaceId $WorkspaceId -SurfaceId $SurfaceId
+    Set-Content -LiteralPath $path -Value $Title -Encoding utf8 -NoNewline
+    return $path
+}
+
+function Set-WtwCmuxCurrentTabLabel {
+    <#
+    .SYNOPSIS
+        Rename the current cmux surface and pin that title for the action-tab guard.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string] $PrettyName,
+        $GetTabLabel,
+        $InvokeRawCommand,
+        [string] $CmuxBin
+    )
+
+    if (-not ($PrettyName -and $env:CMUX_WORKSPACE_ID -and $env:CMUX_SURFACE_ID)) { return }
+
+    $tabLabel = if ($GetTabLabel) { & $GetTabLabel -PrettyName $PrettyName } else { Get-WtwCmuxTabLabel -PrettyName $PrettyName }
+    Set-WtwCmuxTabTitleOverride -WorkspaceId $env:CMUX_WORKSPACE_ID -SurfaceId $env:CMUX_SURFACE_ID -Title $tabLabel | Out-Null
+
+    if ($InvokeRawCommand) {
+        & $InvokeRawCommand -CmuxBin $CmuxBin -ArgumentList @(
+            'rename-tab',
+            '--workspace', $env:CMUX_WORKSPACE_ID,
+            '--surface', $env:CMUX_SURFACE_ID,
+            $tabLabel
+        ) | Out-Null
+    }
+}
+
+function Get-WtwCmuxRemoteSessionPrettyName {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Remote)
+
+    $workspace = Get-WtwCmuxCurrentWorkspaceObject
+    if ($workspace) {
+        $fromWorkspace = Get-WtwCmuxWorkspaceName -Workspace $workspace
+        if ($fromWorkspace) { return $fromWorkspace }
+    }
+
+    $prefix = Get-WtwHostTitlePrefix -HostEntry $Remote.HostEntry
+    if ($Remote.Name) { return "$prefix$($Remote.Name)" }
+    return "$prefix$($Remote.HostSelector)"
+}

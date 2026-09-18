@@ -40,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'Remote cmux workspaces open two SSH tabs (🌴 wtw + pwsh) and stamp WTW_REMOTE_HOST / WTW_REMOTE_NAME so Command Palette 🌴 wtw and pwsh in that workspace SSH into the same remote project instead of opening a local shell. `wtw list -f/--filter` keeps repos and worktrees whose name, alias, task, or pretty name contains the substring. Host output follows shell-theme / AGENT_SHELL_THEME. Install, update, and Gallery publish rewrite wtw.zsh/wtw.bash to LF.'
+            ReleaseNotes = 'wtw cmux places each workspace in a cmux sidebar group per machine/project (🍏SP/🎸 snowmain1, 🧊AT/🎭 kulissa-landing). Set this machine''s badge with `wtw host self --emoji --label` (alias: `wtw self`). Remote cmux workspaces open two SSH tabs (🌴 wtw + pwsh) and stamp WTW_REMOTE_HOST / WTW_REMOTE_NAME so Command Palette 🌴 wtw and pwsh SSH into the same remote project. The 🌴 wtw title guard keeps the worktree tab name (🖥️🌳 …) instead of snapping back to 🌴 wtw. `wtw list -f/--filter` keeps matching repos and worktrees. Host output follows shell-theme. Install/update/publish rewrite wtw.zsh/wtw.bash to LF.'
         }
     }
 }

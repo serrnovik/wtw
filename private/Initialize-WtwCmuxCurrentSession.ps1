@@ -14,6 +14,11 @@ function Initialize-WtwCmuxCurrentSession {
 
     $remote = Get-WtwCmuxCurrentRemoteSession
     if ($remote) {
+        Set-WtwCmuxCurrentTabLabel `
+            -PrettyName (Get-WtwCmuxRemoteSessionPrettyName -Remote $remote) `
+            -GetTabLabel (Get-Command Get-WtwCmuxTabLabel -ErrorAction SilentlyContinue) `
+            -InvokeRawCommand (Get-Command Invoke-WtwCmuxRawCommand -ErrorAction SilentlyContinue) `
+            -CmuxBin (Get-WtwCmuxBin)
         if ($ApplyTerminalSession) {
             Connect-WtwRemoteWorktree -HostEntry $remote.HostEntry -Name $remote.Name
         }
@@ -59,11 +64,14 @@ function Initialize-WtwCmuxCurrentSession {
             & $invokeRawCommand -CmuxBin $cmuxBin -ArgumentList @('set-status', 'wtw', $statusValue, '--workspace', $env:CMUX_WORKSPACE_ID, '--icon', 'git-branch', '--color', ($color ?? '#7A4FD8'), '--priority', '90') | Out-Null
         }
     }
-    if ($env:CMUX_SURFACE_ID -and $prettyName -and $invokeRawCommand) {
+    if ($env:CMUX_SURFACE_ID -and $prettyName) {
         # Tab label gets the console+tree wtw icon prefix; the workspace title (above)
-        # stays as the bare pretty name for the sidebar/switcher. Invoke via the
-        # pre-captured command so it survives the Restore-WtwInstalledModule re-import.
-        $tabLabel = if ($getTabLabel) { & $getTabLabel -PrettyName $prettyName } else { $prettyName }
-        & $invokeRawCommand -CmuxBin $cmuxBin -ArgumentList @('rename-tab', '--workspace', $env:CMUX_WORKSPACE_ID, '--surface', $env:CMUX_SURFACE_ID, $tabLabel) | Out-Null
+        # stays as the bare pretty name for the sidebar/switcher. Also pin the label
+        # so agent-action.ps1's title guard cannot stomp it back to 🌴 wtw.
+        Set-WtwCmuxCurrentTabLabel `
+            -PrettyName $prettyName `
+            -GetTabLabel $getTabLabel `
+            -InvokeRawCommand $invokeRawCommand `
+            -CmuxBin $cmuxBin
     }
 }

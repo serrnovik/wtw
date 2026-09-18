@@ -882,14 +882,23 @@ Describe 'cmux remote status and current-session helpers' {
 
     It 'SSHs from __cmux_init_current when the workspace is remote' {
         $oldWorkspaceId = $env:CMUX_WORKSPACE_ID
+        $oldSurfaceId = $env:CMUX_SURFACE_ID
         $oldHost = $env:WTW_REMOTE_HOST
         $oldName = $env:WTW_REMOTE_NAME
         try {
             $env:CMUX_WORKSPACE_ID = 'workspace:remote'
+            $env:CMUX_SURFACE_ID = 'surface:remote'
             $env:WTW_REMOTE_HOST = 'at'
             $env:WTW_REMOTE_NAME = 'scoring'
             InModuleScope wtw {
-                Mock Resolve-WtwHost { @{ Name = 'arctictroll'; User = 'sno' } }
+                Mock Resolve-WtwHost {
+                    @{ Name = 'arctictroll'; User = 'sno'; Emoji = '🧊'; Label = 'AT'; Separator = ' ' }
+                }
+                Mock Get-WtwCmuxCurrentWorkspaceObject {
+                    [PSCustomObject]@{ name = '🧊AT 🐇 scoring-system-that-works' }
+                }
+                Mock Get-WtwCmuxBin { 'cmux' }
+                Mock Invoke-WtwCmuxRawCommand { [PSCustomObject]@{ ExitCode = 0; Output = '' } }
                 Mock Connect-WtwRemoteWorktree {}
                 Mock Enter-WtwWorktree { throw 'remote init must not enter a local worktree' }
 
@@ -898,9 +907,13 @@ Describe 'cmux remote status and current-session helpers' {
                 Should -Invoke Connect-WtwRemoteWorktree -Times 1 -Exactly -ParameterFilter {
                     $Name -eq 'scoring'
                 }
+                Should -Invoke Invoke-WtwCmuxRawCommand -Times 1 -Exactly -ParameterFilter {
+                    ($ArgumentList -join ' ') -eq 'rename-tab --workspace workspace:remote --surface surface:remote 🖥️🌳 🧊AT 🐇 scoring-system-that-works'
+                }
             }
         } finally {
             if ($null -eq $oldWorkspaceId) { Remove-Item Env:CMUX_WORKSPACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_WORKSPACE_ID = $oldWorkspaceId }
+            if ($null -eq $oldSurfaceId) { Remove-Item Env:CMUX_SURFACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_SURFACE_ID = $oldSurfaceId }
             if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
             if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
         }

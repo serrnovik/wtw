@@ -313,6 +313,13 @@ Command Palette / sidebar), registered on `wtw host add` / `sync` / `discover`
 and when you open a remote cmux tab. Picking that project starts the same
 two-tab SSH layout for that machine. `wtw --on at` with no subcommand opens it.
 
+`wtw cmux` (local or `--on`) puts the tab in a cmux sidebar **group per
+machine/project**: `🍏SP/🎸 snowmain1` for every local snowmain1 worktree,
+`🧊AT/🎭 kulissa-landing` for AT worktrees in that repo. The header is a
+generated group workspace, not the first tab — closing a worktree does not
+rename the group. Set this Mac/PC badge with `wtw host self --emoji 🍏 --label SP`
+(or `wtw self`).
+
 The built-in cmux **+ new terminal** button still uses Ghostty's local default
 shell. Use 🌴 wtw or pwsh in a remote workspace when you want another SSH tab.
 
@@ -878,7 +885,11 @@ them and `wtw remove` cleans that registration up:
   `cmux new-workspace --name <pretty> --cwd <path>`. Main-repo titles include
   the repo `--emoji` when set; worktrees compose repo + worktree glyphs.
   `wtw --on <host> cmux [name]` opens a local cmux
-  workspace whose terminal is `wtw --on <host> go [name]`. `wtw create`
+  workspace whose terminal is `wtw --on <host> go [name]`. Both local and
+  remote opens place the tab in a sidebar group named
+  `<machine-badge>/<repo>` (for example `🍏SP/🎸 snowmain1`).
+  `wtw host self --emoji --label` sets this machine's badge.
+  `wtw create`
   registers a Command-Palette workspace entry in `~/.config/cmux/cmux.json`,
   and `wtw remove` cleans that entry up. Inside cmux terminals, the `wtw.bash` /
   `wtw.zsh` shell init stamps the worktree's pretty name, color, and a

@@ -305,6 +305,9 @@ function Open-WtwCmuxWorkspace {
         -RepoName $Target.RepoName `
         -TaskName $Target.TaskName | Out-Null
 
+    $groupSpec = Get-WtwCmuxLocalWorkspaceGroupSpec -Target $Target
+    $group = Ensure-WtwCmuxWorkspaceGroup -Spec $groupSpec
+
     $existing = Find-WtwCmuxWorkspace -ProjectPath $fullDir -PrettyName $prettyName
     if ($existing) {
         $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $existing
@@ -318,7 +321,8 @@ function Open-WtwCmuxWorkspace {
                     -StatusValue $statusValue `
                     -CurrentName (Get-WtwCmuxWorkspaceName -Workspace $existing) `
                     -CurrentColor (Get-WtwCmuxObjectValue -Object $existing -Names @('color', 'workspace.color', 'sidebar.color', 'sidebarState.color'))
-                Write-WtwHost "  cmux: selected workspace '$prettyName'" -ForegroundColor Green
+                Add-WtwCmuxWorkspaceToGroup -Group $group -WorkspaceRef "$workspaceRef"
+                Write-WtwHost "  cmux: selected workspace '$prettyName' ($($groupSpec.Name))" -ForegroundColor Green
                 return
             }
         }
@@ -334,7 +338,12 @@ function Open-WtwCmuxWorkspace {
     if ($statusValue) {
         $cmuxArgs += @('--description', "wtw: $statusValue")
     }
+    $cmuxArgs += @(Get-WtwCmuxNewWorkspaceGroupArgs -Group $group)
     $createResult = Invoke-WtwCmuxCommand -ArgumentList $cmuxArgs
+    if ($createResult.ExitCode -ne 0 -and $group) {
+        $withoutGroup = @($cmuxArgs | Where-Object { $_ -notin @('--group', $group.Ref) })
+        $createResult = Invoke-WtwCmuxCommand -ArgumentList $withoutGroup
+    }
     if ($createResult.ExitCode -ne 0) {
         $appleScriptInit = Get-WtwCmuxLocalAppleScriptInitCommand -ProjectPath $fullDir
         if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $fullDir -PrettyName $prettyName -InitCommand $appleScriptInit) {
@@ -371,5 +380,6 @@ function Open-WtwCmuxWorkspace {
     }
 
     Set-WtwCmuxWorkspaceMetadata -WorkspaceRef "$workspaceRef" -PrettyName $prettyName -Color $color -StatusValue $statusValue -CurrentName $prettyName -CurrentColor $null
-    Write-WtwHost "  Opening in cmux: $fullDir" -ForegroundColor Green
+    Add-WtwCmuxWorkspaceToGroup -Group $group -WorkspaceRef "$workspaceRef"
+    Write-WtwHost "  Opening in cmux: $fullDir ($($groupSpec.Name))" -ForegroundColor Green
 }

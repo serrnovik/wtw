@@ -110,7 +110,8 @@ function Invoke-Wtw {
         Write-WtwHost '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
         Write-WtwHost '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
         Write-WtwHost '                      Launch AI sandbox (sbx) with workspace folders mounted'
-        Write-WtwHost '    host [list|add|remove|sync|test]  Manage remote machines for --on'
+        Write-WtwHost '    host [list|self|add|remove|sync|test]  Manage remote machines for --on'
+        Write-WtwHost '    self [--emoji X] [--label X]  This machine''s cmux group badge (🍏SP)'
         Write-WtwHost ''
         Write-WtwHost '  Options:' -ForegroundColor Yellow
         Write-WtwHost '    --help, -h        Show this help'
@@ -399,6 +400,10 @@ function Invoke-Wtw {
             if ($pos.Count -gt 1) { $splat['Name'] = $pos[1] }
             Invoke-WtwHost @splat
         }
+        'self'      {
+            $splat['Action'] = 'self'
+            Invoke-WtwHost @splat
+        }
         'agent'     { Invoke-WtwAgent @rawArgs }
         'install'   { Install-Wtw @splat }
         # `update` is no longer an alias of `install`. Install copies a checkout
@@ -476,6 +481,7 @@ function Invoke-Wtw {
                 title      = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
                 prettyName = if ($display) { $display.PrettyName } else { $null }
                 repo       = $target.RepoName
+                repoEmoji  = (Get-WtwRepoEmoji -RepoEntry $target.RepoEntry)
                 task       = $target.TaskName
             } | ConvertTo-Json -Compress -Depth 5 | Write-Output
         }

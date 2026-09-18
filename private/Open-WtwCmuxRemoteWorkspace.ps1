@@ -382,6 +382,8 @@ function Resolve-WtwCmuxRemoteSession {
     $label = $HostSelector
     $color = $null
     $remotePath = $null
+    $repoName = $null
+    $repoEmoji = $null
 
     if ($Name) {
         $remote = Get-WtwRemoteTarget -HostEntry $HostEntry -Name $Name
@@ -393,6 +395,8 @@ function Resolve-WtwCmuxRemoteSession {
         $label = if ($remote.PrettyName) { $remote.PrettyName }
         elseif ($remote.Title) { $remote.Title }
         else { $Name }
+        $repoName = Get-WtwPropertyValue -Object $remote -Name 'Repo'
+        $repoEmoji = Get-WtwPropertyValue -Object $remote -Name 'RepoEmoji'
     }
 
     $inner = Get-WtwCmuxRemoteGoInnerCommand -HostSelector $HostSelector -Name $Name -Via $Via
@@ -406,6 +410,8 @@ function Resolve-WtwCmuxRemoteSession {
         RemotePath        = $remotePath
         HostSelector      = $HostSelector
         Name              = $Name
+        RepoName          = $repoName
+        RepoEmoji         = $repoEmoji
     }
 }
 
@@ -509,6 +515,9 @@ function Open-WtwCmuxRemoteWorkspace {
     # still creates the live auth tab; the host project stays `wtw --on at go`.
     Register-WtwCmuxRemoteProject -HostEntry $HostEntry -HostSelector $HostSelector | Out-Null
 
+    $groupSpec = Get-WtwCmuxRemoteWorkspaceGroupSpec -HostEntry $HostEntry -Session $session
+    $group = Ensure-WtwCmuxWorkspaceGroup -Spec $groupSpec
+
     $existing = Find-WtwCmuxRemoteWorkspace -PrettyName $session.PrettyName -StatusValue $session.StatusValue
     if ($existing) {
         $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $existing
@@ -522,7 +531,8 @@ function Open-WtwCmuxRemoteWorkspace {
                     -StatusValue $session.StatusValue `
                     -CurrentName (Get-WtwCmuxWorkspaceName -Workspace $existing) `
                     -CurrentColor (Get-WtwCmuxObjectValue -Object $existing -Names @('color', 'workspace.color', 'sidebar.color', 'sidebarState.color'))
-                Write-WtwHost "  cmux: selected remote workspace '$($session.PrettyName)'" -ForegroundColor Green
+                Add-WtwCmuxWorkspaceToGroup -Group $group -WorkspaceRef "$workspaceRef"
+                Write-WtwHost "  cmux: selected remote workspace '$($session.PrettyName)' ($($groupSpec.Name))" -ForegroundColor Green
                 return
             }
         }
@@ -538,6 +548,9 @@ function Open-WtwCmuxRemoteWorkspace {
             '--focus', 'true',
             '--description', $session.StatusValue
         )) {
+        [void]$cmuxArgs.Add($part)
+    }
+    foreach ($part in @(Get-WtwCmuxNewWorkspaceGroupArgs -Group $group)) {
         [void]$cmuxArgs.Add($part)
     }
     Add-WtwCmuxRemoteWorkspaceEnvArgs -ArgumentList $cmuxArgs -HostSelector $HostSelector -Name $Name
@@ -556,9 +569,20 @@ function Open-WtwCmuxRemoteWorkspace {
             )) {
             [void]$fallbackArgs.Add($part)
         }
+        foreach ($part in @(Get-WtwCmuxNewWorkspaceGroupArgs -Group $group)) {
+            [void]$fallbackArgs.Add($part)
+        }
         Add-WtwCmuxRemoteWorkspaceEnvArgs -ArgumentList $fallbackArgs -HostSelector $HostSelector -Name $Name
         $createResult = Invoke-WtwCmuxCommand -ArgumentList @($fallbackArgs)
         $usedSingleCommand = $true
+    }
+    if ($createResult.ExitCode -ne 0 -and $group) {
+        $plainArgs = [System.Collections.Generic.List[string]]::new()
+        foreach ($part in $cmuxArgs) {
+            if ($part -in @('--group', $group.Ref)) { continue }
+            [void]$plainArgs.Add($part)
+        }
+        $createResult = Invoke-WtwCmuxCommand -ArgumentList @($plainArgs)
     }
     if ($createResult.ExitCode -ne 0) {
         if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $localCwd -PrettyName $session.PrettyName -InitCommand $session.ShellInitCommand -MatchByNameOnly) {
@@ -601,6 +625,8 @@ function Open-WtwCmuxRemoteWorkspace {
         Add-WtwCmuxRemoteShellSurface -WorkspaceRef $workspaceRef -Command $session.Command
     }
 
+    Add-WtwCmuxWorkspaceToGroup -Group $group -WorkspaceRef "$workspaceRef"
+
     $where = if ($session.RemotePath) { $session.RemotePath } else { $HostEntry.Name }
-    Write-WtwHost "  cmux: remote session '$($session.PrettyName)' → $where" -ForegroundColor Green
+    Write-WtwHost "  cmux: remote session '$($session.PrettyName)' → $where ($($groupSpec.Name))" -ForegroundColor Green
 }

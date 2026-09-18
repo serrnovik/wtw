@@ -350,6 +350,8 @@ function Get-WtwRemoteTarget {
                     Color      = Get-WtwPropertyValue -Object $parsed -Name 'color'
                     Title      = Get-WtwPropertyValue -Object $parsed -Name 'title'
                     PrettyName = Get-WtwPropertyValue -Object $parsed -Name 'prettyName'
+                    Repo       = Get-WtwPropertyValue -Object $parsed -Name 'repo'
+                    RepoEmoji  = Get-WtwPropertyValue -Object $parsed -Name 'repoEmoji'
                 }
             } catch {
                 Write-Verbose "Remote __resolve_json returned unparseable JSON: $json"
@@ -384,5 +386,7 @@ function Get-WtwRemoteTarget {
         Color      = if ($fields.Count -gt 1) { $fields[1] } else { $null }
         Title      = if ($fields.Count -gt 2) { $fields[2] } else { $null }
         PrettyName = $null
+        Repo       = $null
+        RepoEmoji  = $null
     }
 }

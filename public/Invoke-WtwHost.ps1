@@ -8,7 +8,8 @@ function Invoke-WtwHost {
         hosts through the ssh client, not through wtw — can see them too.
 
         Subcommands:
-          list                     Show configured hosts and their ssh status
+          list                     Show this machine's badge and configured hosts
+          self [--emoji] [--label] Local machine badge for cmux groups (🍏SP)
           discover [--yes] [--exclude a,b]  Find tailnet machines and register them
           add <name> [options]     Add or update a host, then sync ssh config
           remove <name>            Drop a host, then sync ssh config
@@ -65,14 +66,16 @@ function Invoke-WtwHost {
     switch ($Action.ToLowerInvariant()) {
         'list' {
             $hosts = Get-WtwHosts
+            $self = Get-WtwSelfIdentity
+            Write-WtwHost ''
+            Write-WtwHost "  this machine  $($self.Badge)" -ForegroundColor Green -NoNewline
+            Write-WtwHost '   wtw host self --emoji --label' -ForegroundColor DarkGray
             if ($hosts.Count -eq 0) {
-                Write-WtwHost ''
                 Write-WtwHost '  No remote hosts configured.' -ForegroundColor Yellow
                 Write-WtwHost '  Add one:  wtw host add workstation --alias at --user dev --address 192.168.1.10 --platform windows' -ForegroundColor DarkGray
                 Write-WtwHost ''
                 return
             }
-            Write-WtwHost ''
             $ztPrefixes = Get-WtwZeroTierPrefixes
             foreach ($h in ($hosts | Sort-Object { $_.Name })) {
                 $aliases = if (@($h.Aliases).Count -gt 0) { " (" + (@($h.Aliases) -join ', ') + ")" } else { '' }
@@ -103,6 +106,19 @@ function Invoke-WtwHost {
             Write-WtwHost ''
             Write-WtwHost '  Details: wtw host show [name]' -ForegroundColor DarkGray
             Write-WtwHost ''
+        }
+
+        'self' {
+            if ($PSBoundParameters.ContainsKey('Emoji') -or $PSBoundParameters.ContainsKey('Label')) {
+                if ($PSBoundParameters.ContainsKey('Emoji') -and -not (Test-WtwEmojiArgument -Emoji $Emoji)) {
+                    return
+                }
+                $setArgs = @{}
+                if ($PSBoundParameters.ContainsKey('Emoji')) { $setArgs['Emoji'] = $Emoji }
+                if ($PSBoundParameters.ContainsKey('Label')) { $setArgs['Label'] = $Label }
+                Set-WtwSelfIdentity @setArgs | Out-Null
+            }
+            Show-WtwSelfIdentity
         }
 
         'add' {
@@ -501,7 +517,7 @@ function Invoke-WtwHost {
         }
 
         default {
-            Write-Error "Unknown host action '$Action'. Use: list, discover, add, remove, sync, trust, test."
+            Write-Error "Unknown host action '$Action'. Use: list, self, discover, add, remove, sync, trust, test."
         }
     }
 }
