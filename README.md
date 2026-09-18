@@ -128,6 +128,29 @@ and the subcommands whose output the shell wrappers parse — and when
 `WTW_NO_UPDATE_NOTICE=1` is set. `Get-WtwUpdateStatus` reports the same
 comparison on demand.
 
+### Stale session (imported older than installed)
+
+PowerShell keeps the functions from `Import-Module` in memory. After `wtw
+update`, `wtw install`, or an overwrite of `~/.wtw/module` in another window,
+this shell can still be running the previous copy — `(Get-Module wtw).Version`
+is often `0.0` because the profile imports `wtw.psm1` by path, so that is not a
+reliable signal.
+
+On the next ordinary `wtw` command, wtw compares the manifest version it
+snapshotted at import with the files next to that module. If the on-disk copy
+is newer, it `Import-Module -Force`s that path and re-runs the command you
+typed. A session that imported a **checkout** older than `~/.wtw/module` is not
+switched automatically (that would surprise local wtw development); it prints
+`wtw reload` once instead.
+
+```text
+wtw reload          # re-import the copy this session should be running
+wtw reload --check  # loaded vs this copy vs ~/.wtw/module, change nothing
+```
+
+`WTW_NO_SESSION_RELOAD=1` skips the automatic check. `WTW_USE_REPO_MODULE=1`
+keeps a checkout loaded (same as after `wtw go` session scripts).
+
 ## Quick Start
 
 ### 1. Register your repos
@@ -221,6 +244,7 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 | `wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]` | Clean stale AI / detached worktrees and leftover merged local branches |
 | `wtw install [--skip-profile]` | Install this checkout globally to `~/.wtw/module/` |
 | `wtw update [--check] [--yes] [--force]` | Update the global install to the latest PowerShell Gallery release |
+| `wtw reload [--check]` | Re-import the installed (or current) module in this session |
 | `wtw skill [--agent claude\|agents\|all]` | Install AI skill into current repo for agent support |
 | `wtw host [list\|discover\|add\|remove\|sync\|trust\|test]` | Manage remote machines for `--on` |
 | `wtw --on <host> <editor> <name>` | Open a worktree that lives on another machine (see [Remote worktrees](#remote-worktrees)) |
@@ -876,7 +900,9 @@ them and `wtw remove` cleans that registration up:
   The same prefix is reused for cmux / wmux / T3 / ChatGPT main-checkout titles
   and `wtw list`. Worktrees get a deterministic identity emoji from the task
   name (override with `--emoji`); titles compose as `🎸🦔 auth` with no space
-  between the two glyphs. The main checkout stays repo-only.
+  between the two glyphs, using the form name (not an alias). Derived slugs
+  such as `NTB-real-dogfood` display as `NTB real dogfood`; a custom `--name`
+  is left as typed. The main checkout stays repo-only.
   Before every write, wtw copies `preference.json` into `~/.wtw/backups/sourcegit/`
   (last 3 copies plus one snapshot each at 3 / 7 / 30 days). The same rotating
   backup is used for cmux, Codex, Claude, Cursor, and T3 configs wtw edits.
@@ -897,12 +923,19 @@ them and `wtw remove` cleans that registration up:
   this is a no-op when the cmux CLI is not installed.
 - **wmux** — `wtw wmux <name>` (alias `wtw wm <name>`) on Windows selects an
   existing [wmux](https://github.com/amirlehmam/wmux) workspace for the
-  worktree's path (cwd first, then title — so a repo-emoji rename does not
-  duplicate the tab), or creates one via
+  worktree's path (cwd first, then title — so a title/emoji rename does not
+  duplicate the tab), **renames** it to the composed pretty title, and
+  **selects** it so the tab is visible. Otherwise it creates one via
   `wmux new-workspace --title <pretty> --cwd <path> --shell pwsh` (starting wmux
   if it isn't running — this is the only command that launches the app).
-  Main-repo titles include the repo `--emoji` when set; worktrees compose
-  repo + worktree glyphs.
+  Main-repo titles use the registry key plus the optional repo `--emoji`
+  (`🎸 snowmain`); worktrees compose `{repoEmoji}{worktreeEmoji} {form name}`
+  (`🎸🐕 NTB real dogfood`). Derived slugs get `-` / `_` turned into spaces
+  unless you passed a custom `--name`. Packaged Electron rejects jax/pnpm
+  `NODE_OPTIONS`; wtw clears that for CLI and GUI launch and strips the
+  leftover log line so JSON parsing and `$LASTEXITCODE` stay clean. Native
+  Windows pwsh also strips Windows Terminal `WSLENV` for the CLI — wmux.js
+  otherwise assumes WSL and fails `ping` while the GUI is already running.
   `wtw create` / `wtw add` create the live workspace only when wmux is already
   open; otherwise they skip and print `wtw wmux <name>`. `wtw remove` closes it.
   wmux workspaces are live (daemon-backed) rather than a static config registry,
