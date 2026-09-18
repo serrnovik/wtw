@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.35'
+    ModuleVersion     = '0.2.36'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -40,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'wtw --version / -v / version prints the running module version. 🌴 wtw tab labels survive snowmain session re-import of ~/.wtw (Set-WtwCmuxCurrentTabLabel is captured before Restore-WtwInstalledModule). wtw cmux places each workspace in a cmux sidebar group per machine/project (🍏SP/🎸 snowmain1). Set this machine''s badge with `wtw host self --emoji --label` (alias: `wtw self`). Remote cmux workspaces open two SSH tabs (🌴 wtw + pwsh). `wtw list -f/--filter` keeps matching repos and worktrees. Install/update/publish rewrite wtw.zsh/wtw.bash to LF.'
+            ReleaseNotes = '`wtw cmux` no longer moves the caller tab (e.g. snowmain) into a new remote group such as 🧊AT/🛏️ chezmoi — it identifies the created workspace by title/description instead of `cmux current-workspace`. `wtw update` finishes after reloading ~/.wtw. wtw --version / -v / version prints the running module version.'
         }
     }
 }

@@ -244,14 +244,24 @@ Describe 'Open-WtwCmuxWorkspace' {
     }
 
     It 'creates a named cwd workspace when none is already open' {
+        $expectedTitle = Get-WtwExpectedWorktreeTitle -PrettyName 'Green Feature' -TaskName 'green'
         Mock Invoke-WtwCmuxCommand {
             $script:cmuxCalls.Add(($ArgumentList -join ' '))
             $command = $ArgumentList -join ' '
             if ($command -eq 'list-workspaces --json') {
-                return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+                if ($script:cmuxCalls | Where-Object { $_ -like 'new-workspace *' }) {
+                    $cwd = $script:projectPath.Replace('\', '\\')
+                    return [PSCustomObject]@{
+                        ExitCode = 0
+                        Output   = @"
+{ "workspaces": [ { "ref": "workspace:4", "title": "$expectedTitle", "current_directory": "$cwd", "description": "wtw: repo/green" } ] }
+"@
+                    }
+                }
+                return [PSCustomObject]@{ ExitCode = 0; Output = '{ "workspaces": [] }' }
             }
             if ($command -eq 'current-workspace') {
-                return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:4' }
+                return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:1' }
             }
             return [PSCustomObject]@{ ExitCode = 0; Output = '' }
         } -ModuleName wtw
@@ -269,7 +279,6 @@ Describe 'Open-WtwCmuxWorkspace' {
 
         Open-WtwCmuxWorkspace -Target $target
 
-        $expectedTitle = Get-WtwExpectedWorktreeTitle -PrettyName 'Green Feature' -TaskName 'green'
         $script:cmuxCalls | Should -Contain "new-workspace --name $expectedTitle --cwd $script:projectPath --command pwsh -NoLogo -NoExit -Command `"Clear-Host; wtw __cmux_init_current`" --focus true --description wtw: repo/green"
         ($script:cmuxCalls | Where-Object { $_ -eq "workspace-action --workspace workspace:4 --action rename --title $expectedTitle" }).Count | Should -Be 0
         $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:4 --action set-color --color #228833'

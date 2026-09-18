@@ -129,6 +129,7 @@ function Update-Wtw {
         return
     }
 
+    $finishedInLoadedModule = $false
     try {
         if (Install-WtwStagedModule -StagedRoot $staged -InstallRoot $installRoot) {
             Write-WtwInstallRecord -InstallRoot $installRoot -Origin 'Gallery' -Version $status.LatestVersion
@@ -136,12 +137,24 @@ function Update-Wtw {
             $modulePath = Join-Path $installRoot 'wtw.psm1'
             if (Test-Path -LiteralPath $modulePath) {
                 Import-Module $modulePath -Global -Force -DisableNameChecking -Verbose:$false -Debug:$false 1>$null 4>$null 5>$null 6>$null
-                Write-WtwHost '  Reloaded the module in this session.' -ForegroundColor DarkGray
-                Sync-WtwCmuxRemoteProjects -Quiet
+                # Force-reimport tears down this stack frame's private command
+                # table. Talk to the newly loaded module instead of calling
+                # Write-WtwHost / Sync-WtwCmuxRemoteProjects by name.
+                $loaded = Get-Module wtw | Select-Object -First 1
+                if ($loaded) {
+                    & $loaded {
+                        Write-WtwHost '  Reloaded the module in this session.' -ForegroundColor DarkGray
+                        Sync-WtwCmuxRemoteProjects -Quiet
+                        Write-WtwHost ''
+                    }
+                    $finishedInLoadedModule = $true
+                }
             }
         }
     } finally {
         Remove-Item -LiteralPath (Split-Path -Parent $staged) -Recurse -Force -ErrorAction SilentlyContinue
     }
-    Write-WtwHost ''
+    if (-not $finishedInLoadedModule) {
+        Write-WtwHost ''
+    }
 }

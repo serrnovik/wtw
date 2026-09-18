@@ -209,10 +209,19 @@ Describe 'wtw cmux places the tab in the machine/project group' {
                 }
             }
             if ($command -eq 'list-workspaces --json') {
+                if ($script:cmuxCalls | Where-Object { $_ -like 'new-workspace *' }) {
+                    $cwd = $script:projectPath.Replace('\', '\\')
+                    return [PSCustomObject]@{
+                        ExitCode = 0
+                        Output   = @"
+{ "workspaces": [ { "ref": "workspace:11", "title": "🎸 snowmain1", "current_directory": "$cwd", "description": "wtw: snowmain1" } ] }
+"@
+                    }
+                }
                 return [PSCustomObject]@{ ExitCode = 0; Output = '{ "workspaces": [] }' }
             }
             if ($command -eq 'current-workspace') {
-                return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:11' }
+                return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:1' }
             }
             return [PSCustomObject]@{ ExitCode = 0; Output = '' }
         } -ModuleName wtw
@@ -229,7 +238,68 @@ Describe 'wtw cmux places the tab in the machine/project group' {
 
         $create = $script:cmuxCalls | Where-Object { $_ -like 'new-workspace *' } | Select-Object -First 1
         $create | Should -Match '--group workspace_group:4'
+        $create | Should -Match '--group-placement top'
         $script:cmuxCalls | Should -Contain 'workspace-group add --group workspace_group:4 --workspace workspace:11'
+        $script:cmuxCalls | Should -Not -Contain 'workspace-group add --group workspace_group:4 --workspace workspace:1'
+    }
+
+    It 'does not move the caller tab into a new remote group' {
+        Mock Test-WtwCmuxPresent { $true } -ModuleName wtw
+        Mock Register-WtwCmuxRemoteProject { 'wtw.remote.arctictroll' } -ModuleName wtw
+        Mock Open-WtwCmuxAppleScriptWorkspace { $false } -ModuleName wtw
+        Mock Get-WtwRemoteTarget {
+            @{
+                Path       = 'C:\Users\sno\.local\share\chezmoi'
+                Color      = $null
+                Title      = 'chezmoi'
+                PrettyName = '🟣 chezmoi'
+                Repo       = 'chezmoi'
+                RepoEmoji  = '🛏️'
+            }
+        } -ModuleName wtw
+        Mock Invoke-WtwCmuxCommand {
+            $script:cmuxCalls.Add(($ArgumentList -join ' '))
+            $command = $ArgumentList -join ' '
+            if ($command -eq 'workspace-group list --json') {
+                return [PSCustomObject]@{
+                    ExitCode = 0
+                    Output   = '{"groups":[{"ref":"workspace_group:5","name":"🧊AT/🛏️ chezmoi","idempotency_key":"wtw.group.arctictroll.chezmoi","member_workspace_refs":["workspace:10"]}]}'
+                }
+            }
+            if ($command -eq 'list-workspaces --json') {
+                if ($script:cmuxCalls | Where-Object { $_ -like 'new-workspace *' }) {
+                    return [PSCustomObject]@{
+                        ExitCode = 0
+                        Output   = @'
+{ "workspaces": [
+  { "ref": "workspace:1", "title": "⚪ 🎸 snowmain1", "current_directory": "/Users/sno/Data/snogit/snowmain1" },
+  { "ref": "workspace:11", "title": "🧊AT 🟣 chezmoi", "description": "wtw-remote: at chez" }
+] }
+'@
+                    }
+                }
+                return [PSCustomObject]@{ ExitCode = 0; Output = '{ "workspaces": [] }' }
+            }
+            if ($command -eq 'current-workspace') {
+                return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:1' }
+            }
+            return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+        } -ModuleName wtw
+
+        InModuleScope wtw {
+            $hostEntry = @{
+                Name      = 'arctictroll'
+                Aliases   = @('at')
+                Emoji     = '🧊'
+                Label     = 'AT'
+                Separator = ' '
+                Platform  = 'windows'
+            }
+            Open-WtwCmuxRemoteWorkspace -HostEntry $hostEntry -HostSelector 'at' -Name 'chez'
+        }
+
+        $script:cmuxCalls | Should -Contain 'workspace-group add --group workspace_group:5 --workspace workspace:11'
+        $script:cmuxCalls | Should -Not -Contain 'workspace-group add --group workspace_group:5 --workspace workspace:1'
     }
 
     It 'adds an already-open workspace to the group' {

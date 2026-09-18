@@ -553,6 +553,10 @@ function Open-WtwCmuxRemoteWorkspace {
     foreach ($part in @(Get-WtwCmuxNewWorkspaceGroupArgs -Group $group)) {
         [void]$cmuxArgs.Add($part)
     }
+    if ($group) {
+        [void]$cmuxArgs.Add('--group-placement')
+        [void]$cmuxArgs.Add('top')
+    }
     Add-WtwCmuxRemoteWorkspaceEnvArgs -ArgumentList $cmuxArgs -HostSelector $HostSelector -Name $Name
 
     $createResult = Invoke-WtwCmuxCommand -ArgumentList @($cmuxArgs)
@@ -572,6 +576,10 @@ function Open-WtwCmuxRemoteWorkspace {
         foreach ($part in @(Get-WtwCmuxNewWorkspaceGroupArgs -Group $group)) {
             [void]$fallbackArgs.Add($part)
         }
+        if ($group) {
+            [void]$fallbackArgs.Add('--group-placement')
+            [void]$fallbackArgs.Add('top')
+        }
         Add-WtwCmuxRemoteWorkspaceEnvArgs -ArgumentList $fallbackArgs -HostSelector $HostSelector -Name $Name
         $createResult = Invoke-WtwCmuxCommand -ArgumentList @($fallbackArgs)
         $usedSingleCommand = $true
@@ -579,7 +587,7 @@ function Open-WtwCmuxRemoteWorkspace {
     if ($createResult.ExitCode -ne 0 -and $group) {
         $plainArgs = [System.Collections.Generic.List[string]]::new()
         foreach ($part in $cmuxArgs) {
-            if ($part -in @('--group', $group.Ref)) { continue }
+            if ($part -in @('--group', $group.Ref, '--group-placement', 'top')) { continue }
             [void]$plainArgs.Add($part)
         }
         $createResult = Invoke-WtwCmuxCommand -ArgumentList @($plainArgs)
@@ -598,20 +606,9 @@ function Open-WtwCmuxRemoteWorkspace {
         return
     }
 
-    $currentResult = Invoke-WtwCmuxCommand -ArgumentList @('current-workspace')
-    $workspaceRef = $null
-    if ($currentResult.ExitCode -eq 0) {
-        $currentWorkspace = ConvertFrom-WtwCmuxCurrentWorkspaceOutput -Output $currentResult.Output
-        if ($currentWorkspace) {
-            $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $currentWorkspace
-        }
-    }
-    if (-not $workspaceRef) {
-        $created = Find-WtwCmuxRemoteWorkspace -PrettyName $session.PrettyName -StatusValue $session.StatusValue
-        if ($created) {
-            $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $created
-        }
-    }
+    $workspaceRef = Resolve-WtwCmuxCreatedWorkspaceRef `
+        -PrettyName $session.PrettyName `
+        -StatusValue $session.StatusValue
 
     Set-WtwCmuxWorkspaceMetadata `
         -WorkspaceRef "$workspaceRef" `
