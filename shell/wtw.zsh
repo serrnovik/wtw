@@ -233,7 +233,7 @@ _wtw_completion() {
                 options=('--name:display name' '--folder:worktree folder' '--branch:existing branch' '--color:workspace color' '--repo:repository' '--open:open after creation' '--no-branch:do not create a branch' '--from:base branch' '--gt-track:Graphite parent')
                 ;;
             list|ls)
-                options=('-d:detailed view' '--detailed:detailed view' '--wide:untruncated columns' '--repo:repository')
+                options=('-d:detailed view' '--detailed:detailed view' '--wide:untruncated columns' '--repo:repository' '-f:substring filter' '--filter:substring filter')
                 ;;
             remove|rm|delete|del|unregister|unreg)
                 options=('--repo:repository' '--force:skip confirmation')

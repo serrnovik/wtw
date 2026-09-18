@@ -134,16 +134,16 @@ function Show-WtwZeroTierHint {
     $networks = Get-WtwZeroTierNetworks
     if ($networks.Count -eq 0) { return }
 
-    Write-Host '  ZeroTier detected.' -ForegroundColor Cyan
+    Write-WtwHost '  ZeroTier detected.' -ForegroundColor Cyan
     foreach ($net in $networks) {
         $label = if ($net.Name) { "$($net.Name) ($($net.Id))" } else { $net.Id }
-        Write-Host "    $label  this machine: $((@($net.Addresses)) -join ', ')" -ForegroundColor DarkGray
+        Write-WtwHost "    $label  this machine: $((@($net.Addresses)) -join ', ')" -ForegroundColor DarkGray
     }
-    Write-Host '    ZeroTier cannot be auto-discovered: its local client exposes only your own' -ForegroundColor DarkGray
-    Write-Host '    address and peer node IDs — not member names or their managed IPs.' -ForegroundColor DarkGray
-    Write-Host '    Add a ZeroTier peer by its managed IP, which works like any other address:' -ForegroundColor DarkGray
-    Write-Host '      wtw host add <name> --user <u> --address 10.147.20.42 --platform windows' -ForegroundColor DarkGray
-    Write-Host ''
+    Write-WtwHost '    ZeroTier cannot be auto-discovered: its local client exposes only your own' -ForegroundColor DarkGray
+    Write-WtwHost '    address and peer node IDs — not member names or their managed IPs.' -ForegroundColor DarkGray
+    Write-WtwHost '    Add a ZeroTier peer by its managed IP, which works like any other address:' -ForegroundColor DarkGray
+    Write-WtwHost '      wtw host add <name> --user <u> --address 10.147.20.42 --platform windows' -ForegroundColor DarkGray
+    Write-WtwHost ''
 }
 
 function Resolve-WtwPeerPlan {

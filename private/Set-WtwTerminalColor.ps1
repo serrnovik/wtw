@@ -37,10 +37,10 @@ function Set-WtwTerminalColor {
     if ($Title) {
         if ($inTmux) {
             # tmux: passthrough + set pane title
-            Write-Host "${esc}]0;${Title}${bel}" -NoNewline
-            Write-Host "${esc}k${Title}${esc}\" -NoNewline
+            Write-WtwHost "${esc}]0;${Title}${bel}" -NoNewline
+            Write-WtwHost "${esc}k${Title}${esc}\" -NoNewline
         } else {
-            Write-Host "${esc}]0;${Title}${bel}" -NoNewline
+            Write-WtwHost "${esc}]0;${Title}${bel}" -NoNewline
         }
     }
 
@@ -63,9 +63,9 @@ function Set-WtwTerminalColor {
             } catch { Write-Verbose "tmux color: $_" }
         } elseif ($termProgram -eq 'iTerm.app') {
             # iTerm2 proprietary escape for tab color
-            Write-Host "${esc}]6;1;bg;red;brightness;${r}${bel}" -NoNewline
-            Write-Host "${esc}]6;1;bg;green;brightness;${g}${bel}" -NoNewline
-            Write-Host "${esc}]6;1;bg;blue;brightness;${b}${bel}" -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;red;brightness;${r}${bel}" -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;green;brightness;${g}${bel}" -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;blue;brightness;${b}${bel}" -NoNewline
             # Persist so the prompt hook can re-apply after dark/light mode switches
             $env:WTW_TAB_COLOR = "#${hex}"
         } elseif ($env:WT_SESSION) {
@@ -77,13 +77,13 @@ function Set-WtwTerminalColor {
             # The tab title was already set above via OSC 0, which WT respects.
         } elseif ($env:KITTY_PID -or $termProgram -eq 'kitty') {
             # Kitty - OSC 30 sets the tab/window title bar color
-            Write-Host "${esc}]30;#${hex}${bel}" -NoNewline
+            Write-WtwHost "${esc}]30;#${hex}${bel}" -NoNewline
         } elseif ($env:KONSOLE_VERSION) {
             # Konsole - same OSC 30 as Kitty
-            Write-Host "${esc}]30;#${hex}${bel}" -NoNewline
+            Write-WtwHost "${esc}]30;#${hex}${bel}" -NoNewline
         } elseif ($env:WEZTERM_PANE) {
             # WezTerm - set tab color via user var
-            Write-Host "${esc}]1337;SetUserVar=wtw_color=$(
+            Write-WtwHost "${esc}]1337;SetUserVar=wtw_color=$(
                 [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("#${hex}"))
             )${bel}" -NoNewline
         }

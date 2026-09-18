@@ -44,10 +44,10 @@ function Invoke-WtwSbx {
     )
 
     if (-not (Get-Command 'sbx' -ErrorAction SilentlyContinue)) {
-        Write-Host ''
-        Write-Host '  ✗  sbx not found' -ForegroundColor Red
-        Write-Host '     Install: brew install docker/tap/sbx' -ForegroundColor DarkGray
-        Write-Host ''
+        Write-WtwHost ''
+        Write-WtwHost '  ✗  sbx not found' -ForegroundColor Red
+        Write-WtwHost '     Install: brew install docker/tap/sbx' -ForegroundColor DarkGray
+        Write-WtwHost ''
         return
     }
 
@@ -124,24 +124,24 @@ function Invoke-WtwSbx {
     }
 
     # Display
-    Write-Host ''
+    Write-WtwHost ''
     if ($DryRun) {
-        Write-Host '  [dry-run] sbx ' -ForegroundColor DarkCyan -NoNewline
-        Write-Host ($sbxArgs -join ' ') -ForegroundColor Cyan
-        Write-Host ''
+        Write-WtwHost '  [dry-run] sbx ' -ForegroundColor DarkCyan -NoNewline
+        Write-WtwHost ($sbxArgs -join ' ') -ForegroundColor Cyan
+        Write-WtwHost ''
         return
     }
 
-    Write-Host "  Launching $Agent sandbox" -ForegroundColor Cyan
-    Write-Host "  Primary:  $targetPath" -ForegroundColor DarkGray
+    Write-WtwHost "  Launching $Agent sandbox" -ForegroundColor Cyan
+    Write-WtwHost "  Primary:  $targetPath" -ForegroundColor DarkGray
     foreach ($m in $extraFolders) {
         $label = if ($Writable) { '  Mount:    ' } else { '  Mount:ro: ' }
-        Write-Host "$label$m" -ForegroundColor DarkGray
+        Write-WtwHost "$label$m" -ForegroundColor DarkGray
     }
     if ($Instruction) {
-        Write-Host "  Task:     $Instruction" -ForegroundColor DarkGray
+        Write-WtwHost "  Task:     $Instruction" -ForegroundColor DarkGray
     }
-    Write-Host ''
+    Write-WtwHost ''
 
     & sbx @sbxArgs
 }

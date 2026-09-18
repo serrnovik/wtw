@@ -13,6 +13,10 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     zsh -n "$SHELL_FILE"
 }
 
+@test "wtw.zsh has unix line endings" {
+    ! grep -q $'\r' "$SHELL_FILE"
+}
+
 @test "wtw.zsh defines wtw function after sourcing" {
     command -v zsh &>/dev/null || skip "zsh not installed"
     run zsh -c "source '$SHELL_FILE' 2>/dev/null; type wtw"

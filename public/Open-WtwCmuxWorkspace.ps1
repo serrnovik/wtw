@@ -318,7 +318,7 @@ function Open-WtwCmuxWorkspace {
                     -StatusValue $statusValue `
                     -CurrentName (Get-WtwCmuxWorkspaceName -Workspace $existing) `
                     -CurrentColor (Get-WtwCmuxObjectValue -Object $existing -Names @('color', 'workspace.color', 'sidebar.color', 'sidebarState.color'))
-                Write-Host "  cmux: selected workspace '$prettyName'" -ForegroundColor Green
+                Write-WtwHost "  cmux: selected workspace '$prettyName'" -ForegroundColor Green
                 return
             }
         }
@@ -339,15 +339,15 @@ function Open-WtwCmuxWorkspace {
         $appleScriptInit = Get-WtwCmuxLocalAppleScriptInitCommand -ProjectPath $fullDir
         if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $fullDir -PrettyName $prettyName -InitCommand $appleScriptInit) {
             if (Test-WtwCmuxSocketPermissionDenied -Output $createResult.Output) {
-                Write-Host "  cmux: opened via AppleScript fallback (socket access denied)." -ForegroundColor Green
+                Write-WtwHost "  cmux: opened via AppleScript fallback (socket access denied)." -ForegroundColor Green
             } else {
-                Write-Host "  cmux: opened via AppleScript fallback." -ForegroundColor Green
+                Write-WtwHost "  cmux: opened via AppleScript fallback." -ForegroundColor Green
             }
             return
         }
 
         if (Open-WtwCmuxAppPath -ProjectPath $fullDir) {
-            Write-Host "  Opening in cmux: $fullDir" -ForegroundColor Green
+            Write-WtwHost "  Opening in cmux: $fullDir" -ForegroundColor Green
             return
         }
 
@@ -371,5 +371,5 @@ function Open-WtwCmuxWorkspace {
     }
 
     Set-WtwCmuxWorkspaceMetadata -WorkspaceRef "$workspaceRef" -PrettyName $prettyName -Color $color -StatusValue $statusValue -CurrentName $prettyName -CurrentColor $null
-    Write-Host "  Opening in cmux: $fullDir" -ForegroundColor Green
+    Write-WtwHost "  Opening in cmux: $fullDir" -ForegroundColor Green
 }

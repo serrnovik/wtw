@@ -29,7 +29,7 @@ function Repair-WtwSupersetProjectPath {
 
     if (-not (Get-Command superset -ErrorAction SilentlyContinue)) { return }
     if (-not (Test-Path $ExpectedRepoPath)) {
-        Write-Host "  Superset: expected main repo path missing on disk: $ExpectedRepoPath" -ForegroundColor Yellow
+        Write-WtwHost "  Superset: expected main repo path missing on disk: $ExpectedRepoPath" -ForegroundColor Yellow
         return
     }
 
@@ -40,22 +40,22 @@ function Repair-WtwSupersetProjectPath {
     $m = [regex]::Match($probeText, 'already set up on this device at\s+(.+?)\.\s')
     if (-not $m.Success) {
         # Unknown failure mode — surface it but don't block ws open
-        Write-Host "  Superset: project path probe failed: $($probeText.Trim())" -ForegroundColor Yellow
+        Write-WtwHost "  Superset: project path probe failed: $($probeText.Trim())" -ForegroundColor Yellow
         return
     }
 
     $storedPath = $m.Groups[1].Value.Trim()
     if (Test-Path $storedPath) {
-        Write-Host "  Superset: project points at $storedPath (exists; leaving as-is)." -ForegroundColor DarkGray
+        Write-WtwHost "  Superset: project points at $storedPath (exists; leaving as-is)." -ForegroundColor DarkGray
         return
     }
 
-    Write-Host "  Superset: stored repoPath drift detected ($storedPath missing). Self-healing..." -ForegroundColor Yellow
+    Write-WtwHost "  Superset: stored repoPath drift detected ($storedPath missing). Self-healing..." -ForegroundColor Yellow
     $heal = & superset projects setup $ProjectId --local --import $ExpectedRepoPath --allow-relocate 2>&1
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "  Superset: repoPath relocated to $ExpectedRepoPath." -ForegroundColor Green
+        Write-WtwHost "  Superset: repoPath relocated to $ExpectedRepoPath." -ForegroundColor Green
     } else {
-        Write-Host "  Superset: self-heal failed: $(( $heal | Out-String ).Trim())" -ForegroundColor Yellow
-        Write-Host "    Manual fix: superset projects setup $ProjectId --local --import $ExpectedRepoPath --allow-relocate" -ForegroundColor DarkGray
+        Write-WtwHost "  Superset: self-heal failed: $(( $heal | Out-String ).Trim())" -ForegroundColor Yellow
+        Write-WtwHost "    Manual fix: superset projects setup $ProjectId --local --import $ExpectedRepoPath --allow-relocate" -ForegroundColor DarkGray
     }
 }

@@ -83,15 +83,15 @@ function Add-WtwEntry {
     }
 
     $dirName = Split-Path $Path -Leaf
-    Write-Host "  Path: $Path" -ForegroundColor Cyan
+    Write-WtwHost "  Path: $Path" -ForegroundColor Cyan
 
     # A worktree has a .git *file* (gitdir pointer); a primary checkout has
     # a .git *directory*. We only adopt worktrees here — use `wtw init` for
     # the primary checkout.
     $isWorktree = (Test-Path $gitDir -PathType Leaf)
     if (-not $isWorktree) {
-        Write-Host "  This is a primary checkout, not a worktree." -ForegroundColor Cyan
-        Write-Host "  Run 'wtw init' from inside it to register as a main repo." -ForegroundColor DarkGray
+        Write-WtwHost "  This is a primary checkout, not a worktree." -ForegroundColor Cyan
+        Write-WtwHost "  Run 'wtw init' from inside it to register as a main repo." -ForegroundColor DarkGray
         return
     }
 
@@ -120,7 +120,7 @@ function Add-WtwEntry {
             $rCanonical = Resolve-WtwRealPath $r.mainPath
             if ($rCanonical -eq $parentCanonical) {
                 $Repo = $name
-                Write-Host "  Detected parent repo: $Repo ($($r.mainPath))" -ForegroundColor Cyan
+                Write-WtwHost "  Detected parent repo: $Repo ($($r.mainPath))" -ForegroundColor Cyan
                 break
             }
         }
@@ -141,7 +141,7 @@ function Add-WtwEntry {
     # (matches wtw create's folder convention).
     if (-not $Task) {
         $Task = $dirName -replace "^${Repo}_", ''
-        Write-Host "  Task name: $Task" -ForegroundColor DarkGray
+        Write-WtwHost "  Task name: $Task" -ForegroundColor DarkGray
     }
 
     if ((Get-WtwPropertyNames -Object $repoEntry.worktrees) -contains $Task) {
@@ -153,7 +153,7 @@ function Add-WtwEntry {
         $Branch = git -C $Path branch --show-current 2>$null
         if (-not $Branch) { $Branch = '(detached)' }
     }
-    Write-Host "  Branch:    $Branch" -ForegroundColor Green
+    Write-WtwHost "  Branch:    $Branch" -ForegroundColor Green
 
     # FolderSuffix is what `wtw create` would have used — drives the workspace
     # filename. Strip the repo prefix when the dir follows the standard pattern.
@@ -189,6 +189,6 @@ function Add-WtwEntry {
 
     if (-not $meta.Success) { return }
 
-    Write-Host ''
-    Write-Host "  Adopted '$Task' under $Repo. Use 'wtw go $Task' to switch." -ForegroundColor Green
+    Write-WtwHost ''
+    Write-WtwHost "  Adopted '$Task' under $Repo. Use 'wtw go $Task' to switch." -ForegroundColor Green
 }

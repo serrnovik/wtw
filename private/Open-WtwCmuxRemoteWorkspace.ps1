@@ -141,7 +141,7 @@ function Open-WtwCmuxRemoteWorkspace {
     )
 
     if ($Name) {
-        Write-Host "  Resolving '$Name' on $($HostEntry.Name)..." -ForegroundColor DarkGray
+        Write-WtwHost "  Resolving '$Name' on $($HostEntry.Name)..." -ForegroundColor DarkGray
     }
 
     $session = Resolve-WtwCmuxRemoteSession `
@@ -152,7 +152,7 @@ function Open-WtwCmuxRemoteWorkspace {
 
     if (-not $session) {
         $numericHint = Get-WtwNumericNameHint -Name $Name
-        if ($numericHint) { Write-Host "  $numericHint" -ForegroundColor Yellow }
+        if ($numericHint) { Write-WtwHost "  $numericHint" -ForegroundColor Yellow }
         Show-WtwRemoteTargetSuggestions -HostEntry $HostEntry -Name $Name
         Write-Error "Could not resolve '$Name' on $($HostEntry.Name)."
         return
@@ -161,7 +161,7 @@ function Open-WtwCmuxRemoteWorkspace {
     $localCwd = if ($HOME -and (Test-Path $HOME)) { [System.IO.Path]::GetFullPath($HOME) } else { (Get-Location).Path }
 
     if ($PrintOnly) {
-        Write-Host "  cmux new-workspace --name $($session.PrettyName) --cwd $localCwd --command $($session.Command)" -ForegroundColor White
+        Write-WtwHost "  cmux new-workspace --name $($session.PrettyName) --cwd $localCwd --command $($session.Command)" -ForegroundColor White
         return
     }
 
@@ -169,6 +169,11 @@ function Open-WtwCmuxRemoteWorkspace {
         Write-Error "cmux is not installed or not on PATH. Install cmux or symlink '/Applications/cmux.app/Contents/Resources/bin/cmux'."
         return
     }
+
+    # Machine-level project (sidebar / Command Palette), independent of this
+    # invocation's optional worktree name. Opening `wtw --on at cmux auth`
+    # still creates the live auth tab; the host project stays `wtw --on at go`.
+    Register-WtwCmuxRemoteProject -HostEntry $HostEntry -HostSelector $HostSelector | Out-Null
 
     $existing = Find-WtwCmuxRemoteWorkspace -PrettyName $session.PrettyName -StatusValue $session.StatusValue
     if ($existing) {
@@ -183,7 +188,7 @@ function Open-WtwCmuxRemoteWorkspace {
                     -StatusValue $session.StatusValue `
                     -CurrentName (Get-WtwCmuxWorkspaceName -Workspace $existing) `
                     -CurrentColor (Get-WtwCmuxObjectValue -Object $existing -Names @('color', 'workspace.color', 'sidebar.color', 'sidebarState.color'))
-                Write-Host "  cmux: selected remote workspace '$($session.PrettyName)'" -ForegroundColor Green
+                Write-WtwHost "  cmux: selected remote workspace '$($session.PrettyName)'" -ForegroundColor Green
                 return
             }
         }
@@ -201,9 +206,9 @@ function Open-WtwCmuxRemoteWorkspace {
     if ($createResult.ExitCode -ne 0) {
         if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $localCwd -PrettyName $session.PrettyName -InitCommand $session.ShellInitCommand -MatchByNameOnly) {
             if (Test-WtwCmuxSocketPermissionDenied -Output $createResult.Output) {
-                Write-Host "  cmux: opened remote session via AppleScript fallback (socket access denied)." -ForegroundColor Green
+                Write-WtwHost "  cmux: opened remote session via AppleScript fallback (socket access denied)." -ForegroundColor Green
             } else {
-                Write-Host "  cmux: opened remote session via AppleScript fallback." -ForegroundColor Green
+                Write-WtwHost "  cmux: opened remote session via AppleScript fallback." -ForegroundColor Green
             }
             return
         }
@@ -236,5 +241,5 @@ function Open-WtwCmuxRemoteWorkspace {
         -CurrentColor $null
 
     $where = if ($session.RemotePath) { $session.RemotePath } else { $HostEntry.Name }
-    Write-Host "  cmux: remote session '$($session.PrettyName)' → $where" -ForegroundColor Green
+    Write-WtwHost "  cmux: remote session '$($session.PrettyName)' → $where" -ForegroundColor Green
 }

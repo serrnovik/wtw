@@ -1,0 +1,17 @@
+# Cross-platform line endings for the published serrnovik/wtw tree.
+# Unix wrappers MUST be LF: zsh treats CR as a command (`^M`) and then
+# fails to parse `elif`. `* text=auto` alone checks *.zsh out as CRLF
+# on Windows, which is how Gallery 0.2.29 shipped a broken wtw.zsh
+# while wtw.bash (already pinned to LF in the monorepo) stayed fine.
+* text=auto
+
+*.ps1  text eol=lf
+*.psd1 text eol=lf
+*.psm1 text eol=lf
+*.sh   text eol=lf
+*.bash text eol=lf
+*.zsh  text eol=lf
+*.bats text eol=lf
+*.md   text eol=lf
+
+*.cmd  text eol=crlf

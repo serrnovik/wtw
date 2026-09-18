@@ -1,6 +1,8 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
     . "$PSScriptRoot/../private/Get-WtwPropertyNames.ps1"
+    . "$PSScriptRoot/../private/Get-WtwShellTheme.ps1"
+    . "$PSScriptRoot/../private/Write-WtwHost.ps1"
     . "$PSScriptRoot/../private/Write-WtwUpdateNotice.ps1"
     . "$PSScriptRoot/../private/Get-WtwInstallInfo.ps1"
     . "$PSScriptRoot/../private/Write-WtwInstallRecord.ps1"

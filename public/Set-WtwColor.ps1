@@ -46,7 +46,7 @@ function Set-WtwColor {
             Write-Error "Not inside a registered repo. Specify a target or cd into a repo."
             return
         }
-        Write-Host "  Detected: $Name" -ForegroundColor DarkGray
+        Write-WtwHost "  Detected: $Name" -ForegroundColor DarkGray
     }
 
     $target = Resolve-WtwTarget $Name
@@ -62,13 +62,13 @@ function Set-WtwColor {
             $current = $colors.assignments.$colorKey
         }
         if ($current) {
-            Write-Host ''
+            Write-WtwHost ''
             Write-WtwColorSwatch "  $colorKey" $current
-            Write-Host "  Tip: in PowerShell, '#rrggbb' must be quoted. Use 689b59 or '#689b59'." -ForegroundColor DarkGray
-            Write-Host ''
+            Write-WtwHost "  Tip: in PowerShell, '#rrggbb' must be quoted. Use 689b59 or '#689b59'." -ForegroundColor DarkGray
+            Write-WtwHost ''
         } else {
-            Write-Host "  No color assigned for $colorKey" -ForegroundColor DarkGray
-            Write-Host "  Tip: in PowerShell, '#rrggbb' must be quoted. Use 689b59 or '#689b59'." -ForegroundColor DarkGray
+            Write-WtwHost "  No color assigned for $colorKey" -ForegroundColor DarkGray
+            Write-WtwHost "  Tip: in PowerShell, '#rrggbb' must be quoted. Use 689b59 or '#689b59'." -ForegroundColor DarkGray
         }
         return
     }
@@ -79,7 +79,7 @@ function Set-WtwColor {
         Write-Error "Invalid color '$Color'. Use '#rrggbb', 'random', or a known color name."
         return
     }
-    if ($Color -ieq 'random') { Write-Host "  Picked: $newColor" -ForegroundColor DarkGray }
+    if ($Color -ieq 'random') { Write-WtwHost "  Picked: $newColor" -ForegroundColor DarkGray }
 
     # Save to colors.json
     $colors.assignments | Add-Member -NotePropertyName $colorKey -NotePropertyValue $newColor -Force
@@ -107,7 +107,7 @@ function Set-WtwColor {
         Add-WtwSourceGitRepository -Path $target.WorktreeEntry.path -Name $displayName -Hex $newColor -RepoName $target.RepoName
     }
 
-    Write-Host ''
+    Write-WtwHost ''
     Write-WtwColorSwatch "  $colorKey" $newColor
 
     # Sync workspace unless --no-sync
@@ -120,10 +120,10 @@ function Set-WtwColor {
         }
 
         if ($wsFile -and (Test-Path $wsFile)) {
-            Write-Host "  Syncing workspace..." -ForegroundColor DarkGray
+            Write-WtwHost "  Syncing workspace..." -ForegroundColor DarkGray
             Sync-WtwWorkspace -Target $wsFile -ColorSource Json
         } else {
-            Write-Host "  No workspace file to sync." -ForegroundColor DarkGray
+            Write-WtwHost "  No workspace file to sync." -ForegroundColor DarkGray
         }
     }
 
@@ -145,12 +145,12 @@ function Set-WtwColor {
         # how to actually see the new color.
         if ($IsWindows -and $env:WT_SESSION) {
             $alias = $colorKey -replace '/main$', '' -replace '/', '-'
-            Write-Host "  Windows Terminal can't recolor this tab in place." -ForegroundColor DarkYellow
-            Write-Host "  Spawn a new tab to see it:  wtw go $alias --new-tab" -ForegroundColor Cyan
+            Write-WtwHost "  Windows Terminal can't recolor this tab in place." -ForegroundColor DarkYellow
+            Write-WtwHost "  Spawn a new tab to see it:  wtw go $alias --new-tab" -ForegroundColor Cyan
         }
     }
 
-    Write-Host ''
+    Write-WtwHost ''
 }
 
 

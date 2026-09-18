@@ -110,7 +110,7 @@ function Initialize-WtwWorktreeMetadata {
     $colorsState = Get-WtwColors
     $colorsState.assignments | Add-Member -NotePropertyName $colorKey -NotePropertyValue $resolvedColor -Force
     Save-WtwColors $colorsState
-    Write-Host "  Color:    $resolvedColor" -ForegroundColor Green
+    Write-WtwHost "  Color:    $resolvedColor" -ForegroundColor Green
 
     # Stored pretty name: folder suffix (or --name) with a color-circle prefix.
     # Identity emojis are composed at display time so existing worktrees pick up
@@ -136,9 +136,9 @@ function Initialize-WtwWorktreeMetadata {
     $result.DisplayName = $displayName
     $result.WorktreeEmoji = $wtEmoji
     if ($wtEmoji) {
-        Write-Host "  Emoji:    $wtEmoji" -ForegroundColor Green
+        Write-WtwHost "  Emoji:    $wtEmoji" -ForegroundColor Green
     }
-    Write-Host "  Pretty:   $displayName" -ForegroundColor Green
+    Write-WtwHost "  Pretty:   $displayName" -ForegroundColor Green
 
     # Generate workspace file from the repo's template, when one is configured.
     $wsFile = $null
@@ -176,9 +176,9 @@ function Initialize-WtwWorktreeMetadata {
             -WorktreePath $WorktreePath `
             -Managed | Out-Null
 
-        Write-Host "  Workspace: $wsFile" -ForegroundColor Green
+        Write-WtwHost "  Workspace: $wsFile" -ForegroundColor Green
     } else {
-        Write-Host '  Workspace: (no template configured, skipped)' -ForegroundColor Yellow
+        Write-WtwHost '  Workspace: (no template configured, skipped)' -ForegroundColor Yellow
     }
     $result.WorkspaceFile = $wsFile
 

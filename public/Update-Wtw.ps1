@@ -54,28 +54,28 @@ function Update-Wtw {
     }
     $installedPresent = Test-Path -LiteralPath (Join-Path $installRoot 'wtw.psm1') -PathType Leaf
 
-    Write-Host ''
-    Write-Host '  wtw update' -ForegroundColor Cyan
+    Write-WtwHost ''
+    Write-WtwHost '  wtw update' -ForegroundColor Cyan
     if ($installedPresent) {
         $originLabel = switch ($installed.Flavour) {
             'Gallery' { 'PowerShell Gallery' }
             default { if ($installed.SourcePath) { "local checkout ($($installed.SourcePath))" } else { 'local checkout' } }
         }
-        Write-Host ("    Installed:  {0}  [{1}]" -f ($installed.Version ?? 'unknown'), $originLabel)
-        Write-Host ("    Location:   {0}" -f $installRoot) -ForegroundColor DarkGray
+        Write-WtwHost ("    Installed:  {0}  [{1}]" -f ($installed.Version ?? 'unknown'), $originLabel)
+        Write-WtwHost ("    Location:   {0}" -f $installRoot) -ForegroundColor DarkGray
     } else {
-        Write-Host '    Installed:  not installed globally' -ForegroundColor Yellow
+        Write-WtwHost '    Installed:  not installed globally' -ForegroundColor Yellow
     }
 
     if ($status.Status -ne 'Available' -or $null -eq $status.LatestVersion) {
-        Write-Host '    Gallery:    unreachable — try again when online.' -ForegroundColor Yellow
-        Write-Host ''
+        Write-WtwHost '    Gallery:    unreachable — try again when online.' -ForegroundColor Yellow
+        Write-WtwHost ''
         return
     }
-    Write-Host ("    Gallery:    {0}" -f $status.LatestVersion)
+    Write-WtwHost ("    Gallery:    {0}" -f $status.LatestVersion)
 
     if ($info.Flavour -eq 'Repo') {
-        Write-Host ("    Running from a checkout at {0}" -f $info.ModuleRoot) -ForegroundColor DarkGray
+        Write-WtwHost ("    Running from a checkout at {0}" -f $info.ModuleRoot) -ForegroundColor DarkGray
     }
 
     Write-WtwShadowWarning -Info $info -Yes:$Yes -Check:$Check
@@ -87,25 +87,25 @@ function Update-Wtw {
         # Equal, or a local build ahead of the Gallery. Neither is a problem, so
         # neither gets a warning.
         if ($status.LatestVersion -lt $current) {
-            Write-Host ("    {0} is newer than the published {1} — nothing to do." -f $current, $status.LatestVersion) -ForegroundColor Green
+            Write-WtwHost ("    {0} is newer than the published {1} — nothing to do." -f $current, $status.LatestVersion) -ForegroundColor Green
         } else {
-            Write-Host '    Up to date.' -ForegroundColor Green
+            Write-WtwHost '    Up to date.' -ForegroundColor Green
         }
-        Write-Host ''
+        Write-WtwHost ''
         return
     }
 
     if ($Check) {
-        Write-Host ("    Update available: {0} -> {1}   (run: wtw update)" -f ($current ?? 'none'), $status.LatestVersion) -ForegroundColor Cyan
-        Write-Host ''
+        Write-WtwHost ("    Update available: {0} -> {1}   (run: wtw update)" -f ($current ?? 'none'), $status.LatestVersion) -ForegroundColor Cyan
+        Write-WtwHost ''
         return
     }
 
-    Write-Host ''
+    Write-WtwHost ''
     if ($installed.Flavour -eq 'Manual' -and $installedPresent) {
-        Write-Host '  The installed copy was hand-installed from a checkout.' -ForegroundColor Yellow
-        Write-Host '  Updating replaces it with the published Gallery package.' -ForegroundColor DarkGray
-        Write-Host '  To keep tracking your checkout instead, run `wtw install` from it.' -ForegroundColor DarkGray
+        Write-WtwHost '  The installed copy was hand-installed from a checkout.' -ForegroundColor Yellow
+        Write-WtwHost '  Updating replaces it with the published Gallery package.' -ForegroundColor DarkGray
+        Write-WtwHost '  To keep tracking your checkout instead, run `wtw install` from it.' -ForegroundColor DarkGray
     }
 
     if (-not $Yes) {
@@ -113,8 +113,8 @@ function Update-Wtw {
         # question mark as part of the variable name.
         $prompt = "  Install wtw $($status.LatestVersion) from the PowerShell Gallery into ${installRoot}? [y/N]"
         if ((Read-Host $prompt) -notin @('y', 'Y', 'yes')) {
-            Write-Host '  Cancelled.' -ForegroundColor DarkGray
-            Write-Host ''
+            Write-WtwHost '  Cancelled.' -ForegroundColor DarkGray
+            Write-WtwHost ''
             return
         }
     }
@@ -125,22 +125,23 @@ function Update-Wtw {
 
     $staged = Save-WtwGalleryPackage -Version $status.LatestVersion
     if (-not $staged) {
-        Write-Host ''
+        Write-WtwHost ''
         return
     }
 
     try {
         if (Install-WtwStagedModule -StagedRoot $staged -InstallRoot $installRoot) {
             Write-WtwInstallRecord -InstallRoot $installRoot -Origin 'Gallery' -Version $status.LatestVersion
-            Write-Host ("  wtw {0} installed to {1}" -f $status.LatestVersion, $installRoot) -ForegroundColor Green
+            Write-WtwHost ("  wtw {0} installed to {1}" -f $status.LatestVersion, $installRoot) -ForegroundColor Green
             $modulePath = Join-Path $installRoot 'wtw.psm1'
             if (Test-Path -LiteralPath $modulePath) {
                 Import-Module $modulePath -Global -Force -DisableNameChecking -Verbose:$false -Debug:$false 1>$null 4>$null 5>$null 6>$null
-                Write-Host '  Reloaded the module in this session.' -ForegroundColor DarkGray
+                Write-WtwHost '  Reloaded the module in this session.' -ForegroundColor DarkGray
+                Sync-WtwCmuxRemoteProjects -Quiet
             }
         }
     } finally {
         Remove-Item -LiteralPath (Split-Path -Parent $staged) -Recurse -Force -ErrorAction SilentlyContinue
     }
-    Write-Host ''
+    Write-WtwHost ''
 }

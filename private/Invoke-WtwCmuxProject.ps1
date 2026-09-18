@@ -254,7 +254,7 @@ function Register-WtwCmuxProject {
     )
 
     if (-not (Test-WtwCmuxPresent)) {
-        Write-Host '  cmux: CLI not installed/present - skipping project registration.' -ForegroundColor DarkGray
+        Write-WtwHost '  cmux: CLI not installed/present - skipping project registration.' -ForegroundColor DarkGray
         return $null
     }
 
@@ -290,12 +290,12 @@ function Register-WtwCmuxProject {
     if ($before -ne $after) {
         Backup-WtwCmuxConfig -ConfigPath $resolvedConfigPath | Out-Null
         Save-WtwCmuxConfig -Config $config -ConfigPath $resolvedConfigPath
-        Write-Host "  cmux: registered Command Palette workspace '$($entry.name)'" -ForegroundColor Green
+        Write-WtwHost "  cmux: registered Command Palette workspace '$($entry.name)'" -ForegroundColor Green
         if ($rawConfig -match '(?m)^\s*//|/\*') {
-            Write-Host '  cmux: rewrote cmux.json as JSON; original with comments was backed up.' -ForegroundColor DarkGray
+            Write-WtwHost '  cmux: rewrote cmux.json as JSON; original with comments was backed up.' -ForegroundColor DarkGray
         }
     } else {
-        Write-Host "  cmux: Command Palette workspace already registered '$($entry.name)'" -ForegroundColor DarkGray
+        Write-WtwHost "  cmux: Command Palette workspace already registered '$($entry.name)'" -ForegroundColor DarkGray
     }
 
     return $commandKey
@@ -342,9 +342,211 @@ function Unregister-WtwCmuxProject {
     if ($before -ne $after) {
         Backup-WtwCmuxConfig -ConfigPath $resolvedConfigPath | Out-Null
         Save-WtwCmuxConfig -Config $config -ConfigPath $resolvedConfigPath
-        Write-Host '  cmux: removed Command Palette workspace metadata.' -ForegroundColor Green
+        Write-WtwHost '  cmux: removed Command Palette workspace metadata.' -ForegroundColor Green
         if ($rawConfig -match '(?m)^\s*//|/\*') {
-            Write-Host '  cmux: rewrote cmux.json as JSON; original with comments was backed up.' -ForegroundColor DarkGray
+            Write-WtwHost '  cmux: rewrote cmux.json as JSON; original with comments was backed up.' -ForegroundColor DarkGray
         }
+    }
+}
+
+function ConvertTo-WtwCmuxRemoteCommandKey {
+    <#
+    .SYNOPSIS
+        Stable cmux Command Palette id for a remote host (never hashed from HOME).
+    .DESCRIPTION
+        Local projects key off the worktree path. Remote machine projects all
+        share the local home directory as cwd, so a path hash would collide
+        and ``Unregister-WtwCmuxProject`` would wipe every remote entry.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $HostName
+    )
+
+    $safe = ($HostName.ToLowerInvariant() -replace '[^a-z0-9._-]', '-')
+    return "wtw.remote.$safe"
+}
+
+function New-WtwCmuxRemoteWorkspaceCommand {
+    <#
+    .SYNOPSIS
+        Command Palette entry whose surface SSHs into a configured wtw host.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $HostEntry,
+        [string] $HostSelector
+    )
+
+    if (-not $HostSelector) { $HostSelector = [string]$HostEntry.Name }
+    $session = Resolve-WtwCmuxRemoteSession -HostEntry $HostEntry -HostSelector $HostSelector
+    $localCwd = if ($HOME -and (Test-Path $HOME)) {
+        [System.IO.Path]::GetFullPath($HOME)
+    } else {
+        [System.IO.Path]::GetFullPath((Get-Location).Path)
+    }
+
+    $keywords = [System.Collections.Generic.List[string]]::new()
+    foreach ($word in @('wtw', 'remote', [string]$HostEntry.Name, [string]$HostEntry.Platform)) {
+        if ($word) { [void]$keywords.Add($word) }
+    }
+    foreach ($alias in @($HostEntry.Aliases)) {
+        if ($alias) { [void]$keywords.Add([string]$alias) }
+    }
+
+    $workspace = [PSCustomObject]@{
+        name        = $session.PrettyName
+        cwd         = $localCwd
+        restart     = 'ignore'
+        description = $session.StatusValue
+        layout      = [PSCustomObject]@{
+            pane = [PSCustomObject]@{
+                surfaces = @(
+                    [PSCustomObject]@{
+                        type    = 'terminal'
+                        name    = (Get-WtwCmuxTabLabel -PrettyName $session.PrettyName)
+                        command = $session.Command
+                        focus   = $true
+                    }
+                )
+            }
+        }
+    }
+    if ($session.Color) {
+        $workspace | Add-Member -NotePropertyName 'color' -NotePropertyValue $session.Color -Force
+    }
+
+    $platform = if ($HostEntry.Platform) { [string]$HostEntry.Platform } else { 'remote' }
+    return [PSCustomObject]@{
+        id          = (ConvertTo-WtwCmuxRemoteCommandKey -HostName $HostEntry.Name)
+        name        = "wtw remote: $($HostEntry.Name)"
+        description = "SSH into $($HostEntry.Name) ($platform)"
+        keywords    = @($keywords)
+        workspace   = $workspace
+    }
+}
+
+function Register-WtwCmuxRemoteProject {
+    <#
+    .SYNOPSIS
+        Register a remote host as a cmux Command Palette / sidebar project.
+    .DESCRIPTION
+        Same persistence as a local worktree: picking the project in cmux starts
+        ``wtw --on <host> go`` in a local tab. Keyed by host name, not cwd.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $HostEntry,
+        [string] $HostSelector,
+        [string] $ConfigPath,
+        [switch] $Quiet
+    )
+
+    if (-not (Test-WtwCmuxPresent)) {
+        if (-not $Quiet) {
+            Write-WtwHost '  cmux: CLI not installed/present - skipping remote project registration.' -ForegroundColor DarkGray
+        }
+        return $null
+    }
+
+    if (-not $HostSelector) { $HostSelector = [string]$HostEntry.Name }
+    $resolvedConfigPath = Get-WtwCmuxConfigPath -ConfigPath $ConfigPath
+    $rawConfig = if (Test-Path $resolvedConfigPath) { Get-Content -Path $resolvedConfigPath -Raw } else { $null }
+    $config = Read-JsoncFile $resolvedConfigPath
+    if (-not $config) {
+        $config = New-WtwCmuxConfig
+    }
+    if (-not ((Get-WtwPropertyNames -Object $config) -contains 'commands') -or -not $config.commands) {
+        $config | Add-Member -NotePropertyName 'commands' -NotePropertyValue @() -Force
+    }
+
+    $before = ConvertTo-WtwCmuxConfigJson -Config $config
+    $entry = New-WtwCmuxRemoteWorkspaceCommand -HostEntry $HostEntry -HostSelector $HostSelector
+    $commandKey = $entry.id
+
+    $commands = @($config.commands) | Where-Object {
+        $id = if ((Get-WtwPropertyNames -Object $_) -contains 'id') { $_.id } else { $null }
+        $name = if ((Get-WtwPropertyNames -Object $_) -contains 'name') { $_.name } else { $null }
+        $id -ne $commandKey -and $name -ne $entry.name
+    }
+    $config.commands = @($commands) + @($entry)
+
+    $after = ConvertTo-WtwCmuxConfigJson -Config $config
+    if ($before -ne $after) {
+        Backup-WtwCmuxConfig -ConfigPath $resolvedConfigPath | Out-Null
+        Save-WtwCmuxConfig -Config $config -ConfigPath $resolvedConfigPath
+        if (-not $Quiet) {
+            Write-WtwHost "  cmux: registered remote project '$($entry.name)'" -ForegroundColor Green
+            if ($rawConfig -match '(?m)^\s*//|/\*') {
+                Write-WtwHost '  cmux: rewrote cmux.json as JSON; original with comments was backed up.' -ForegroundColor DarkGray
+            }
+        }
+    } elseif (-not $Quiet) {
+        Write-WtwHost "  cmux: remote project already registered '$($entry.name)'" -ForegroundColor DarkGray
+    }
+
+    return $commandKey
+}
+
+function Unregister-WtwCmuxRemoteProject {
+    <#
+    .SYNOPSIS
+        Remove the cmux Command Palette project for one remote host.
+    .DESCRIPTION
+        Matches only the ``wtw.remote.*`` id / ``wtw remote: <name>`` title.
+        Never keys off cwd — remotes share the local home directory.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $HostName,
+        [string] $ConfigPath
+    )
+
+    if (-not (Test-WtwCmuxPresent)) { return }
+
+    $resolvedConfigPath = Get-WtwCmuxConfigPath -ConfigPath $ConfigPath
+    if (-not (Test-Path $resolvedConfigPath)) { return }
+
+    $rawConfig = Get-Content -Path $resolvedConfigPath -Raw
+    $config = Read-JsoncFile $resolvedConfigPath
+    if (-not ($config -and (Get-WtwPropertyNames -Object $config) -contains 'commands')) { return }
+
+    $commandKey = ConvertTo-WtwCmuxRemoteCommandKey -HostName $HostName
+    $paletteName = "wtw remote: $HostName"
+
+    $before = ConvertTo-WtwCmuxConfigJson -Config $config
+    $config.commands = @($config.commands) | Where-Object {
+        $id = if ((Get-WtwPropertyNames -Object $_) -contains 'id') { $_.id } else { $null }
+        $name = if ((Get-WtwPropertyNames -Object $_) -contains 'name') { $_.name } else { $null }
+        $id -ne $commandKey -and $name -ne $paletteName
+    }
+    $after = ConvertTo-WtwCmuxConfigJson -Config $config
+
+    if ($before -ne $after) {
+        Backup-WtwCmuxConfig -ConfigPath $resolvedConfigPath | Out-Null
+        Save-WtwCmuxConfig -Config $config -ConfigPath $resolvedConfigPath
+        Write-WtwHost "  cmux: removed remote project '$paletteName'." -ForegroundColor Green
+        if ($rawConfig -match '(?m)^\s*//|/\*') {
+            Write-WtwHost '  cmux: rewrote cmux.json as JSON; original with comments was backed up.' -ForegroundColor DarkGray
+        }
+    }
+}
+
+function Sync-WtwCmuxRemoteProjects {
+    <#
+    .SYNOPSIS
+        Register a cmux project for every configured wtw host.
+    #>
+    [CmdletBinding()]
+    param(
+        [string] $ConfigPath,
+        [switch] $Quiet
+    )
+
+    if (-not (Test-WtwCmuxPresent)) { return }
+
+    foreach ($hostEntry in @(Get-WtwHosts)) {
+        Register-WtwCmuxRemoteProject -HostEntry $hostEntry -ConfigPath $ConfigPath -Quiet:$Quiet | Out-Null
     }
 }

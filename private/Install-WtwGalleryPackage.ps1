@@ -23,7 +23,7 @@ function Save-WtwGalleryPackage {
     $stagingParent = Join-Path ([IO.Path]::GetTempPath()) ('wtw-update-{0}' -f [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $stagingParent -Force | Out-Null
 
-    Write-Host ("  Downloading wtw {0} from the {1}..." -f $Version, $Repository) -ForegroundColor Cyan
+    Write-WtwHost ("  Downloading wtw {0} from the {1}..." -f $Version, $Repository) -ForegroundColor Cyan
     $saved = $false
     try {
         if (Get-Command Save-PSResource -ErrorAction SilentlyContinue) {
@@ -35,11 +35,11 @@ function Save-WtwGalleryPackage {
                 -Path $stagingParent -Force -ErrorAction Stop
             $saved = $true
         } else {
-            Write-Host '  Neither Save-PSResource nor Save-Module is available.' -ForegroundColor Red
-            Write-Host '  Install Microsoft.PowerShell.PSResourceGet, or update from a checkout with `wtw install`.' -ForegroundColor DarkGray
+            Write-WtwHost '  Neither Save-PSResource nor Save-Module is available.' -ForegroundColor Red
+            Write-WtwHost '  Install Microsoft.PowerShell.PSResourceGet, or update from a checkout with `wtw install`.' -ForegroundColor DarkGray
         }
     } catch {
-        Write-Host ("  Download failed: {0}" -f $_.Exception.Message) -ForegroundColor Red
+        Write-WtwHost ("  Download failed: {0}" -f $_.Exception.Message) -ForegroundColor Red
     }
 
     if ($saved) {
@@ -48,7 +48,7 @@ function Save-WtwGalleryPackage {
         if ($manifest) {
             return $manifest.Directory.FullName
         }
-        Write-Host '  The downloaded package did not contain wtw.psm1.' -ForegroundColor Red
+        Write-WtwHost '  The downloaded package did not contain wtw.psm1.' -ForegroundColor Red
     }
 
     Remove-Item -LiteralPath $stagingParent -Recurse -Force -ErrorAction SilentlyContinue
@@ -91,6 +91,7 @@ function Install-WtwStagedModule {
             Move-Item -LiteralPath $InstallRoot -Destination $backup -Force -ErrorAction Stop
         }
         Copy-Item -LiteralPath $StagedRoot -Destination $InstallRoot -Recurse -Force -ErrorAction Stop
+        ConvertTo-WtwUnixLineEndings -Path $InstallRoot
 
         $shellSource = Join-Path $InstallRoot 'shell'
         if (Test-Path -LiteralPath $shellSource -PathType Container) {
@@ -99,6 +100,7 @@ function Install-WtwStagedModule {
                 Remove-Item -LiteralPath $shellDest -Recurse -Force -ErrorAction SilentlyContinue
             }
             Copy-Item -LiteralPath $shellSource -Destination $shellDest -Recurse -Force -ErrorAction SilentlyContinue
+            ConvertTo-WtwUnixLineEndings -Path $shellDest
         }
 
         if ($hadPrevious) {
@@ -106,13 +108,13 @@ function Install-WtwStagedModule {
         }
         return $true
     } catch {
-        Write-Host ("  Install failed: {0}" -f $_.Exception.Message) -ForegroundColor Red
+        Write-WtwHost ("  Install failed: {0}" -f $_.Exception.Message) -ForegroundColor Red
         if ($hadPrevious -and (Test-Path -LiteralPath $backup)) {
             if (Test-Path -LiteralPath $InstallRoot) {
                 Remove-Item -LiteralPath $InstallRoot -Recurse -Force -ErrorAction SilentlyContinue
             }
             Move-Item -LiteralPath $backup -Destination $InstallRoot -Force -ErrorAction SilentlyContinue
-            Write-Host '  Previous install restored.' -ForegroundColor Yellow
+            Write-WtwHost '  Previous install restored.' -ForegroundColor Yellow
         }
         return $false
     }
@@ -142,12 +144,12 @@ function Write-WtwShadowWarning {
 
     if (-not $Info.ShadowedBy) { return }
 
-    Write-Host ''
-    Write-Host '  Another wtw is installed on PSModulePath:' -ForegroundColor Yellow
+    Write-WtwHost ''
+    Write-WtwHost '  Another wtw is installed on PSModulePath:' -ForegroundColor Yellow
     foreach ($copy in $Info.GalleryCopies) {
-        Write-Host ("    {0}  {1}" -f $copy.Version, $copy.Path) -ForegroundColor DarkGray
+        Write-WtwHost ("    {0}  {1}" -f $copy.Version, $copy.Path) -ForegroundColor DarkGray
     }
-    Write-Host '  `Import-Module wtw` resolves to that copy, not the one your shell loads.' -ForegroundColor DarkGray
+    Write-WtwHost '  `Import-Module wtw` resolves to that copy, not the one your shell loads.' -ForegroundColor DarkGray
 
     if ($Check) { return }
 
@@ -160,9 +162,9 @@ function Write-WtwShadowWarning {
     foreach ($copy in $Info.GalleryCopies) {
         try {
             Remove-Item -LiteralPath $copy.Path -Recurse -Force -ErrorAction Stop
-            Write-Host ("    removed {0}" -f $copy.Path) -ForegroundColor Green
+            Write-WtwHost ("    removed {0}" -f $copy.Path) -ForegroundColor Green
         } catch {
-            Write-Host ("    could not remove {0}: {1}" -f $copy.Path, $_.Exception.Message) -ForegroundColor Red
+            Write-WtwHost ("    could not remove {0}: {1}" -f $copy.Path, $_.Exception.Message) -ForegroundColor Red
         }
     }
 }

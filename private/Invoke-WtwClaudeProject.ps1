@@ -261,7 +261,7 @@ function Start-WtwClaudeCodeSession {
         # and re-send once — `code/new` just navigates, so a repeat is harmless.
         $coldStart = -not (Test-WtwClaudeAppRunning -AppName $appName)
         if ($coldStart) {
-            Write-Host '  Claude is not running — launching it first...' -ForegroundColor DarkGray
+            Write-WtwHost '  Claude is not running — launching it first...' -ForegroundColor DarkGray
             & open -a $appName
             $deadline = (Get-Date).AddSeconds($LaunchTimeoutSeconds)
             while (-not (Test-WtwClaudeAppRunning -AppName $appName) -and (Get-Date) -lt $deadline) {

@@ -39,16 +39,16 @@ function Enter-WtwWorktree {
 
     if (-not (Test-Path $targetPath)) {
         $resolvedLabel = if ($target.TaskName) { "$($target.RepoName) / $($target.TaskName)" } else { $target.RepoName }
-        Write-Host ''
-        Write-Host '  ✗  Worktree path not found' -ForegroundColor Red
-        Write-Host ''
-        Write-Host "  Resolved:  $resolvedLabel" -ForegroundColor DarkGray
-        Write-Host "  Path:      $targetPath" -ForegroundColor DarkGray
-        Write-Host ''
-        Write-Host '  The worktree is registered but its directory no longer exists.' -ForegroundColor Yellow
-        Write-Host "  To recreate:    wtw create $Name" -ForegroundColor Cyan
-        Write-Host "  To unregister:  wtw remove $Name" -ForegroundColor Cyan
-        Write-Host ''
+        Write-WtwHost ''
+        Write-WtwHost '  ✗  Worktree path not found' -ForegroundColor Red
+        Write-WtwHost ''
+        Write-WtwHost "  Resolved:  $resolvedLabel" -ForegroundColor DarkGray
+        Write-WtwHost "  Path:      $targetPath" -ForegroundColor DarkGray
+        Write-WtwHost ''
+        Write-WtwHost '  The worktree is registered but its directory no longer exists.' -ForegroundColor Yellow
+        Write-WtwHost "  To recreate:    wtw create $Name" -ForegroundColor Cyan
+        Write-WtwHost "  To unregister:  wtw remove $Name" -ForegroundColor Cyan
+        Write-WtwHost ''
         return
     }
 
@@ -94,7 +94,7 @@ function Enter-WtwWorktree {
                 # background colour requires user Lua config — out of scope here.
                 if (Get-Command wezterm -ErrorAction SilentlyContinue) {
                     & wezterm cli spawn --cwd $targetPath -- pwsh -NoLogo -NoExit -Command $innerCmd
-                    Write-Host '  Note: WezTerm tab background colour requires user Lua config.' -ForegroundColor DarkGray
+                    Write-WtwHost '  Note: WezTerm tab background colour requires user Lua config.' -ForegroundColor DarkGray
                     $spawned = $true
                 }
             }
@@ -105,7 +105,7 @@ function Enter-WtwWorktree {
                 if (-not $conemuExe) { $conemuExe = Get-Command ConEmu.exe -ErrorAction SilentlyContinue }
                 if ($conemuExe) {
                     & $conemuExe.Path -reuse -dir $targetPath -cmd pwsh -NoLogo -NoExit -Command $innerCmd
-                    Write-Host '  Note: ConEmu tab colour must be configured per-Task in ConEmu settings.' -ForegroundColor DarkGray
+                    Write-WtwHost '  Note: ConEmu tab colour must be configured per-Task in ConEmu settings.' -ForegroundColor DarkGray
                     $spawned = $true
                 }
             }
@@ -114,12 +114,12 @@ function Enter-WtwWorktree {
         if ($spawned) { return }
 
         if (-not $term.CanSpawn) {
-            Write-Host "  --new-tab not automatable in this terminal ($($term.Name))." -ForegroundColor Yellow
+            Write-WtwHost "  --new-tab not automatable in this terminal ($($term.Name))." -ForegroundColor Yellow
         } else {
-            Write-Host "  Could not locate the spawn CLI for $($term.Name)." -ForegroundColor Yellow
+            Write-WtwHost "  Could not locate the spawn CLI for $($term.Name)." -ForegroundColor Yellow
         }
-        Write-Host "  Open a new tab manually, then run:  wtw go $nameArg" -ForegroundColor DarkGray
-        Write-Host '  Falling back to in-place switch.' -ForegroundColor DarkGray
+        Write-WtwHost "  Open a new tab manually, then run:  wtw go $nameArg" -ForegroundColor DarkGray
+        Write-WtwHost '  Falling back to in-place switch.' -ForegroundColor DarkGray
     }
 
     # Set worktree environment variables (WTW_*, DEV_WORKTREE_*)
@@ -141,7 +141,7 @@ function Enter-WtwWorktree {
                 $scriptPath = Join-Path $targetPath $sessionScript
                 if (Test-Path $scriptPath) { & $scriptPath }
             }
-            Write-Host "  Switched to: $targetPath" -ForegroundColor Green
+            Write-WtwHost "  Switched to: $targetPath" -ForegroundColor Green
         }
 
         # Inside a cmux surface, also push the workspace/tab metadata (icon'd tab label,

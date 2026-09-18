@@ -34,6 +34,7 @@ pwsh -Command "wtw go <name>"
 
 # List all repos and worktrees
 pwsh -Command "wtw list"          # compact table
+pwsh -Command "wtw list -f kul"   # substring filter (repos + matching worktrees)
 pwsh -Command "wtw list --wide"   # full columns when debugging alias resolution
 pwsh -Command "wtw list -d"       # detailed view with color swatches
 
@@ -58,7 +59,7 @@ pwsh -Command "wtw cursor [name]"
 pwsh -Command "wtw code [name]"
 pwsh -Command "wtw chatgpt [name] [--skip-restart]" # aliases: cgpt, codex
 pwsh -Command "wtw claudecode [name] [--prompt X]"  # aliases: ccode — new Claude Code chat in the worktree
-pwsh -Command "wtw cmux [name]"                    # cmux workspace; `wtw --on <host> cmux [name]` SSHs from a local tab
+pwsh -Command "wtw cmux [name]"                    # cmux workspace; `wtw --on <host>` opens the machine project; `wtw --on <host> cmux [name]` SSHs from a local tab
 pwsh -Command "wtw wmux [name]"                    # Windows wmux workspace
 
 # Clean stale AI worktrees and/or leftover merged local branches

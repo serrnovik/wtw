@@ -67,9 +67,9 @@ function Initialize-WtwConfig {
     $repoDir = Split-Path $repoRoot -Leaf
     $registryKey = if ($Name) { $Name } else { $repoDir }
 
-    Write-Host "  Detected repo: $repoDir" -ForegroundColor Cyan
-    Write-Host "  Registry key:  $registryKey" -ForegroundColor Cyan
-    Write-Host "  Path:          $repoRoot" -ForegroundColor Cyan
+    Write-WtwHost "  Detected repo: $repoDir" -ForegroundColor Cyan
+    Write-WtwHost "  Registry key:  $registryKey" -ForegroundColor Cyan
+    Write-WtwHost "  Path:          $repoRoot" -ForegroundColor Cyan
 
     # Session script — explicit override or auto-detect
     $sessionScript = if ($StartupScript) {
@@ -78,9 +78,9 @@ function Initialize-WtwConfig {
         Get-WtwSessionScript $repoRoot
     }
     if ($sessionScript) {
-        Write-Host "  Session script: $sessionScript" -ForegroundColor Cyan
+        Write-WtwHost "  Session script: $sessionScript" -ForegroundColor Cyan
     } else {
-        Write-Host '  Session script: (none — wtw will set terminal color/title directly)' -ForegroundColor DarkGray
+        Write-WtwHost '  Session script: (none — wtw will set terminal color/title directly)' -ForegroundColor DarkGray
     }
 
     # Alias
@@ -100,7 +100,7 @@ function Initialize-WtwConfig {
             $config.workspacesDir = $WorkspacesDir
         }
         Save-WtwConfig $config
-        Write-Host "  Created config: $(Join-Path $HOME '.wtw' 'config.json')" -ForegroundColor Green
+        Write-WtwHost "  Created config: $(Join-Path $HOME '.wtw' 'config.json')" -ForegroundColor Green
     }
 
     # Alias collision check
@@ -154,7 +154,7 @@ function Initialize-WtwConfig {
                 }
                 if ($src -and (Test-Path $src)) {
                     $templateSource = $src
-                    Write-Host "  Template from repo: $rn" -ForegroundColor Cyan
+                    Write-WtwHost "  Template from repo: $rn" -ForegroundColor Cyan
                 }
                 break
             }
@@ -197,10 +197,10 @@ function Initialize-WtwConfig {
     }
 
     if ($templateSource) {
-        Write-Host "  Template source: $templateSource" -ForegroundColor Cyan
+        Write-WtwHost "  Template source: $templateSource" -ForegroundColor Cyan
     } else {
-        Write-Host "  No template found — workspace generation skipped." -ForegroundColor Yellow
-        Write-Host "  You can set it later: wtw init --template <path>" -ForegroundColor DarkGray
+        Write-WtwHost "  No template found — workspace generation skipped." -ForegroundColor Yellow
+        Write-WtwHost "  You can set it later: wtw init --template <path>" -ForegroundColor DarkGray
     }
 
     # Pick/record main color
@@ -221,7 +221,7 @@ function Initialize-WtwConfig {
             }
         }
     }
-    Write-Host "  Color:         $mainColor" -ForegroundColor Cyan
+    Write-WtwHost "  Color:         $mainColor" -ForegroundColor Cyan
 
     # Generate main workspace file from template
     $mainWorkspaceFile = $null
@@ -267,7 +267,7 @@ function Initialize-WtwConfig {
             -Color $mainColor `
             -Managed | Out-Null
 
-        Write-Host "  Workspace:     $mainWorkspaceFile" -ForegroundColor Green
+        Write-WtwHost "  Workspace:     $mainWorkspaceFile" -ForegroundColor Green
     } else {
         # No template — just register without workspace
         $worktreeParent = Split-Path $repoRoot -Parent
@@ -305,13 +305,13 @@ function Initialize-WtwConfig {
         }
     }
 
-    Write-Host ''
-    Write-Host "  Registered '$registryKey' (aliases: $($aliasArray -join ', '))" -ForegroundColor Green
+    Write-WtwHost ''
+    Write-WtwHost "  Registered '$registryKey' (aliases: $($aliasArray -join ', '))" -ForegroundColor Green
     if ($resolvedEmoji) {
-        Write-Host "  Emoji:          $resolvedEmoji" -ForegroundColor Cyan
+        Write-WtwHost "  Emoji:          $resolvedEmoji" -ForegroundColor Cyan
     }
     if ($Template) {
-        Write-Host "  Template shared from: $Template" -ForegroundColor DarkGray
+        Write-WtwHost "  Template shared from: $Template" -ForegroundColor DarkGray
     }
-    Write-Host "  Run 'wtw create <task>' to create your first worktree." -ForegroundColor DarkGray
+    Write-WtwHost "  Run 'wtw create <task>' to create your first worktree." -ForegroundColor DarkGray
 }

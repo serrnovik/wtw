@@ -46,6 +46,6 @@ function Open-WtwClaudeCodeWorkspace {
     if (-not $label) { $label = $Target.TaskName }
     if (-not $label) { $label = Split-Path $dir -Leaf }
 
-    Write-Host "  Claude Code: new chat in '$label'" -ForegroundColor Green
-    Write-Host "  Path: $([System.IO.Path]::GetFullPath($dir))" -ForegroundColor DarkGray
+    Write-WtwHost "  Claude Code: new chat in '$label'" -ForegroundColor Green
+    Write-WtwHost "  Path: $([System.IO.Path]::GetFullPath($dir))" -ForegroundColor DarkGray
 }

@@ -12,6 +12,10 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.bash"
     bash -n "$SHELL_FILE"
 }
 
+@test "wtw.bash has unix line endings" {
+    ! grep -q $'\r' "$SHELL_FILE"
+}
+
 @test "wtw.bash defines wtw function after sourcing" {
     run bash -c "source '$SHELL_FILE' 2>/dev/null; type wtw"
     [ "$status" -eq 0 ]

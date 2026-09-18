@@ -604,6 +604,7 @@ Describe 'cmux remote SSH workspace' {
         InModuleScope wtw -Parameters @{ HostEntry = $script:remoteHost } {
             $script:cmuxCalls = [System.Collections.Generic.List[string]]::new()
             Mock Test-WtwCmuxPresent { $true }
+            Mock Register-WtwCmuxRemoteProject { 'wtw.remote.workstation' }
             Mock Open-WtwCmuxAppleScriptWorkspace { $false }
             Mock Invoke-WtwCmuxCommand {
                 $script:cmuxCalls.Add(($ArgumentList -join ' '))
@@ -652,6 +653,7 @@ Describe 'cmux remote SSH workspace' {
                 }
             }
             Mock Test-WtwCmuxPresent { $true }
+            Mock Register-WtwCmuxRemoteProject { 'wtw.remote.workstation' }
             Mock Invoke-WtwCmuxCommand {
                 return [PSCustomObject]@{
                     ExitCode = 1
@@ -681,6 +683,7 @@ Describe 'cmux remote SSH workspace' {
                 }
             }
             Mock Test-WtwCmuxPresent { $true }
+            Mock Register-WtwCmuxRemoteProject { 'wtw.remote.workstation' }
             Mock Invoke-WtwCmuxCommand {
                 $script:cmuxCalls.Add(($ArgumentList -join ' '))
                 $command = $ArgumentList -join ' '
@@ -708,6 +711,108 @@ Describe 'cmux remote SSH workspace' {
             $script:cmuxCalls | Should -Contain 'select-workspace --workspace workspace:remote'
             @($script:cmuxCalls | Where-Object { $_ -like 'new-workspace*' }).Count | Should -Be 0
             $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:remote --action rename --title 🧊AT.🟢 Auth'
+        }
+    }
+}
+
+Describe 'cmux remote host projects' {
+    BeforeEach {
+        $script:tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-cmux-remote-" + [guid]::NewGuid())
+        $script:configPath = Join-Path $script:tempDir 'cmux.json'
+        New-Item -ItemType Directory -Path $script:tempDir -Force | Out-Null
+        $script:remoteHost = @{
+            Name      = 'workstation'
+            Aliases   = @('at')
+            Emoji     = '🧊'
+            Label     = 'AT'
+            Platform  = 'windows'
+            User      = 'dev'
+            HostNames = @('workstation.local')
+        }
+        Mock Test-WtwCmuxPresent { $true }
+    }
+
+    AfterEach {
+        Remove-Item -Recurse -Force $script:tempDir -ErrorAction SilentlyContinue
+    }
+
+    It 'keys the project by host name, never by a HOME path hash' {
+        ConvertTo-WtwCmuxRemoteCommandKey -HostName 'workstation' | Should -Be 'wtw.remote.workstation'
+        ConvertTo-WtwCmuxRemoteCommandKey -HostName 'Work-Station' | Should -Be 'wtw.remote.work-station'
+        if ($HOME) {
+            $homeKey = ConvertTo-WtwCmuxCommandKey -ProjectPath $HOME
+            (ConvertTo-WtwCmuxRemoteCommandKey -HostName 'workstation') | Should -Not -Be $homeKey
+        }
+    }
+
+    It 'registers an idempotent sidebar project that SSHs to the host' {
+        $key1 = Register-WtwCmuxRemoteProject -HostEntry $script:remoteHost -ConfigPath $script:configPath
+        $key2 = Register-WtwCmuxRemoteProject -HostEntry $script:remoteHost -ConfigPath $script:configPath
+
+        $key1 | Should -Be 'wtw.remote.workstation'
+        $key1 | Should -Be $key2
+        $config = Get-Content -Path $script:configPath -Raw | ConvertFrom-Json
+        @($config.commands).Count | Should -Be 1
+        $config.commands[0].id | Should -Be $key1
+        $config.commands[0].name | Should -Be 'wtw remote: workstation'
+        $config.commands[0].description | Should -Match 'windows'
+        $config.commands[0].keywords | Should -Contain 'at'
+        $config.commands[0].workspace.layout.pane.surfaces[0].command |
+            Should -Be 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on workstation go"'
+    }
+
+    It 'unregister leaves a local HOME-cwd command in place' {
+        $homePath = if ($HOME) { [System.IO.Path]::GetFullPath($HOME) } else { (Get-Location).Path }
+        $existing = [PSCustomObject]@{
+            commands = @(
+                [PSCustomObject]@{
+                    id          = 'wtw.local-home'
+                    name        = 'wtw: local home'
+                    workspace   = [PSCustomObject]@{ cwd = $homePath; name = 'local' }
+                }
+            )
+        }
+        $existing | ConvertTo-Json -Depth 8 | Set-Content -Path $script:configPath -Encoding utf8
+
+        Register-WtwCmuxRemoteProject -HostEntry $script:remoteHost -ConfigPath $script:configPath | Out-Null
+        Unregister-WtwCmuxRemoteProject -HostName 'workstation' -ConfigPath $script:configPath
+
+        $config = Get-Content -Path $script:configPath -Raw | ConvertFrom-Json
+        @($config.commands).Count | Should -Be 1
+        $config.commands[0].id | Should -Be 'wtw.local-home'
+    }
+}
+
+Describe 'Invoke-Wtw --on host with no command' {
+    It 'opens the remote cmux project when cmux is present' {
+        InModuleScope wtw {
+            Mock Write-WtwUpdateNotice { }
+            Mock Get-WtwHostNames { @('at', 'workstation') }
+            Mock Resolve-WtwHost { @{ Name = 'workstation'; Aliases = @('at') } }
+            Mock Test-WtwCmuxPresent { $true }
+            Mock Open-WtwCmuxRemoteWorkspace { }
+            Mock Connect-WtwRemoteWorktree { throw 'cmux is present — do not ssh in this terminal' }
+
+            Invoke-Wtw '--on' 'at'
+
+            Should -Invoke Open-WtwCmuxRemoteWorkspace -Times 1 -Exactly -ParameterFilter {
+                $HostSelector -eq 'at'
+            }
+        }
+    }
+
+    It 'falls back to ssh home when cmux is missing' {
+        InModuleScope wtw {
+            Mock Write-WtwUpdateNotice { }
+            Mock Get-WtwHostNames { @('at') }
+            Mock Resolve-WtwHost { @{ Name = 'workstation'; Aliases = @('at') } }
+            Mock Test-WtwCmuxPresent { $false }
+            Mock Open-WtwCmuxRemoteWorkspace { throw 'cmux is missing' }
+            Mock Connect-WtwRemoteWorktree { }
+
+            Invoke-Wtw '--on' 'at'
+
+            Should -Invoke Connect-WtwRemoteWorktree -Times 1 -Exactly
         }
     }
 }

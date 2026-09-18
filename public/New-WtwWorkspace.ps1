@@ -85,10 +85,10 @@ function New-WtwWorkspace {
     $taskKey = if ($Main) { 'main' } else { $Name }
     $color = New-WtwColor -RepoName $repoName -TaskName $taskKey
 
-    Write-Host ''
-    Write-Host "  Generating workspace: $wsName" -ForegroundColor Cyan
-    Write-Host "  Code folder: $codeFolderPath"
-    Write-Host "  Color:       $color"
+    Write-WtwHost ''
+    Write-WtwHost "  Generating workspace: $wsName" -ForegroundColor Cyan
+    Write-WtwHost "  Code folder: $codeFolderPath"
+    Write-WtwHost "  Color:       $color"
 
     New-WtwWorkspaceFile `
         -RepoName $repoName `
@@ -99,13 +99,13 @@ function New-WtwWorkspace {
         -Color $color `
         -Managed | Out-Null
 
-    Write-Host "  Workspace:   $wsFile" -ForegroundColor Green
+    Write-WtwHost "  Workspace:   $wsFile" -ForegroundColor Green
 
     if ($Open) {
         $editor = Get-WtwPropertyValue -Object $config -Name 'editor' -DefaultValue 'code'
-        Write-Host "  Opening in ${editor}..." -ForegroundColor Green
+        Write-WtwHost "  Opening in ${editor}..." -ForegroundColor Green
         Invoke-WtwEditorCli -Cmd $editor -Path $wsFile
     }
 
-    Write-Host ''
+    Write-WtwHost ''
 }

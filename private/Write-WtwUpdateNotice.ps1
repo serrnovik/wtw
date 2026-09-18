@@ -311,13 +311,13 @@ function Write-WtwUpdateNotice {
         # An install probe that fails must not swallow "a new version exists".
         $install = try { Get-WtwInstallInfo } catch { $null }
 
-        Write-Host ''
-        Write-Host ("  wtw {0} is available (you have {1})." -f $latestVersion, $currentVersion) -ForegroundColor Cyan
+        Write-WtwHost ''
+        Write-WtwHost ("  wtw {0} is available (you have {1})." -f $latestVersion, $currentVersion) -ForegroundColor Cyan
         if ($install -and $install.Flavour -eq 'Repo') {
-            Write-Host ("  You are running from a checkout at {0}" -f $install.ModuleRoot) -ForegroundColor DarkGray
-            Write-Host '  Update: git pull, then wtw install' -ForegroundColor DarkGray
+            Write-WtwHost ("  You are running from a checkout at {0}" -f $install.ModuleRoot) -ForegroundColor DarkGray
+            Write-WtwHost '  Update: git pull, then wtw install' -ForegroundColor DarkGray
         } else {
-            Write-Host '  Update: wtw update' -ForegroundColor DarkGray
+            Write-WtwHost '  Update: wtw update' -ForegroundColor DarkGray
         }
     } catch {
         # An update hint must never slow down, interrupt, or fail a wtw command.

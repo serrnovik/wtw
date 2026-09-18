@@ -336,30 +336,30 @@ function Resolve-WtwT3StateConflict {
         return @{ proceed = $false; relaunch = $false }
     }
 
-    Write-Host ''
-    Write-Host '  T3 Code is running — it owns its project store while open.' -ForegroundColor Yellow
-    Write-Host '  How should I register this worktree as a project?' -ForegroundColor Yellow
-    Write-Host '    [c] Close T3 Code yourself, then register (I will wait, then relaunch)'
-    Write-Host '    [k] Quit T3 Code for me, register, relaunch'
-    Write-Host '    [s] Skip — just bring T3 Code forward'
+    Write-WtwHost ''
+    Write-WtwHost '  T3 Code is running — it owns its project store while open.' -ForegroundColor Yellow
+    Write-WtwHost '  How should I register this worktree as a project?' -ForegroundColor Yellow
+    Write-WtwHost '    [c] Close T3 Code yourself, then register (I will wait, then relaunch)'
+    Write-WtwHost '    [k] Quit T3 Code for me, register, relaunch'
+    Write-WtwHost '    [s] Skip — just bring T3 Code forward'
 
     $answer = (Read-Host '  Choice [c/k/s]').Trim().ToLowerInvariant()
     if (-not $answer) { $answer = 'c' }
 
     switch ($answer) {
         'c' {
-            Write-Host '  Waiting for T3 Code to close (Ctrl+C to abort)...' -ForegroundColor Cyan
+            Write-WtwHost '  Waiting for T3 Code to close (Ctrl+C to abort)...' -ForegroundColor Cyan
             while (Test-WtwT3AppRunning -Candidates $Candidates) { Start-Sleep -Milliseconds 500 }
-            Write-Host '  T3 Code closed.' -ForegroundColor Green
+            Write-WtwHost '  T3 Code closed.' -ForegroundColor Green
             return @{ proceed = $true; relaunch = $true }
         }
         'k' {
-            Write-Host '  Closing T3 Code...' -ForegroundColor Cyan
+            Write-WtwHost '  Closing T3 Code...' -ForegroundColor Cyan
             if (-not (Stop-WtwT3Process -Candidates $Candidates)) {
-                Write-Host '  Could not stop T3 Code — skipping project registration.' -ForegroundColor Red
+                Write-WtwHost '  Could not stop T3 Code — skipping project registration.' -ForegroundColor Red
                 return @{ proceed = $false; relaunch = $false }
             }
-            Write-Host '  T3 Code stopped.' -ForegroundColor Green
+            Write-WtwHost '  T3 Code stopped.' -ForegroundColor Green
             return @{ proceed = $true; relaunch = $true }
         }
         default {

@@ -196,7 +196,7 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 | `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X] [--emoji X] [--sourcegit-folder]` | Register current repo with aliases, template, per-shell session scripts, optional SourceGit / list / cmux / wmux / T3 prefix, and optional SourceGit group folder |
 | `wtw add [path] [--repo X --task X] [--alias a,b] [--emoji X] [--sourcegit-folder]` | Import an existing worktree into the registry |
 | `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b] [--emoji X]` | Create worktree + workspace + branch |
-| `wtw list [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`--wide` = full aliases and paths) |
+| `wtw list [-f\|--filter text] [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`-f kul` = substring; `--wide` = full aliases and paths) |
 | `wtw <name>` | Switch to repo/worktree — implicit `go` (cd + session init) |
 | `wtw go <name>` | Same as above, explicit |
 | `wtw open [name] [--editor X]` | Open workspace in editor (defaults to current repo/worktree) |
@@ -245,6 +245,7 @@ wtw --on at cursor auth     # open its "auth" worktree here, in Cursor
 wtw at cursor auth          # same thing — bare host shorthand
 wtw --on at go auth         # ssh into that worktree: pwsh, right directory
 wtw --on at cmux auth       # same session, in a local cmux workspace
+wtw --on at                 # open the machine as a cmux project (ssh home if no cmux)
 wtw --at at cursor auth     # `--at` is an alias of `--on`
 ```
 
@@ -304,7 +305,14 @@ than dumping you in the home directory behind a scrolled-off error.
 matched by title or `wtw-remote:` description, never by the local home
 directory they share as cwd. Omit the name to land in the remote home directory.
 
+Each host is also a persistent cmux project (`wtw remote: workstation` in the
+Command Palette / sidebar), registered on `wtw host add` / `sync` / `discover`
+and when you open a remote cmux tab. Picking that project starts
+`wtw --on <host> go` — the same as sitting down at that machine. `wtw --on at`
+with no subcommand opens it.
+
 ```powershell
+wtw --on at                 # open the machine project
 wtw --on at cmux auth
 wtw --at workstation cmux --via tailscale
 wtw --on at cmux
@@ -627,6 +635,11 @@ If `--template` points to a real `.code-workspace` file (no `{{WTW_*}}` placehol
 ## List Output
 
 ### Standard view
+
+`wtw list -f kul` (alias `--filter`) keeps repos whose name or alias contains
+`kul` — and every worktree under those repos — plus any worktree whose task,
+alias, or pretty name matches. `wtw list kulissa-landing` still requires an
+**exact** repo name or alias; `-f` is the substring form.
 
 `wtw list` shows registered repos and worktrees in a **compact** table so terminal width stays usable:
 
@@ -1007,6 +1020,19 @@ wtw is a PowerShell module, but you don't need to use pwsh as your daily shell. 
 | `wtw list`, `wtw create`, etc. | Passthrough | Full logic |
 
 The pwsh subprocess adds ~400ms latency to `wtw go`. Pre-generated shell aliases are instant.
+
+### Host colors and `shell-theme`
+
+CLI chrome (`wtw clean`, tables, status lines) follows the same theme knobs as chezmoi `shell-theme` / agent-shell. After `theme.ps1` or `theme.zsh` has run, WTW uses those truecolor inks instead of the 16-color `Write-Host -ForegroundColor` palette (which washes out on a light cream background).
+
+| Variable | Role |
+|----------|------|
+| `WTW_THEME` | Force `light` or `dark` for WTW only |
+| `AGENT_SHELL_THEME` | Set by `shell-theme` |
+| `STARSHIP_THEME` | Starship light/dark |
+| `TERM_BACKGROUND` | Common terminal hint |
+
+If none of those are set, WTW falls back to a cheap console hint (Windows light sets RawUI ink to Black; `COLORFGBG`; light RawUI backgrounds). Set `NO_COLOR=1` to print uncolored text.
 
 ### Terminal Color Support
 

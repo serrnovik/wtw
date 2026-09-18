@@ -516,29 +516,29 @@ function Register-WtwWmuxProject {
 
     if (-not $IsWindows) { return $null }
     if (-not (Test-WtwWmuxPresent)) {
-        Write-Host '  wmux: CLI not found - skipping workspace creation.' -ForegroundColor DarkGray
+        Write-WtwHost '  wmux: CLI not found - skipping workspace creation.' -ForegroundColor DarkGray
         return $null
     }
 
     if (-not (Confirm-WtwWmuxRunning)) {
         $hint = if ($TaskName) { "wtw wmux $TaskName" } else { 'wtw wmux <name>' }
-        Write-Host "  wmux: app not running - skipped. Run '$hint' to create the workspace once wmux is open." -ForegroundColor DarkGray
+        Write-WtwHost "  wmux: app not running - skipped. Run '$hint' to create the workspace once wmux is open." -ForegroundColor DarkGray
         return $null
     }
 
     $existing = Find-WtwWmuxWorkspace -PrettyName $PrettyName -ProjectPath $ProjectPath
     if ($existing) {
-        Write-Host "  wmux: workspace already exists '$PrettyName'." -ForegroundColor DarkGray
+        Write-WtwHost "  wmux: workspace already exists '$PrettyName'." -ForegroundColor DarkGray
         return $PrettyName
     }
 
     $created = New-WtwWmuxWorkspace -ProjectPath $ProjectPath -PrettyName $PrettyName
     if (-not $created.Success) {
-        Write-Host "  wmux: could not create workspace - $($created.Reason)" -ForegroundColor Yellow
+        Write-WtwHost "  wmux: could not create workspace - $($created.Reason)" -ForegroundColor Yellow
         return $null
     }
 
-    Write-Host "  wmux: created workspace '$PrettyName'" -ForegroundColor Green
+    Write-WtwHost "  wmux: created workspace '$PrettyName'" -ForegroundColor Green
     return $PrettyName
 }
 
@@ -566,6 +566,6 @@ function Unregister-WtwWmuxProject {
 
     $result = Invoke-WtwWmuxCommand -ArgumentList @('close-workspace', "$workspaceId")
     if ($result.ExitCode -eq 0) {
-        Write-Host "  wmux: closed workspace '$PrettyName'." -ForegroundColor Green
+        Write-WtwHost "  wmux: closed workspace '$PrettyName'." -ForegroundColor Green
     }
 }

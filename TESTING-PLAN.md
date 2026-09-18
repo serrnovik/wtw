@@ -46,6 +46,7 @@ Plan for integration tests and GitHub Actions CI. Not yet implemented.
 #### 4. `Wtw.List.Tests.ps1` — List output
 - `wtw list` returns all repos and worktrees
 - `wtw list --repo alias` filters to one repo
+- `wtw list -f kul` substring-filters repos and worktrees
 - `wtw list -d` produces detailed output (spot-check for key strings)
 - Output includes correct branch names and colors
 

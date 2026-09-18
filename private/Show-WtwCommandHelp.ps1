@@ -96,8 +96,8 @@ function Show-WtwCommandHelp {
             '  wtw create initiative-016 --from MS-phase-5-swim-polish   # stack on another branch',
             '  wtw create auth --color "forest green"'
         ) }
-        'list'        { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)', '', 'Options:', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)') }
-        'ls'          { @('wtw list [repo]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Filter to a specific repo (optional)', '', 'Options:', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)') }
+        'list'        { @('wtw list [repo] [-f|--filter <text>]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Exact repo name or alias (optional)', '', 'Options:', '  -f, --filter     Substring match on repo / alias / worktree / pretty name', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)', '', 'A matching repo includes all of its worktrees. A matching worktree', 'keeps its parent repo row. `wtw list kul` still needs an exact repo;', 'use `wtw list -f kul` for kulissa-*.') }
+        'ls'          { @('wtw list [repo] [-f|--filter <text>]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Exact repo name or alias (optional)', '', 'Options:', '  -f, --filter     Substring match on repo / alias / worktree / pretty name', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)', '', 'A matching repo includes all of its worktrees. A matching worktree', 'keeps its parent repo row. `wtw list kul` still needs an exact repo;', 'use `wtw list -f kul` for kulissa-*.') }
         'info'        { @('wtw info <name>', 'Show full details for a repo or all its worktrees.', '', 'Arguments:', '  name    Anything wtw go accepts: repo alias, task name, alias-task combo, prefix, or fuzzy', '', 'Alias: wtw show') }
         'show'        { @('wtw info <name>', 'Show full details for a repo or all its worktrees.', '', 'Arguments:', '  name    Anything wtw go accepts: repo alias, task name, alias-task combo, prefix, or fuzzy', '', 'Alias: wtw show') }
         'go'          { @('wtw go <name>', 'Switch to a worktree (cd + session init).', '', 'Arguments:', '  name    Repo alias, task name, or alias-task combo') }
@@ -189,8 +189,10 @@ function Show-WtwCommandHelp {
             '  discover          Register machines found on your tailnet (Tailscale)',
             '                    --yes to skip the prompt, --exclude a,b to ignore for good',
             '  add <name>        Add or update a host, then sync ssh config',
+            '                    and register a cmux project (`wtw remote: <name>`)',
             '  remove <name>     Drop a host, then sync ssh config',
-            '  sync              Re-probe addresses, rewrite ~/.ssh/config.d/wtw',
+            '  sync              Re-probe addresses, rewrite ~/.ssh/config.d/wtw,',
+            '                    and refresh cmux remote projects',
             '  trust <name>      Show host-key fingerprints, then add to known_hosts',
             '  test <name>       Probe addresses, ssh config, and the remote wtw',
             '',
@@ -244,8 +246,13 @@ function Show-WtwCommandHelp {
                 'an ssh session into that host (the same as `wtw --on <host> go [name]`).',
                 'Omit the name to land in the remote home directory.',
                 '',
+                'Each configured host is also registered as a cmux Command Palette /',
+                'sidebar project (`wtw remote: <host>`). `wtw --on <host>` with no',
+                'subcommand opens that project.',
+                '',
                 'Examples:',
                 '  wtw cmux snowmain1',
+                '  wtw --on at',
                 '  wtw --on at cmux',
                 '  wtw --at workstation cmux auth --via tailscale'
             )
@@ -281,12 +288,12 @@ function Show-WtwCommandHelp {
     }
 
     if ($help) {
-        Write-Host ''
-        Write-Host "  $($help[0])" -ForegroundColor Cyan
+        Write-WtwHost ''
+        Write-WtwHost "  $($help[0])" -ForegroundColor Cyan
         for ($i = 1; $i -lt $help.Count; $i++) {
-            Write-Host "  $($help[$i])"
+            Write-WtwHost "  $($help[$i])"
         }
-        Write-Host ''
+        Write-WtwHost ''
     } else {
         Invoke-Wtw
     }

@@ -66,13 +66,13 @@ function Invoke-WtwHost {
         'list' {
             $hosts = Get-WtwHosts
             if ($hosts.Count -eq 0) {
-                Write-Host ''
-                Write-Host '  No remote hosts configured.' -ForegroundColor Yellow
-                Write-Host '  Add one:  wtw host add workstation --alias at --user dev --address 192.168.1.10 --platform windows' -ForegroundColor DarkGray
-                Write-Host ''
+                Write-WtwHost ''
+                Write-WtwHost '  No remote hosts configured.' -ForegroundColor Yellow
+                Write-WtwHost '  Add one:  wtw host add workstation --alias at --user dev --address 192.168.1.10 --platform windows' -ForegroundColor DarkGray
+                Write-WtwHost ''
                 return
             }
-            Write-Host ''
+            Write-WtwHost ''
             $ztPrefixes = Get-WtwZeroTierPrefixes
             foreach ($h in ($hosts | Sort-Object { $_.Name })) {
                 $aliases = if (@($h.Aliases).Count -gt 0) { " (" + (@($h.Aliases) -join ', ') + ")" } else { '' }
@@ -88,21 +88,21 @@ function Invoke-WtwHost {
                 $active = if ($effective) { $effective } else { ($h.HostNames | Select-Object -First 1) }
                 $kind = if ($active) { Get-WtwAddressKind -Address $active -ZeroTierPrefixes $ztPrefixes } else { '-' }
 
-                Write-Host "  $(Get-WtwHostTitlePrefix -HostEntry $h) " -ForegroundColor Green -NoNewline
-                Write-Host "$($h.Name)$aliases" -ForegroundColor Cyan -NoNewline
-                Write-Host "  $($h.User)@$active  [$($h.Platform)]" -ForegroundColor White -NoNewline
-                Write-Host "  via $kind" -ForegroundColor Green -NoNewline
-                Write-Host "  $known" -ForegroundColor $knownColor
+                Write-WtwHost "  $(Get-WtwHostTitlePrefix -HostEntry $h) " -ForegroundColor Green -NoNewline
+                Write-WtwHost "$($h.Name)$aliases" -ForegroundColor Cyan -NoNewline
+                Write-WtwHost "  $($h.User)@$active  [$($h.Platform)]" -ForegroundColor White -NoNewline
+                Write-WtwHost "  via $kind" -ForegroundColor Green -NoNewline
+                Write-WtwHost "  $known" -ForegroundColor $knownColor
                 if (@($h.HostNames).Count -gt 1) {
                     $labelled = @($h.HostNames | ForEach-Object {
                             "$_ [$(Get-WtwAddressKind -Address $_ -ZeroTierPrefixes $ztPrefixes)]"
                         })
-                    Write-Host "      candidates: $($labelled -join ', ')" -ForegroundColor DarkGray
+                    Write-WtwHost "      candidates: $($labelled -join ', ')" -ForegroundColor DarkGray
                 }
             }
-            Write-Host ''
-            Write-Host '  Details: wtw host show [name]' -ForegroundColor DarkGray
-            Write-Host ''
+            Write-WtwHost ''
+            Write-WtwHost '  Details: wtw host show [name]' -ForegroundColor DarkGray
+            Write-WtwHost ''
         }
 
         'add' {
@@ -149,8 +149,12 @@ function Invoke-WtwHost {
             $config | Add-Member -NotePropertyName 'hosts' -NotePropertyValue $hosts -Force
             Save-WtwConfig $config
 
-            Write-Host "  Saved host '$Name'." -ForegroundColor Green
+            Write-WtwHost "  Saved host '$Name'." -ForegroundColor Green
             Sync-WtwSshConfig | Out-Null
+            $savedHost = Resolve-WtwHost -Name $Name
+            if ($savedHost) {
+                Register-WtwCmuxRemoteProject -HostEntry $savedHost | Out-Null
+            }
         }
 
         'remove' {
@@ -163,17 +167,19 @@ function Invoke-WtwHost {
             }
             $hosts.PSObject.Properties.Remove($Name)
             Save-WtwConfig $config
-            Write-Host "  Removed host '$Name'." -ForegroundColor Green
+            Write-WtwHost "  Removed host '$Name'." -ForegroundColor Green
             Sync-WtwSshConfig | Out-Null
+            Unregister-WtwCmuxRemoteProject -HostName $Name
         }
 
         'sync' {
             $hosts = Get-WtwHosts
             if ($hosts.Count -eq 0) {
-                Write-Host '  No hosts configured — nothing to sync.' -ForegroundColor Yellow
+                Write-WtwHost '  No hosts configured — nothing to sync.' -ForegroundColor Yellow
                 return
             }
             Sync-WtwSshConfig | Out-Null
+            Sync-WtwCmuxRemoteProjects
         }
 
         'discover' {
@@ -181,13 +187,13 @@ function Invoke-WtwHost {
             # the array and every $item.Property would read the wrapper.
             $peers = Get-WtwTailscalePeers
             if ($peers.Count -eq 0) {
-                Write-Host ''
-                Write-Host '  No tailnet found.' -ForegroundColor Yellow
+                Write-WtwHost ''
+                Write-WtwHost '  No tailnet found.' -ForegroundColor Yellow
                 if (-not (Get-WtwTailscaleCommand)) {
-                    Write-Host '  The tailscale CLI is not installed here. https://tailscale.com/download' -ForegroundColor DarkGray
+                    Write-WtwHost '  The tailscale CLI is not installed here. https://tailscale.com/download' -ForegroundColor DarkGray
                 } else {
-                    Write-Host '  tailscale is installed but reported nothing — is it logged in and up?' -ForegroundColor DarkGray
-                    Write-Host '    tailscale status' -ForegroundColor DarkGray
+                    Write-WtwHost '  tailscale is installed but reported nothing — is it logged in and up?' -ForegroundColor DarkGray
+                    Write-WtwHost '    tailscale status' -ForegroundColor DarkGray
                 }
                 Show-WtwZeroTierHint
                 return
@@ -202,42 +208,42 @@ function Invoke-WtwHost {
                 if (-not $config) { $config = New-WtwDefaultConfig }
                 $config | Add-Member -NotePropertyName 'discoverIgnore' -NotePropertyValue @($ignored) -Force
                 Save-WtwConfig $config
-                Write-Host "  Ignoring from now on: $((@($ignored)) -join ', ')" -ForegroundColor DarkGray
+                Write-WtwHost "  Ignoring from now on: $((@($ignored)) -join ', ')" -ForegroundColor DarkGray
             }
 
             $existingHosts = Get-WtwHosts
             $plan = Resolve-WtwPeerPlan -Peers $peers -Hosts $existingHosts -Ignore $ignored
 
-            Write-Host ''
-            Write-Host '  Tailnet machines' -ForegroundColor Cyan
-            Write-Host ''
+            Write-WtwHost ''
+            Write-WtwHost '  Tailnet machines' -ForegroundColor Cyan
+            Write-WtwHost ''
             foreach ($item in $plan) {
                 $color = switch ($item.Action) {
                     'add' { 'Green' } 'update' { 'Yellow' } 'ok' { 'DarkGray' } default { 'DarkGray' }
                 }
                 $state = if ($item.Online) { 'online ' } else { 'offline' }
-                Write-Host ("    {0,-8} {1,-24} {2,-8} {3,-8} {4}" -f $item.Action, $item.Name, ($item.Platform ?? '-'), $state, $item.Reason) -ForegroundColor $color
+                Write-WtwHost ("    {0,-8} {1,-24} {2,-8} {3,-8} {4}" -f $item.Action, $item.Name, ($item.Platform ?? '-'), $state, $item.Reason) -ForegroundColor $color
                 if ($item.AddAddresses.Count -gt 0) {
-                    Write-Host ("             + " + (@($item.AddAddresses) -join ', ')) -ForegroundColor DarkGray
+                    Write-WtwHost ("             + " + (@($item.AddAddresses) -join ', ')) -ForegroundColor DarkGray
                 }
             }
-            Write-Host ''
+            Write-WtwHost ''
 
             $actionable = @($plan | Where-Object { $_.Action -in @('add', 'update') })
             if ($actionable.Count -eq 0) {
-                Write-Host '  Nothing to change.' -ForegroundColor Green
+                Write-WtwHost '  Nothing to change.' -ForegroundColor Green
                 Show-WtwZeroTierHint
                 return
             }
 
             # Tailscale knows the machine but not which account you ssh in as.
             $sshUser = if ($User) { $User } elseif ($env:USER) { $env:USER } else { $env:USERNAME }
-            Write-Host "  New hosts will use ssh user '$sshUser' (override with --user)." -ForegroundColor DarkGray
+            Write-WtwHost "  New hosts will use ssh user '$sshUser' (override with --user)." -ForegroundColor DarkGray
 
             if (-not $Yes) {
                 $answer = Read-Host "  Apply these $($actionable.Count) change(s)? [y/N]"
                 if ($answer -notin @('y', 'Y', 'yes')) {
-                    Write-Host '  No changes made.' -ForegroundColor DarkGray
+                    Write-WtwHost '  No changes made.' -ForegroundColor DarkGray
                     return
                 }
             }
@@ -263,17 +269,18 @@ function Invoke-WtwHost {
                 }
 
                 $hostMap | Add-Member -NotePropertyName $item.Name -NotePropertyValue $entry -Force
-                Write-Host "  $($item.Action): $($item.Name)" -ForegroundColor Green
+                Write-WtwHost "  $($item.Action): $($item.Name)" -ForegroundColor Green
             }
 
             $config | Add-Member -NotePropertyName 'hosts' -NotePropertyValue $hostMap -Force
             Save-WtwConfig $config
             Sync-WtwSshConfig | Out-Null
+            Sync-WtwCmuxRemoteProjects
 
-            Write-Host ''
-            Write-Host '  Next:  wtw host trust <name>   then   wtw host test <name>' -ForegroundColor DarkGray
-            Write-Host '  Aliases are not invented for you — add one with: wtw host add <name> --alias <a>' -ForegroundColor DarkGray
-            Write-Host ''
+            Write-WtwHost ''
+            Write-WtwHost '  Next:  wtw host trust <name>   then   wtw host test <name>' -ForegroundColor DarkGray
+            Write-WtwHost '  Aliases are not invented for you — add one with: wtw host add <name> --alias <a>' -ForegroundColor DarkGray
+            Write-WtwHost ''
             Show-WtwZeroTierHint
         }
 
@@ -286,9 +293,9 @@ function Invoke-WtwHost {
                 Get-WtwHosts
             }
             if (@($targets).Count -eq 0) {
-                Write-Host ''
-                Write-Host '  No remote hosts configured.  Try: wtw host discover' -ForegroundColor Yellow
-                Write-Host ''
+                Write-WtwHost ''
+                Write-WtwHost '  No remote hosts configured.  Try: wtw host discover' -ForegroundColor Yellow
+                Write-WtwHost ''
                 return
             }
 
@@ -297,49 +304,49 @@ function Invoke-WtwHost {
                 $resolved = Resolve-WtwHostAddress -HostEntry $h
                 $port = if ($h.Port) { [int]$h.Port } else { 22 }
 
-                Write-Host ''
-                Write-Host "  $($h.Name)" -ForegroundColor Cyan -NoNewline
-                if (@($h.Aliases).Count -gt 0) { Write-Host "  (aliases: $((@($h.Aliases)) -join ', '))" -ForegroundColor DarkGray } else { Write-Host '' }
+                Write-WtwHost ''
+                Write-WtwHost "  $($h.Name)" -ForegroundColor Cyan -NoNewline
+                if (@($h.Aliases).Count -gt 0) { Write-WtwHost "  (aliases: $((@($h.Aliases)) -join ', '))" -ForegroundColor DarkGray } else { Write-WtwHost '' }
 
-                Write-Host "    ssh          $($h.User)@$($resolved.Address)  port $port" -ForegroundColor White
-                Write-Host "    platform     $($h.Platform)" -ForegroundColor White
-                Write-Host "    title as     $(Get-WtwHostTitlePrefix -HostEntry $h)<worktree>" -ForegroundColor White
-                if ($h.IdentityFile) { Write-Host "    identity     $($h.IdentityFile)" -ForegroundColor White }
-                if ($h.Pwsh)         { Write-Host "    pwsh         $($h.Pwsh)" -ForegroundColor White }
-                if ($h.Wtw -and $h.Wtw -ne 'wtw') { Write-Host "    wtw command  $($h.Wtw)" -ForegroundColor White }
+                Write-WtwHost "    ssh          $($h.User)@$($resolved.Address)  port $port" -ForegroundColor White
+                Write-WtwHost "    platform     $($h.Platform)" -ForegroundColor White
+                Write-WtwHost "    title as     $(Get-WtwHostTitlePrefix -HostEntry $h)<worktree>" -ForegroundColor White
+                if ($h.IdentityFile) { Write-WtwHost "    identity     $($h.IdentityFile)" -ForegroundColor White }
+                if ($h.Pwsh)         { Write-WtwHost "    pwsh         $($h.Pwsh)" -ForegroundColor White }
+                if ($h.Wtw -and $h.Wtw -ne 'wtw') { Write-WtwHost "    wtw command  $($h.Wtw)" -ForegroundColor White }
 
                 # NOT $via: PowerShell variable names are case-insensitive, so
                 # assigning $via rebinds the $Via parameter and trips its
                 # ValidateSet on an empty value.
                 $preferredVia = Get-WtwPropertyValue -Object $h -Name 'Via'
                 $viaLabel = if ($preferredVia -and $preferredVia -ne 'any') { $preferredVia } else { 'any (first reachable wins)' }
-                Write-Host "    prefer       $viaLabel" -ForegroundColor White
+                Write-WtwHost "    prefer       $viaLabel" -ForegroundColor White
 
-                Write-Host '    addresses' -ForegroundColor White
+                Write-WtwHost '    addresses' -ForegroundColor White
                 foreach ($candidate in @($h.HostNames)) {
                     $kind = Get-WtwAddressKind -Address $candidate -ZeroTierPrefixes $ztPrefixes
                     $up = Test-WtwAddressReachable -Address $candidate -Port $port
                     $active = if ($candidate -eq $resolved.Address) { '→' } else { ' ' }
                     $state = if ($up) { 'up  ' } else { 'down' }
                     $color = if ($candidate -eq $resolved.Address) { 'Green' } elseif ($up) { 'White' } else { 'DarkGray' }
-                    Write-Host ("      {0} {1,-10} {2}  {3}" -f $active, $kind, $state, $candidate) -ForegroundColor $color
+                    Write-WtwHost ("      {0} {1,-10} {2}  {3}" -f $active, $kind, $state, $candidate) -ForegroundColor $color
                 }
                 if ($preferredVia -and $preferredVia -ne 'any' -and -not $resolved.Preferred) {
-                    Write-Host "      note: '$preferredVia' was preferred but is not reachable — using $($resolved.Kind)." -ForegroundColor Yellow
+                    Write-WtwHost "      note: '$preferredVia' was preferred but is not reachable — using $($resolved.Kind)." -ForegroundColor Yellow
                 }
 
                 $conflicts = Get-WtwSshHostConflicts -Name $h.Name -Aliases $h.Aliases
                 if ($conflicts.Count -gt 0) {
-                    Write-Host "    ssh config   $($conflicts.Count) other Host block(s) also match this name:" -ForegroundColor Yellow
+                    Write-WtwHost "    ssh config   $($conflicts.Count) other Host block(s) also match this name:" -ForegroundColor Yellow
                     foreach ($conflict in $conflicts) {
-                        Write-Host "                 $($conflict.File):$($conflict.Line)" -ForegroundColor DarkGray
+                        Write-WtwHost "                 $($conflict.File):$($conflict.Line)" -ForegroundColor DarkGray
                     }
                 }
             }
-            Write-Host ''
-            Write-Host '  Change one:  wtw host add <name> --via tailscale|lan|mdns|zerotier|any' -ForegroundColor DarkGray
-            Write-Host '  Deep check:  wtw host test <name>' -ForegroundColor DarkGray
-            Write-Host ''
+            Write-WtwHost ''
+            Write-WtwHost '  Change one:  wtw host add <name> --via tailscale|lan|mdns|zerotier|any' -ForegroundColor DarkGray
+            Write-WtwHost '  Deep check:  wtw host test <name>' -ForegroundColor DarkGray
+            Write-WtwHost ''
         }
 
         'trust' {
@@ -380,8 +387,8 @@ function Invoke-WtwHost {
                 }
             }
 
-            Write-Host ''
-            Write-Host '  Host keys offered:' -ForegroundColor Cyan
+            Write-WtwHost ''
+            Write-WtwHost '  Host keys offered:' -ForegroundColor Cyan
             $anyAlreadyTrusted = $false
             foreach ($key in ($keys | Select-Object -Unique)) {
                 $fields = $key -split '\s+'
@@ -396,29 +403,29 @@ function Invoke-WtwHost {
                 $material = if ($fields.Count -ge 3) { $fields[2] } else { $null }
                 $match = if ($material -and $trustedMaterial.ContainsKey($material)) { $trustedMaterial[$material] } else { $null }
 
-                Write-Host "    $($fields[0])  $fingerprint" -ForegroundColor White -NoNewline
+                Write-WtwHost "    $($fields[0])  $fingerprint" -ForegroundColor White -NoNewline
                 if ($match) {
                     $anyAlreadyTrusted = $true
-                    Write-Host "  ← same key you already trust for $match" -ForegroundColor Green
+                    Write-WtwHost "  ← same key you already trust for $match" -ForegroundColor Green
                 } else {
-                    Write-Host ''
+                    Write-WtwHost ''
                 }
             }
 
-            Write-Host ''
+            Write-WtwHost ''
             if ($anyAlreadyTrusted) {
-                Write-Host '  Keys marked above already match a host you trust, so those are the same' -ForegroundColor Green
-                Write-Host '  machine reachable under another name.' -ForegroundColor Green
+                Write-WtwHost '  Keys marked above already match a host you trust, so those are the same' -ForegroundColor Green
+                Write-WtwHost '  machine reachable under another name.' -ForegroundColor Green
             } else {
-                Write-Host '  None of these match a host you already trust. Verify against the machine:' -ForegroundColor Yellow
-                Write-Host '    on that host, run:  ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub' -ForegroundColor DarkGray
-                Write-Host '    (Windows OpenSSH:   ssh-keygen -lf $env:ProgramData\ssh\ssh_host_ed25519_key.pub)' -ForegroundColor DarkGray
+                Write-WtwHost '  None of these match a host you already trust. Verify against the machine:' -ForegroundColor Yellow
+                Write-WtwHost '    on that host, run:  ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub' -ForegroundColor DarkGray
+                Write-WtwHost '    (Windows OpenSSH:   ssh-keygen -lf $env:ProgramData\ssh\ssh_host_ed25519_key.pub)' -ForegroundColor DarkGray
             }
-            Write-Host ''
+            Write-WtwHost ''
 
             $answer = Read-Host "  Add these to ~/.ssh/known_hosts? [y/N]"
             if ($answer -notin @('y', 'Y', 'yes')) {
-                Write-Host '  Not added.' -ForegroundColor DarkGray
+                Write-WtwHost '  Not added.' -ForegroundColor DarkGray
                 return
             }
 
@@ -434,7 +441,7 @@ function Invoke-WtwHost {
                     $added++
                 }
             }
-            Write-Host "  Added $added key(s) to $knownHosts." -ForegroundColor Green
+            Write-WtwHost "  Added $added key(s) to $knownHosts." -ForegroundColor Green
         }
 
         'test' {
@@ -442,55 +449,55 @@ function Invoke-WtwHost {
             $entry = Resolve-WtwHost -Name $Name
             if (-not $entry) { Write-Error "Host '$Name' is not configured. See: wtw host list"; return }
 
-            Write-Host ''
-            Write-Host "  addresses     " -NoNewline
+            Write-WtwHost ''
+            Write-WtwHost "  addresses     " -NoNewline
             $resolved = Resolve-WtwHostAddress -HostEntry $entry
             if ($resolved.Reachable) {
-                Write-Host "$($resolved.Address) answers on ssh" -ForegroundColor Green
+                Write-WtwHost "$($resolved.Address) answers on ssh" -ForegroundColor Green
             } else {
-                Write-Host "none of [$((@($entry.HostNames)) -join ', ')] answered" -ForegroundColor Red
+                Write-WtwHost "none of [$((@($entry.HostNames)) -join ', ')] answered" -ForegroundColor Red
             }
 
-            Write-Host "  ssh config    " -NoNewline
+            Write-WtwHost "  ssh config    " -NoNewline
             if (Test-WtwSshHostKnown -Name $entry.Name) {
                 $configured = (& ssh -G $entry.Name 2>$null |
                         Where-Object { $_ -match '^hostname\s+(.+)$' } |
                         Select-Object -First 1) -replace '^hostname\s+', ''
                 if ($resolved.Reachable -and $configured.Trim() -ne $resolved.Address) {
                     # The stored address went stale — normal on DHCP.
-                    Write-Host "resolves to $($configured.Trim()), but $($resolved.Address) is the live one — run: wtw host sync" -ForegroundColor Yellow
+                    Write-WtwHost "resolves to $($configured.Trim()), but $($resolved.Address) is the live one — run: wtw host sync" -ForegroundColor Yellow
                 } else {
-                    Write-Host 'resolves' -ForegroundColor Green
+                    Write-WtwHost 'resolves' -ForegroundColor Green
                 }
             } else {
-                Write-Host 'NOT resolvable — run: wtw host sync' -ForegroundColor Red
+                Write-WtwHost 'NOT resolvable — run: wtw host sync' -ForegroundColor Red
             }
 
             $conflicts = Get-WtwSshHostConflicts -Name $entry.Name -Aliases $entry.Aliases
             if ($conflicts.Count -gt 0) {
-                Write-Host "  other blocks  " -NoNewline
-                Write-Host "$($conflicts.Count) more Host block(s) match this name" -ForegroundColor Yellow
+                Write-WtwHost "  other blocks  " -NoNewline
+                Write-WtwHost "$($conflicts.Count) more Host block(s) match this name" -ForegroundColor Yellow
                 foreach ($conflict in $conflicts) {
-                    Write-Host "                  $($conflict.File):$($conflict.Line)  $($conflict.Text)" -ForegroundColor DarkGray
+                    Write-WtwHost "                  $($conflict.File):$($conflict.Line)  $($conflict.Text)" -ForegroundColor DarkGray
                 }
-                Write-Host "                  wtw's block is Included first, so its HostName/User/IdentityFile win." -ForegroundColor DarkGray
-                Write-Host "                  Harmless if they point at the same machine — but they now follow wtw." -ForegroundColor DarkGray
+                Write-WtwHost "                  wtw's block is Included first, so its HostName/User/IdentityFile win." -ForegroundColor DarkGray
+                Write-WtwHost "                  Harmless if they point at the same machine — but they now follow wtw." -ForegroundColor DarkGray
             }
 
-            Write-Host "  remote wtw    " -NoNewline
+            Write-WtwHost "  remote wtw    " -NoNewline
             $probe = Invoke-WtwRemoteCommand -HostEntry $entry -Arguments @('__aliases')
             if ($probe.Success) {
                 $count = @($probe.Output | Where-Object { $_ }).Count
-                Write-Host "reachable ($count registered targets)" -ForegroundColor Green
+                Write-WtwHost "reachable ($count registered targets)" -ForegroundColor Green
             } else {
-                Write-Host "unreachable" -ForegroundColor Red
+                Write-WtwHost "unreachable" -ForegroundColor Red
                 if ($probe.Error) {
                     foreach ($line in (Format-WtwSshError -HostEntry $entry -ErrorText $probe.Error) -split "`n") {
-                        Write-Host "    $line" -ForegroundColor DarkGray
+                        Write-WtwHost "    $line" -ForegroundColor DarkGray
                     }
                 }
             }
-            Write-Host ''
+            Write-WtwHost ''
         }
 
         default {

@@ -39,13 +39,13 @@ with wmux.exe itself via ELECTRON_RUN_AS_NODE when `node` is not on PATH.
 
     $result = Open-WtwWmuxProject -ProjectPath $metadata.Path -PrettyName $metadata.PrettyName -StatusValue $metadata.StatusValue
     if (-not $result.Success) {
-        Write-Host "  wmux: $($result.Reason)" -ForegroundColor Yellow
-        Write-Host "  Target would be: '$($metadata.PrettyName)' -> $($metadata.Path)" -ForegroundColor DarkGray
+        Write-WtwHost "  wmux: $($result.Reason)" -ForegroundColor Yellow
+        Write-WtwHost "  Target would be: '$($metadata.PrettyName)' -> $($metadata.Path)" -ForegroundColor DarkGray
         return
     }
 
     $colorSuffix = if ($metadata.Color) { " [$($metadata.Color)]" } else { '' }
     $verb = if ($result.Created) { 'created' } else { 'opened' }
-    Write-Host "  wmux: $verb workspace '$($metadata.PrettyName)'$colorSuffix" -ForegroundColor Green
-    Write-Host "  Path: $($metadata.Path)" -ForegroundColor DarkGray
+    Write-WtwHost "  wmux: $verb workspace '$($metadata.PrettyName)'$colorSuffix" -ForegroundColor Green
+    Write-WtwHost "  Path: $($metadata.Path)" -ForegroundColor DarkGray
 }
