@@ -550,8 +550,17 @@ function Invoke-Wtw {
         '__cmux_init_current' {
             # PowerShell cmux startup path. Applies the normal wtw terminal title,
             # env vars, and session script for the cwd target, then refreshes cmux
-            # workspace metadata.
+            # workspace metadata. Inside a remote SSH workspace this is
+            # ``wtw --on <host> go [name]``.
             Initialize-WtwCmuxCurrentSession -ApplyTerminalSession
+        }
+        '__cmux_remote_shell' {
+            # Command Palette / tab-bar "pwsh": SSH into the current remote
+            # project when this workspace is a wtw-remote session, otherwise
+            # a nested local pwsh (same as the old tab body).
+            if (-not (Connect-WtwCmuxCurrentRemoteSession)) {
+                & pwsh -NoLogo
+            }
         }
         default   {
             # Check if command is an editor shortcut (cursor, cur, code, co, anti, etc.)

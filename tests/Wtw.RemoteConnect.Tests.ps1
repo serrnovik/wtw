@@ -30,6 +30,11 @@ Describe 'Get-WtwHostTitlePrefix' {
         Get-WtwHostTitlePrefix -HostEntry $h | Should -Be 'AT.'
     }
 
+    It 'accepts a single JSON-scalar alias under strict mode' {
+        $h = @{ Name = 'arctictroll'; Aliases = 'at'; Emoji = '🧊'; Label = $null }
+        Get-WtwHostTitlePrefix -HostEntry $h | Should -Be '🧊AT.'
+    }
+
     It 'falls back to the first two letters when there is no alias' {
         $h = @{ Name = 'buildbox'; Aliases = @(); Emoji = $null; Label = $null }
         Get-WtwHostTitlePrefix -HostEntry $h | Should -Be 'BU.'

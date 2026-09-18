@@ -299,17 +299,22 @@ than dumping you in the home directory behind a scrolled-off error.
 ### `cmux` — a local multiplexer tab over that ssh session
 
 `wtw cmux auth` locally means "open this worktree as a cmux workspace". With
-`--on` the cmux window stays on this machine; the surface command is
-`wtw --on <host> go [name]`, so you get the same interactive remote shell as
-`go`, titled with the host prefix (`🧊AT.🟢 PF037 …`). Existing remote tabs are
-matched by title or `wtw-remote:` description, never by the local home
-directory they share as cwd. Omit the name to land in the remote home directory.
+`--on` the cmux window stays on this machine and opens **two** SSH tabs —
+🌴 wtw and a normal remote pwsh — both running `wtw --on <host> go [name]`.
+The workspace is stamped with `WTW_REMOTE_HOST` / `WTW_REMOTE_NAME`, so the
+Command Palette 🌴 wtw and pwsh actions (and the matching tab-bar buttons)
+SSH into that same remote project instead of opening a local shell. Existing
+remote tabs are matched by title or `wtw-remote:` description, never by the
+local home directory they share as cwd. Omit the name to land in the remote
+home directory.
 
 Each host is also a persistent cmux project (`wtw remote: workstation` in the
 Command Palette / sidebar), registered on `wtw host add` / `sync` / `discover`
-and when you open a remote cmux tab. Picking that project starts
-`wtw --on <host> go` — the same as sitting down at that machine. `wtw --on at`
-with no subcommand opens it.
+and when you open a remote cmux tab. Picking that project starts the same
+two-tab SSH layout for that machine. `wtw --on at` with no subcommand opens it.
+
+The built-in cmux **+ new terminal** button still uses Ghostty's local default
+shell. Use 🌴 wtw or pwsh in a remote workspace when you want another SSH tab.
 
 ```powershell
 wtw --on at                 # open the machine project

@@ -146,11 +146,13 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
         _wtw_pwsh=mock_pwsh
         wtw __cmux_init_current
         wtw __cmux_apply_current
+        wtw __cmux_remote_shell
         wtw --on at go auth
     "
     [ "$status" -eq 0 ]
     [[ "$output" == *"Invoke-Wtw '__cmux_init_current'"* ]]
     [[ "$output" == *"Invoke-Wtw '__cmux_apply_current'"* ]]
+    [[ "$output" == *"Invoke-Wtw '__cmux_remote_shell'"* ]]
     [[ "$output" == *"Invoke-Wtw '--on' 'at' 'go' 'auth'"* ]]
     [[ "$output" != *"__resolve"* ]]
 }

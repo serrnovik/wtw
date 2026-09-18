@@ -12,6 +12,14 @@ function Initialize-WtwCmuxCurrentSession {
         [switch] $ApplyTerminalSession
     )
 
+    $remote = Get-WtwCmuxCurrentRemoteSession
+    if ($remote) {
+        if ($ApplyTerminalSession) {
+            Connect-WtwRemoteWorktree -HostEntry $remote.HostEntry -Name $remote.Name
+        }
+        return
+    }
+
     if (-not $env:CMUX_WORKSPACE_ID) { return }
 
     $currentName = Resolve-WtwCurrentTarget

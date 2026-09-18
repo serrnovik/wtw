@@ -122,6 +122,25 @@ workspace:3
 
         $parsed.ref | Should -Be 'workspace:4'
     }
+
+    It 'parses list-workspaces JSON that is prefixed with a cmux CLI notice' {
+        $parsed = ConvertFrom-WtwCmuxJsonOutput @'
+cmux: 'list-workspaces' is now an alias for 'cmux workspace list'. The legacy form keeps working indefinitely; set CMUX_QUIET=1 to silence this notice.
+{
+  "workspaces": [
+    {
+      "ref": "workspace:4",
+      "title": "🧊AT 🐇 scoring-system-that-works",
+      "description": "wtw-remote: at scoring",
+      "selected": true
+    }
+  ]
+}
+'@
+
+        $parsed.workspaces[0].ref | Should -Be 'workspace:4'
+        $parsed.workspaces[0].description | Should -Be 'wtw-remote: at scoring'
+    }
 }
 
 Describe 'Open-WtwCmuxWorkspace' {
@@ -372,6 +391,7 @@ Describe 'cmux shell startup metadata hook' {
         try {
             $env:CMUX_WORKSPACE_ID = 'workspace:9'
             $env:CMUX_SURFACE_ID = 'surface:9'
+            Mock Get-WtwCmuxCurrentRemoteSession { $null } -ModuleName wtw
             Mock Resolve-WtwCurrentTarget { 'feature' } -ModuleName wtw
             Mock Resolve-WtwTarget {
                 [PSCustomObject]@{
@@ -417,6 +437,7 @@ Describe 'cmux shell startup metadata hook' {
         try {
             $env:CMUX_WORKSPACE_ID = 'workspace:10'
             $env:CMUX_SURFACE_ID = 'surface:10'
+            Mock Get-WtwCmuxCurrentRemoteSession { $null } -ModuleName wtw
             Mock Resolve-WtwCurrentTarget { 'feature' } -ModuleName wtw
             Mock Resolve-WtwTarget {
                 [PSCustomObject]@{
@@ -527,6 +548,7 @@ Describe 'cmux remote SSH workspace' {
             $session.Command | Should -Be 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on at go"'
             $session.ShellInitCommand | Should -Be 'clear; wtw --on at go'
             $session.RemotePath | Should -BeNullOrEmpty
+            $session.HostSelector | Should -Be 'at'
         }
     }
 
@@ -543,7 +565,7 @@ Describe 'cmux remote SSH workspace' {
 
             $session = Resolve-WtwCmuxRemoteSession -HostEntry $HostEntry -HostSelector 'at' -Name 'auth'
             $session.PrettyName | Should -Be '🧊AT.🟢 Auth'
-            $session.StatusValue | Should -Be 'wtw-remote: at/app/auth'
+            $session.StatusValue | Should -Be 'wtw-remote: at auth'
             $session.Color | Should -Be '#336699'
             $session.RemotePath | Should -Be '/remote/app_auth'
             $session.ShellInitCommand | Should -Be 'clear; wtw --on at go auth'
@@ -565,16 +587,19 @@ Describe 'cmux remote SSH workspace' {
                         ref         = 'workspace:remote'
                         title       = '🧊AT.🟢 Auth'
                         cwd         = $home
-                        description = 'wtw-remote: at/app/auth'
+                        description = 'wtw-remote: at auth'
                     }
                 )
             }
 
-            $byTitle = Find-WtwCmuxRemoteWorkspace -PrettyName '🧊AT.🟢 Auth' -StatusValue 'wtw-remote: at/app/auth'
+            $byTitle = Find-WtwCmuxRemoteWorkspace -PrettyName '🧊AT.🟢 Auth' -StatusValue 'wtw-remote: at auth'
             $byTitle.ref | Should -Be 'workspace:remote'
 
-            $byDescription = Find-WtwCmuxRemoteWorkspace -PrettyName 'stale title' -StatusValue 'wtw-remote: at/app/auth'
+            $byDescription = Find-WtwCmuxRemoteWorkspace -PrettyName 'stale title' -StatusValue 'wtw-remote: at auth'
             $byDescription.ref | Should -Be 'workspace:remote'
+
+            $byLegacy = Find-WtwCmuxRemoteWorkspace -PrettyName 'stale title' -StatusValue 'wtw-remote: at/auth'
+            $byLegacy.ref | Should -Be 'workspace:remote'
 
             $miss = Find-WtwCmuxRemoteWorkspace -PrettyName '🧊AT.other' -StatusValue 'wtw-remote: other'
             $miss | Should -BeNullOrEmpty
@@ -596,6 +621,7 @@ Describe 'cmux remote SSH workspace' {
 
             $out = Open-WtwCmuxRemoteWorkspace -HostEntry $HostEntry -HostSelector 'at' -Name 'auth' -Via 'tailscale' -PrintOnly 6>&1 | Out-String
             $out | Should -Match 'new-workspace --name 🧊AT.Auth'
+            $out | Should -Match '--layout'
             $out | Should -Match 'wtw --on at --via tailscale go auth'
         }
     }
@@ -637,8 +663,10 @@ Describe 'cmux remote SSH workspace' {
             @($script:cmuxCalls | Where-Object { $_ -like 'select-workspace*' }).Count | Should -Be 0
             $create = $script:cmuxCalls | Where-Object { $_ -like 'new-workspace *' } | Select-Object -First 1
             $create | Should -Match '--name 🧊AT.at'
-            $create | Should -Match '--command pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on at go"'
+            $create | Should -Match '--layout'
+            $create | Should -Match '--env WTW_REMOTE_HOST=at'
             $create | Should -Match '--description wtw-remote: at'
+            $create | Should -Match '🌴 wtw'
         }
     }
 
@@ -696,7 +724,7 @@ Describe 'cmux remote SSH workspace' {
     {
       "ref": "workspace:remote",
       "title": "stale remote title",
-      "description": "wtw-remote: at/app/auth"
+                    "description": "wtw-remote: at auth"
     }
   ]
 }
@@ -711,6 +739,196 @@ Describe 'cmux remote SSH workspace' {
             $script:cmuxCalls | Should -Contain 'select-workspace --workspace workspace:remote'
             @($script:cmuxCalls | Where-Object { $_ -like 'new-workspace*' }).Count | Should -Be 0
             $script:cmuxCalls | Should -Contain 'workspace-action --workspace workspace:remote --action rename --title 🧊AT.🟢 Auth'
+        }
+    }
+
+    It 'stamps WTW_REMOTE_HOST/NAME on a named workspace so later tabs can SSH' {
+        InModuleScope wtw -Parameters @{ HostEntry = $script:remoteHost } {
+            $script:cmuxCalls = [System.Collections.Generic.List[string]]::new()
+            Mock Get-WtwRemoteTarget {
+                @{
+                    Path       = '/remote/app_auth'
+                    Color      = $null
+                    Title      = 'app/auth'
+                    PrettyName = 'Auth'
+                }
+            }
+            Mock Test-WtwCmuxPresent { $true }
+            Mock Register-WtwCmuxRemoteProject { 'wtw.remote.workstation' }
+            Mock Open-WtwCmuxAppleScriptWorkspace { $false }
+            Mock Invoke-WtwCmuxCommand {
+                $script:cmuxCalls.Add(($ArgumentList -join ' '))
+                if (($ArgumentList -join ' ') -eq 'current-workspace') {
+                    return [PSCustomObject]@{ ExitCode = 0; Output = 'workspace:remote' }
+                }
+                return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+            }
+
+            Open-WtwCmuxRemoteWorkspace -HostEntry $HostEntry -HostSelector 'at' -Name 'auth'
+
+            $create = $script:cmuxCalls | Where-Object { $_ -like 'new-workspace *' } | Select-Object -First 1
+            $create | Should -Match '--env WTW_REMOTE_HOST=at'
+            $create | Should -Match '--env WTW_REMOTE_NAME=auth'
+            $create | Should -Match '--description wtw-remote: at auth'
+            $create | Should -Match '🌴 wtw'
+        }
+    }
+}
+
+Describe 'cmux remote status and current-session helpers' {
+    It 'parses space and legacy slash wtw-remote descriptions' {
+        $homeSession = ConvertFrom-WtwCmuxRemoteStatusValue -StatusValue 'wtw-remote: at'
+        $homeSession.HostSelector | Should -Be 'at'
+        $homeSession.Name | Should -Be ''
+
+        $named = ConvertFrom-WtwCmuxRemoteStatusValue -StatusValue 'wtw-remote: at scoring'
+        $named.HostSelector | Should -Be 'at'
+        $named.Name | Should -Be 'scoring'
+
+        $legacy = ConvertFrom-WtwCmuxRemoteStatusValue -StatusValue 'wtw-remote: at/app/auth'
+        $legacy.HostSelector | Should -Be 'at'
+        $legacy.Name | Should -Be 'app/auth'
+
+        $liveSlash = ConvertFrom-WtwCmuxRemoteStatusValue -StatusValue 'wtw-remote: at/kulissa-landing/scoring-system-that-works'
+        $liveSlash.HostSelector | Should -Be 'at'
+        $liveSlash.Name | Should -Be 'kulissa-landing/scoring-system-that-works'
+
+        ConvertFrom-WtwCmuxRemoteStatusValue -StatusValue 'local shell' | Should -BeNullOrEmpty
+    }
+
+    It 'prefers WTW_REMOTE_* env over listing workspaces' {
+        $oldHost = $env:WTW_REMOTE_HOST
+        $oldName = $env:WTW_REMOTE_NAME
+        try {
+            $env:WTW_REMOTE_HOST = 'at'
+            $env:WTW_REMOTE_NAME = 'scoring'
+            InModuleScope wtw {
+                Mock Get-WtwCmuxCurrentWorkspaceObject { throw 'env should win' }
+                Mock Resolve-WtwHost { @{ Name = 'arctictroll'; Aliases = @('at') } }
+
+                $session = Get-WtwCmuxCurrentRemoteSession
+                $session.HostSelector | Should -Be 'at'
+                $session.Name | Should -Be 'scoring'
+                $session.HostEntry.Name | Should -Be 'arctictroll'
+            }
+        } finally {
+            if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
+            if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
+        }
+    }
+
+    It 'reads WTW_REMOTE_* from the workspace object when process env is empty' {
+        $oldHost = $env:WTW_REMOTE_HOST
+        $oldName = $env:WTW_REMOTE_NAME
+        try {
+            Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue
+            Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue
+            InModuleScope wtw {
+                Mock Get-WtwCmuxCurrentWorkspaceObject {
+                    [PSCustomObject]@{
+                        env = [PSCustomObject]@{
+                            WTW_REMOTE_HOST = 'at'
+                            WTW_REMOTE_NAME = 'scoring'
+                        }
+                    }
+                }
+                Mock Resolve-WtwHost { @{ Name = 'arctictroll'; Aliases = @('at') } }
+
+                $session = Get-WtwCmuxCurrentRemoteSession
+                $session.HostSelector | Should -Be 'at'
+                $session.Name | Should -Be 'scoring'
+            }
+        } finally {
+            if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
+            if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
+        }
+    }
+
+    It 'parses a host-prefixed workspace title when description is missing' {
+        $oldHost = $env:WTW_REMOTE_HOST
+        $oldName = $env:WTW_REMOTE_NAME
+        try {
+            Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue
+            Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue
+            InModuleScope wtw {
+                Mock Get-WtwCmuxCurrentWorkspaceObject {
+                    [PSCustomObject]@{
+                        name        = '🧊AT 🐇 scoring-system-that-works'
+                        description = 'local leftover'
+                    }
+                }
+                Mock Get-WtwHosts {
+                    ,@(
+                        @{
+                            Name      = 'arctictroll'
+                            Aliases   = @('at')
+                            Emoji     = '🧊'
+                            Label     = 'AT'
+                            Separator = ' '
+                        }
+                    )
+                }
+                Mock Resolve-WtwHost { @{ Name = 'arctictroll'; Aliases = @('at') } }
+
+                $session = Get-WtwCmuxCurrentRemoteSession
+                $session.HostSelector | Should -Be 'arctictroll'
+                $session.Name | Should -Be 'scoring-system-that-works'
+            }
+        } finally {
+            if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
+            if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
+        }
+    }
+
+    It 'SSHs from __cmux_init_current when the workspace is remote' {
+        $oldWorkspaceId = $env:CMUX_WORKSPACE_ID
+        $oldHost = $env:WTW_REMOTE_HOST
+        $oldName = $env:WTW_REMOTE_NAME
+        try {
+            $env:CMUX_WORKSPACE_ID = 'workspace:remote'
+            $env:WTW_REMOTE_HOST = 'at'
+            $env:WTW_REMOTE_NAME = 'scoring'
+            InModuleScope wtw {
+                Mock Resolve-WtwHost { @{ Name = 'arctictroll'; User = 'sno' } }
+                Mock Connect-WtwRemoteWorktree {}
+                Mock Enter-WtwWorktree { throw 'remote init must not enter a local worktree' }
+
+                Invoke-Wtw __cmux_init_current
+
+                Should -Invoke Connect-WtwRemoteWorktree -Times 1 -Exactly -ParameterFilter {
+                    $Name -eq 'scoring'
+                }
+            }
+        } finally {
+            if ($null -eq $oldWorkspaceId) { Remove-Item Env:CMUX_WORKSPACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_WORKSPACE_ID = $oldWorkspaceId }
+            if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
+            if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
+        }
+    }
+
+    It 'SSHs from __cmux_init_current without CMUX_WORKSPACE_ID when the tab is remote' {
+        $oldWorkspaceId = $env:CMUX_WORKSPACE_ID
+        $oldHost = $env:WTW_REMOTE_HOST
+        $oldName = $env:WTW_REMOTE_NAME
+        try {
+            Remove-Item Env:CMUX_WORKSPACE_ID -ErrorAction SilentlyContinue
+            $env:WTW_REMOTE_HOST = 'at'
+            $env:WTW_REMOTE_NAME = 'scoring'
+            InModuleScope wtw {
+                Mock Resolve-WtwHost { @{ Name = 'arctictroll'; User = 'sno' } }
+                Mock Connect-WtwRemoteWorktree {}
+                Mock Enter-WtwWorktree { throw 'remote init must not enter a local worktree' }
+
+                Invoke-Wtw __cmux_init_current
+
+                Should -Invoke Connect-WtwRemoteWorktree -Times 1 -Exactly -ParameterFilter {
+                    $Name -eq 'scoring'
+                }
+            }
+        } finally {
+            if ($null -eq $oldWorkspaceId) { Remove-Item Env:CMUX_WORKSPACE_ID -ErrorAction SilentlyContinue } else { $env:CMUX_WORKSPACE_ID = $oldWorkspaceId }
+            if ($null -eq $oldHost) { Remove-Item Env:WTW_REMOTE_HOST -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_HOST = $oldHost }
+            if ($null -eq $oldName) { Remove-Item Env:WTW_REMOTE_NAME -ErrorAction SilentlyContinue } else { $env:WTW_REMOTE_NAME = $oldName }
         }
     }
 }
@@ -757,8 +975,23 @@ Describe 'cmux remote host projects' {
         $config.commands[0].name | Should -Be 'wtw remote: workstation'
         $config.commands[0].description | Should -Match 'windows'
         $config.commands[0].keywords | Should -Contain 'at'
+        $config.commands[0].workspace.name | Should -Be '🧊AT.workstation'
+        $config.commands[0].workspace.layout.pane.surfaces[0].name | Should -Be '🌴 wtw'
         $config.commands[0].workspace.layout.pane.surfaces[0].command |
             Should -Be 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on workstation go"'
+        $config.commands[0].workspace.layout.pane.surfaces[1].name | Should -Be 'pwsh'
+        $config.commands[0].workspace.layout.pane.surfaces[1].command |
+            Should -Be 'pwsh -NoLogo -NoExit -Command "Clear-Host; wtw --on workstation go"'
+        $config.commands[0].workspace.env.WTW_REMOTE_HOST | Should -Be 'workstation'
+    }
+
+    It 'syncs a single host without collapsing it into a nameless array' {
+        Mock Get-WtwHosts { , @($script:remoteHost) }
+        Sync-WtwCmuxRemoteProjects -ConfigPath $script:configPath
+        $config = Get-Content -Path $script:configPath -Raw | ConvertFrom-Json
+        @($config.commands).Count | Should -Be 1
+        $config.commands[0].workspace.name | Should -Be '🧊AT.workstation'
+        $config.commands[0].workspace.name | Should -Not -Be '.workstation'
     }
 
     It 'unregister leaves a local HOME-cwd command in place' {

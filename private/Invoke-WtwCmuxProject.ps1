@@ -41,8 +41,18 @@ function Invoke-WtwCmuxCommand {
         return [PSCustomObject]@{ ExitCode = 127; Output = 'cmux CLI not found' }
     }
 
-    $output = & $cmux @ArgumentList 2>&1
-    return [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Output = ($output -join [Environment]::NewLine) }
+    $previousQuiet = $env:CMUX_QUIET
+    $env:CMUX_QUIET = '1'
+    try {
+        $output = & $cmux @ArgumentList 2>&1
+        return [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Output = ($output -join [Environment]::NewLine) }
+    } finally {
+        if ($null -eq $previousQuiet) {
+            Remove-Item Env:CMUX_QUIET -ErrorAction SilentlyContinue
+        } else {
+            $env:CMUX_QUIET = $previousQuiet
+        }
+    }
 }
 
 function Open-WtwCmuxAppPath {
@@ -63,11 +73,31 @@ function ConvertFrom-WtwCmuxJsonOutput {
 
     if ([string]::IsNullOrWhiteSpace($Output)) { return $null }
 
-    try {
-        return $Output | ConvertFrom-Json
-    } catch {
-        return $null
+    foreach ($candidate in @($Output, (Get-WtwCmuxJsonPayload -Output $Output))) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        try {
+            return $candidate | ConvertFrom-Json
+        } catch {
+            continue
+        }
     }
+
+    return $null
+}
+
+function Get-WtwCmuxJsonPayload {
+    <#
+    .SYNOPSIS
+        Slice the first JSON object/array out of cmux CLI text that includes notices.
+    #>
+    [CmdletBinding()]
+    param([string] $Output)
+
+    if ([string]::IsNullOrWhiteSpace($Output)) { return $null }
+
+    $start = $Output.IndexOfAny([char[]]@('{', '['))
+    if ($start -lt 0) { return $null }
+    return $Output.Substring($start)
 }
 
 function ConvertFrom-WtwCmuxWorkspaceListOutput {
@@ -400,14 +430,22 @@ function New-WtwCmuxRemoteWorkspaceCommand {
         cwd         = $localCwd
         restart     = 'ignore'
         description = $session.StatusValue
+        env         = [PSCustomObject]@{
+            WTW_REMOTE_HOST = $HostSelector
+        }
         layout      = [PSCustomObject]@{
             pane = [PSCustomObject]@{
                 surfaces = @(
                     [PSCustomObject]@{
                         type    = 'terminal'
-                        name    = (Get-WtwCmuxTabLabel -PrettyName $session.PrettyName)
+                        name    = '🌴 wtw'
                         command = $session.Command
                         focus   = $true
+                    }
+                    [PSCustomObject]@{
+                        type    = 'terminal'
+                        name    = 'pwsh'
+                        command = $session.Command
                     }
                 )
             }
@@ -432,8 +470,9 @@ function Register-WtwCmuxRemoteProject {
     .SYNOPSIS
         Register a remote host as a cmux Command Palette / sidebar project.
     .DESCRIPTION
-        Same persistence as a local worktree: picking the project in cmux starts
-        ``wtw --on <host> go`` in a local tab. Keyed by host name, not cwd.
+        Same persistence as a local worktree: picking the project in cmux
+        opens 🌴 wtw and pwsh tabs that both SSH with ``wtw --on <host> go``.
+        Keyed by host name, not cwd.
     #>
     [CmdletBinding()]
     param(
@@ -546,7 +585,10 @@ function Sync-WtwCmuxRemoteProjects {
 
     if (-not (Test-WtwCmuxPresent)) { return }
 
-    foreach ($hostEntry in @(Get-WtwHosts)) {
+    # Do not wrap Get-WtwHosts in @() — it already returns , @($result).
+    # @(Get-WtwHosts) makes foreach see one array object, so a single host
+    # loses Emoji/Label and the palette title becomes `.arctictroll`.
+    foreach ($hostEntry in (Get-WtwHosts)) {
         Register-WtwCmuxRemoteProject -HostEntry $hostEntry -ConfigPath $ConfigPath -Quiet:$Quiet | Out-Null
     }
 }

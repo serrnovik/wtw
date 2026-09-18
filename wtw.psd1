@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.32'
+    ModuleVersion     = '0.2.34'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -40,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'Remote hosts are registered as cmux Command Palette / sidebar projects (`wtw remote: <host>`); `wtw --on <host>` with no subcommand opens that project (ssh home if cmux is missing). `wtw list -f/--filter` keeps repos and worktrees whose name, alias, task, or pretty name contains the substring (`wtw list -f kul`). Host output follows shell-theme / AGENT_SHELL_THEME with agent-shell truecolor inks. Install, update, and Gallery publish rewrite wtw.zsh/wtw.bash to LF so a Windows-packed package can no longer break zsh with ^M / elif parse errors.'
+            ReleaseNotes = 'Remote cmux workspaces open two SSH tabs (🌴 wtw + pwsh) and stamp WTW_REMOTE_HOST / WTW_REMOTE_NAME so Command Palette 🌴 wtw and pwsh in that workspace SSH into the same remote project instead of opening a local shell. `wtw list -f/--filter` keeps repos and worktrees whose name, alias, task, or pretty name contains the substring. Host output follows shell-theme / AGENT_SHELL_THEME. Install, update, and Gallery publish rewrite wtw.zsh/wtw.bash to LF.'
         }
     }
 }
