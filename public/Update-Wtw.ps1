@@ -81,6 +81,7 @@ function Update-Wtw {
     Write-WtwShadowWarning -Info $info -Yes:$Yes -Check:$Check
 
     $current = $installed.Version
+    $galleryOlder = $installedPresent -and $null -ne $current -and $null -ne $status.LatestVersion -and $status.LatestVersion -lt $current
     $upToDate = $installedPresent -and $null -ne $current -and $status.LatestVersion -le $current
 
     if ($upToDate -and -not $Force) {
@@ -92,6 +93,12 @@ function Update-Wtw {
             Write-WtwHost '    Up to date.' -ForegroundColor Green
         }
         Write-WtwHost ''
+        return
+    }
+
+    if ($upToDate -and -not $Force) {
+        Write-Host '    Up to date.' -ForegroundColor Green
+        Write-Host ''
         return
     }
 

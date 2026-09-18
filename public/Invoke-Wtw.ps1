@@ -418,6 +418,7 @@ function Invoke-Wtw {
         # release. Aliasing them meant `wtw update` from a normal shell hit
         # Install-Wtw's self-install guard and refused to do anything.
         'update'    { Update-Wtw @splat }
+        'reload'    { Invoke-WtwReloadSession @splat }
         'skill'     { Install-WtwSkill @splat }
         'sbx'       {
             if ($pos.Count -gt 0) { $splat['Instruction'] = $pos -join ' ' }
