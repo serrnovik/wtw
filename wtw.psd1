@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.36'
+    ModuleVersion     = '0.2.37'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -40,7 +40,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = '`wtw cmux` no longer moves the caller tab (e.g. snowmain) into a new remote group such as 🧊AT/🛏️ chezmoi — it identifies the created workspace by title/description instead of `cmux current-workspace`. `wtw update` finishes after reloading ~/.wtw. wtw --version / -v / version prints the running module version.'
+            ReleaseNotes = 'Remote `wtw cmux` groups follow this machine''s repo identity: Arctic Troll `snowmain` lands in 🧊AT/🎸 snowmain1 when that is a local alias, and an older `wtw.group.*.snowmain` folder is reused instead of creating a second group. `wtw cmux` no longer moves the caller tab into a new remote group. `wtw update` finishes after reloading ~/.wtw. wtw --version / -v / version prints the running module version.'
         }
     }
 }

@@ -59,6 +59,91 @@ function Get-WtwCmuxWorkspaceGroupCwd {
     return (Get-Location).Path
 }
 
+function Resolve-WtwLocalRepoForCmuxGroup {
+    <#
+    .SYNOPSIS
+        Map a remote registry key or alias onto this machine's canonical repo.
+    .DESCRIPTION
+        Arctic Troll registers snowmain as ``snowmain``; this Mac uses
+        ``snowmain1`` with ``snowmain`` as an alias. Sidebar groups should follow
+        the local identity so AT and SP folders line up (``🧊AT/🎸 snowmain1``).
+        Exact key wins; otherwise a unique alias match. Ambiguous aliases return
+        ``$null`` so the remote name is left unchanged.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()][AllowEmptyString()][string] $RepoName)
+
+    if (-not $RepoName) { return $null }
+
+    $repos = Get-WtwPropertyValue -Object (Get-WtwRegistry) -Name 'repos'
+    if (-not $repos) { return $null }
+
+    $exact = Get-WtwPropertyValue -Object $repos -Name $RepoName
+    if ($exact) {
+        return [PSCustomObject]@{
+            Name  = $RepoName
+            Entry = $exact
+        }
+    }
+
+    $hits = [System.Collections.Generic.List[object]]::new()
+    foreach ($name in (Get-WtwPropertyNames -Object $repos)) {
+        $entry = Get-WtwPropertyValue -Object $repos -Name $name
+        if (Test-WtwAliasMatch -Repo $entry -Name $RepoName) {
+            [void]$hits.Add([PSCustomObject]@{
+                    Name  = $name
+                    Entry = $entry
+                })
+        }
+    }
+
+    if ($hits.Count -eq 1) { return $hits[0] }
+    return $null
+}
+
+function Get-WtwCmuxWorkspaceGroupKeyCandidates {
+    <#
+    .SYNOPSIS
+        Idempotency keys that refer to the same machine/project group.
+    .DESCRIPTION
+        A group created from the remote key ``snowmain`` must still be found
+        after we canonicalize to local ``snowmain1``.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Spec)
+
+    $keys = [System.Collections.Generic.List[string]]::new()
+    $primary = [string](Get-WtwPropertyValue -Object $Spec -Name 'Key')
+    if ($primary) { [void]$keys.Add($primary) }
+
+    $machineId = [string](Get-WtwPropertyValue -Object $Spec -Name 'MachineId')
+    $repoId = [string](Get-WtwPropertyValue -Object $Spec -Name 'RepoId')
+    if (-not ($machineId -and $repoId)) { return @($keys) }
+
+    $names = [System.Collections.Generic.List[string]]::new()
+    [void]$names.Add($repoId)
+    $local = Resolve-WtwLocalRepoForCmuxGroup -RepoName $repoId
+    if ($local) {
+        [void]$names.Add([string]$local.Name)
+        $rawAliases = Get-WtwPropertyValue -Object $local.Entry -Name 'aliases'
+        if (-not $rawAliases) {
+            $rawAliases = Get-WtwPropertyValue -Object $local.Entry -Name 'alias'
+        }
+        foreach ($alias in @($rawAliases)) {
+            if ($alias) { [void]$names.Add([string]$alias) }
+        }
+    }
+
+    foreach ($name in @($names | Select-Object -Unique)) {
+        $alt = ConvertTo-WtwCmuxGroupKey -MachineId $machineId -RepoId $name
+        if ($alt -and -not ($keys | Where-Object { [string]::Equals($_, $alt, [System.StringComparison]::OrdinalIgnoreCase) })) {
+            [void]$keys.Add($alt)
+        }
+    }
+
+    return @($keys)
+}
+
 function Get-WtwCmuxLocalWorkspaceGroupSpec {
     <#
     .SYNOPSIS
@@ -98,11 +183,27 @@ function Get-WtwCmuxRemoteWorkspaceGroupSpec {
         [Parameter(Mandatory)] $Session
     )
 
-    $repoName = [string](Get-WtwPropertyValue -Object $Session -Name 'RepoName')
+    $remoteRepoName = [string](Get-WtwPropertyValue -Object $Session -Name 'RepoName')
     $repoEmoji = Get-WtwPropertyValue -Object $Session -Name 'RepoEmoji'
-    if ($repoName -and -not $repoEmoji) {
-        $localRepo = Get-WtwPropertyValue -Object (Get-WtwPropertyValue -Object (Get-WtwRegistry) -Name 'repos') -Name $repoName
-        $repoEmoji = Get-WtwRepoEmoji -RepoEntry $localRepo
+    $localMatch = Resolve-WtwLocalRepoForCmuxGroup -RepoName $remoteRepoName
+
+    if (-not $localMatch -and -not $remoteRepoName) {
+        $hint = [string](Get-WtwPropertyValue -Object $Session -Name 'Name')
+        if ($hint) {
+            $localTarget = Resolve-WtwTarget -Name $hint -SkipFuzzy -ErrorAction SilentlyContinue
+            if ($localTarget -and $localTarget.RepoName) {
+                $localMatch = [PSCustomObject]@{
+                    Name  = [string]$localTarget.RepoName
+                    Entry = $localTarget.RepoEntry
+                }
+            }
+        }
+    }
+
+    $repoName = if ($localMatch) { [string]$localMatch.Name } else { $remoteRepoName }
+    if ($localMatch) {
+        $localEmoji = Get-WtwRepoEmoji -RepoEntry $localMatch.Entry
+        if ($localEmoji) { $repoEmoji = $localEmoji }
     }
     $projectName = if ($repoName) {
         Format-WtwRepoDisplayName -Name $repoName -Emoji $repoEmoji
@@ -166,8 +267,16 @@ function Find-WtwCmuxWorkspaceGroup {
     param([Parameter(Mandatory)] $Spec)
 
     $groups = @(Get-WtwCmuxWorkspaceGroups)
+    $candidates = @(Get-WtwCmuxWorkspaceGroupKeyCandidates -Spec $Spec)
     $byKey = $groups | Where-Object {
-        $_.Key -and [string]::Equals($_.Key, $Spec.Key, [System.StringComparison]::OrdinalIgnoreCase)
+        $groupKey = [string](Get-WtwPropertyValue -Object $_ -Name 'Key')
+        if (-not $groupKey) { return $false }
+        foreach ($candidate in $candidates) {
+            if ([string]::Equals($candidate, $groupKey, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $true
+            }
+        }
+        return $false
     } | Select-Object -First 1
     if ($byKey) { return $byKey }
 
