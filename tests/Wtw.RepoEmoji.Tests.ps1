@@ -6,7 +6,7 @@ Describe 'Format-WtwRepoDisplayName' {
     It 'prefixes a registry key when emoji is set' {
         InModuleScope wtw {
             Format-WtwRepoDisplayName -Name 'snowmain1' -Emoji '🎸' | Should -Be '🎸 snowmain1'
-            Format-WtwRepoDisplayName -Name 'tn1-gitops' -Emoji '🎭 ☸️' | Should -Be '🎭 ☸️ tn1-gitops'
+            Format-WtwRepoDisplayName -Name 'tn1-gitops' -Emoji '🎭 ☸️' | Should -Be '🎭 ☸️ tn1 gitops'
         }
     }
 
@@ -15,14 +15,14 @@ Describe 'Format-WtwRepoDisplayName' {
             ConvertTo-WtwNormalizedRepoEmoji 'none' | Should -BeNullOrEmpty
             ConvertTo-WtwNormalizedRepoEmoji '-' | Should -BeNullOrEmpty
             ConvertTo-WtwNormalizedRepoEmoji '  ' | Should -BeNullOrEmpty
-            Format-WtwRepoDisplayName -Name 'kulissa-landing' -Emoji 'none' | Should -Be 'kulissa-landing'
+            Format-WtwRepoDisplayName -Name 'kulissa-landing' -Emoji 'none' | Should -Be 'kulissa landing'
         }
     }
 
     It 'reads emoji from a repo entry' {
         InModuleScope wtw {
             $entry = [PSCustomObject]@{ emoji = '🎭 🪝'; mainPath = '/tmp/k' }
-            Format-WtwRepoDisplayName -Name 'kulissa-GTM' -RepoEntry $entry | Should -Be '🎭 🪝 kulissa-GTM'
+            Format-WtwRepoDisplayName -Name 'kulissa-GTM' -RepoEntry $entry | Should -Be '🎭 🪝 kulissa GTM'
             Get-WtwRepoEmoji -RepoEntry $entry | Should -Be '🎭 🪝'
         }
     }
@@ -205,6 +205,28 @@ Describe 'Resolve-WtwTerminalWorkspaceMetadata repo emoji' {
             $meta.PrettyName | Should -Match '^🎸'
             $meta.PrettyName | Should -Match 'Blue Feature$'
             $meta.StatusValue | Should -Be 'snowmain1/feature'
+        }
+    }
+
+    It 'humanizes a derived worktree slug and prefixes repo + worktree glyphs' {
+        InModuleScope wtw {
+            $target = [PSCustomObject]@{
+                RepoName      = 'snowmain'
+                TaskName      = 'NTB-real-dogfood'
+                WorktreeEntry = [PSCustomObject]@{
+                    path       = (Join-Path ([System.IO.Path]::GetTempPath()) 'wtw-emoji-ntb')
+                    prettyName = '🔴 NTB-real-dogfood'
+                    emoji      = '🐕'
+                    color      = '#d93f0b'
+                }
+                RepoEntry     = [PSCustomObject]@{
+                    mainPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'wtw-emoji-snowmain')
+                    emoji    = '🎸'
+                }
+            }
+
+            $meta = Resolve-WtwTerminalWorkspaceMetadata -Target $target
+            $meta.PrettyName | Should -Be '🎸🐕 NTB real dogfood'
         }
     }
 }
