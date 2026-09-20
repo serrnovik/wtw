@@ -52,11 +52,11 @@ function Open-WtwT3Workspace {
     $plan = Get-WtwT3RegistrationPlan -ProjectPath $fullDir -PrettyName $prettyName
 
     if ($plan.Action -eq 'none') {
-        Write-Host "  T3 Code: project already '$prettyName'" -ForegroundColor DarkGray
+        Write-WtwHost "  T3 Code: project already '$prettyName'" -ForegroundColor DarkGray
     } elseif ($plan.Action -eq 'blocked') {
-        Write-Host "  T3 Code: $($plan.Reason)" -ForegroundColor Yellow
+        Write-WtwHost "  T3 Code: $($plan.Reason)" -ForegroundColor Yellow
         if (Set-WtwT3AddProjectBaseDirectory -Path $fullDir) {
-            Write-Host "  T3 Code: 'Add project' will start in this worktree" -ForegroundColor DarkGray
+            Write-WtwHost "  T3 Code: 'Add project' will start in this worktree" -ForegroundColor DarkGray
         }
     } else {
         # Writing needs T3 stopped — its server owns the store while it runs.
@@ -64,15 +64,15 @@ function Open-WtwT3Workspace {
         if ($decision.proceed) {
             $result = Register-WtwT3Project -ProjectPath $fullDir -PrettyName $prettyName
             switch ($result.Status) {
-                'created'   { Write-Host "  T3 Code: project '$prettyName' added" -ForegroundColor Green }
-                'renamed'   { Write-Host "  T3 Code: project renamed to '$prettyName'" -ForegroundColor Green }
-                'unchanged' { Write-Host "  T3 Code: project already '$prettyName'" -ForegroundColor DarkGray }
-                default     { Write-Host "  T3 Code: $($result.Reason)" -ForegroundColor Yellow }
+                'created'   { Write-WtwHost "  T3 Code: project '$prettyName' added" -ForegroundColor Green }
+                'renamed'   { Write-WtwHost "  T3 Code: project renamed to '$prettyName'" -ForegroundColor Green }
+                'unchanged' { Write-WtwHost "  T3 Code: project already '$prettyName'" -ForegroundColor DarkGray }
+                default     { Write-WtwHost "  T3 Code: $($result.Reason)" -ForegroundColor Yellow }
             }
         } else {
-            Write-Host "  T3 Code: left running — '$prettyName' not registered." -ForegroundColor DarkGray
+            Write-WtwHost "  T3 Code: left running — '$prettyName' not registered." -ForegroundColor DarkGray
             if (Set-WtwT3AddProjectBaseDirectory -Path $fullDir) {
-                Write-Host "  T3 Code: 'Add project' will start in this worktree" -ForegroundColor DarkGray
+                Write-WtwHost "  T3 Code: 'Add project' will start in this worktree" -ForegroundColor DarkGray
             }
         }
     }
@@ -95,7 +95,7 @@ function Open-WtwT3Workspace {
     }
 
     if ($IsMacOS) {
-        Write-Host "  Launching ${appName} — $where" -ForegroundColor Green
+        Write-WtwHost "  Launching ${appName} — $where" -ForegroundColor Green
         & open -a $appName
         return
     }
@@ -106,7 +106,7 @@ function Open-WtwT3Workspace {
             Write-Error 'T3 Code not found. Install it with: winget install T3Tools.T3Code'
             return
         }
-        Write-Host "  Launching T3 Code — $where" -ForegroundColor Green
+        Write-WtwHost "  Launching T3 Code — $where" -ForegroundColor Green
         Start-Process -FilePath $exe
         return
     }

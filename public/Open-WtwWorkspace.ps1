@@ -34,7 +34,7 @@ function Open-WtwWorkspace {
             Write-Error "Not inside a registered repo. Specify a target or cd into a repo."
             return
         }
-        Write-Host "  Detected: $Name" -ForegroundColor DarkGray
+        Write-WtwHost "  Detected: $Name" -ForegroundColor DarkGray
     }
 
     $config = Get-WtwConfig
@@ -107,19 +107,19 @@ function Open-WtwWorkspace {
             Ensure-WtwCodexProjectConfig -ProjectPath $fullDir | Out-Null
             Set-WtwCodexProjectTrust -ProjectPath $fullDir -ConfigPath (Join-Path $codexHome 'config.toml')
             if ($labelAlreadySet) {
-                Write-Host "  ChatGPT: sidebar label already '$prettyName'" -ForegroundColor DarkGray
+                Write-WtwHost "  ChatGPT: sidebar label already '$prettyName'" -ForegroundColor DarkGray
             } elseif ($SkipRestart -and (Test-WtwCodexAppRunning)) {
-                Write-Host "  ChatGPT: sidebar label needs restart; skipped because --skip-restart was set." -ForegroundColor DarkGray
+                Write-WtwHost "  ChatGPT: sidebar label needs restart; skipped because --skip-restart was set." -ForegroundColor DarkGray
             } else {
                 $decision = Resolve-WtwCodexStateConflict -OperationLabel "set sidebar label '$prettyName'"
                 if ($decision.proceed -and (Set-WtwCodexProjectLabel -ProjectPath $fullDir -PrettyName $prettyName -GlobalStatePath $globalStatePath)) {
-                    Write-Host "  ChatGPT: sidebar label '$prettyName'" -ForegroundColor Green
+                    Write-WtwHost "  ChatGPT: sidebar label '$prettyName'" -ForegroundColor Green
                 }
             }
         }
 
         if (Start-WtwCodexApp -ProjectPath $fullDir) {
-            Write-Host "  Opening in ChatGPT: $fullDir" -ForegroundColor Green
+            Write-WtwHost "  Opening in ChatGPT: $fullDir" -ForegroundColor Green
             return
         }
 
@@ -144,7 +144,7 @@ function Open-WtwWorkspace {
                 Write-Error "$appName is not installed. Tried: $tried"
                 return
             }
-            Write-Host "  Opening in ${found}: $dir" -ForegroundColor Green
+            Write-WtwHost "  Opening in ${found}: $dir" -ForegroundColor Green
             if (Get-WtwPropertyValue -Object $editorCmd -Name 'macArgsViaCli' -DefaultValue $false) {
                 # `open -a` routes paths as Apple "open file" events; many Avalonia apps don't handle them,
                 # and `open -n --args` silently drops --args when LSMultipleInstancesProhibited is set.
@@ -171,12 +171,12 @@ function Open-WtwWorkspace {
                 $exe = $probe | Select-Object -First 1
             }
             if (-not $exe) { Write-Error "$appName not found on PATH or in standard locations."; return }
-            Write-Host "  Opening in ${appName}: $dir" -ForegroundColor Green
+            Write-WtwHost "  Opening in ${appName}: $dir" -ForegroundColor Green
             Start-Process -FilePath $exe -ArgumentList $dir
         } elseif ($IsLinux -and $editorCmd.linuxCmd) {
             $exe = (Get-Command $editorCmd.linuxCmd -ErrorAction SilentlyContinue)?.Source
             if (-not $exe) { Write-Error "'$appName' not installed (no '$($editorCmd.linuxCmd)' on PATH)."; return }
-            Write-Host "  Opening in ${appName}: $dir" -ForegroundColor Green
+            Write-WtwHost "  Opening in ${appName}: $dir" -ForegroundColor Green
             Start-Process -FilePath $exe -ArgumentList $dir
         } else {
             $platform = if ($IsWindows) { 'Windows' } elseif ($IsLinux) { 'Linux' } else { 'this platform' }
@@ -204,7 +204,7 @@ function Open-WtwWorkspace {
                 $canMigrate = -not $needsAgentsLabelMigration
                 if ($needsAgentsLabelMigration) {
                     if ($SkipRestart -and (Test-WtwCursorAppRunning)) {
-                        Write-Host '  Cursor: Agents label migration skipped because --skip-restart was set.' -ForegroundColor DarkGray
+                        Write-WtwHost '  Cursor: Agents label migration skipped because --skip-restart was set.' -ForegroundColor DarkGray
                     } else {
                         $canMigrate = Resolve-WtwCursorStateConflict -PrettyName $prettyName
                     }
@@ -225,7 +225,7 @@ function Open-WtwWorkspace {
             }
             Register-WtwCursorProject -WorkspacePath $wsFile -ProjectPath $dir -PrettyName $prettyName -Color $color | Out-Null
         }
-        Write-Host "  Opening in ${editorCmd}: $wsFile" -ForegroundColor Green
+        Write-WtwHost "  Opening in ${editorCmd}: $wsFile" -ForegroundColor Green
         Invoke-WtwEditorCli -Cmd $editorCmd -Path $wsFile
         return
     }
@@ -233,7 +233,7 @@ function Open-WtwWorkspace {
     # No workspace file — fall back to opening the directory
     $dir = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
     if ($dir -and (Test-Path $dir)) {
-        Write-Host "  Opening in ${editorCmd}: $dir" -ForegroundColor Green
+        Write-WtwHost "  Opening in ${editorCmd}: $dir" -ForegroundColor Green
         Invoke-WtwEditorCli -Cmd $editorCmd -Path $dir
     } else {
         Write-Error "No workspace or directory found for '$Name'."

@@ -203,8 +203,8 @@ function Get-WtwHostTitlePrefix {
     $label = Get-WtwPropertyValue -Object $HostEntry -Name 'Label'
 
     if (-not $label) {
-        $aliases = @(Get-WtwPropertyValue -Object $HostEntry -Name 'Aliases' -DefaultValue @()) |
-            Where-Object { $_ }
+        $aliases = @(@(Get-WtwPropertyValue -Object $HostEntry -Name 'Aliases' -DefaultValue @()) |
+            Where-Object { $_ })
         $label = if ($aliases.Count -gt 0) {
             (@($aliases | Sort-Object { $_.Length }) | Select-Object -First 1).ToUpperInvariant()
         } else {

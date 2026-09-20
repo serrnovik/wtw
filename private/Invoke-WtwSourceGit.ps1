@@ -134,40 +134,40 @@ function Resolve-WtwSourceGitConflict {
 
     if (-not (Test-WtwSourceGitRunning)) { return @{ proceed = $true; relaunch = $false } }
 
-    Write-Host ''
-    Write-Host '  SourceGit is running — it overwrites preference.json on exit.' -ForegroundColor Yellow
-    Write-Host "  How should I $OperationLabel"'?' -ForegroundColor Yellow
-    Write-Host '    [c] Close SourceGit, then write (I will wait, then relaunch)'
-    Write-Host '    [k] Force-kill SourceGit, write, relaunch'
-    Write-Host '    [i] Ignore — write anyway (you restart SourceGit later)'
-    Write-Host '    [s] Skip — do not modify preference.json'
+    Write-WtwHost ''
+    Write-WtwHost '  SourceGit is running — it overwrites preference.json on exit.' -ForegroundColor Yellow
+    Write-WtwHost "  How should I $OperationLabel"'?' -ForegroundColor Yellow
+    Write-WtwHost '    [c] Close SourceGit, then write (I will wait, then relaunch)'
+    Write-WtwHost '    [k] Force-kill SourceGit, write, relaunch'
+    Write-WtwHost '    [i] Ignore — write anyway (you restart SourceGit later)'
+    Write-WtwHost '    [s] Skip — do not modify preference.json'
 
     $answer = (Read-Host '  Choice [c/k/i/s]').Trim().ToLowerInvariant()
     if (-not $answer) { $answer = 'c' }
 
     switch ($answer) {
         'c' {
-            Write-Host '  Waiting for SourceGit to close (Ctrl+C to abort)...' -ForegroundColor Cyan
+            Write-WtwHost '  Waiting for SourceGit to close (Ctrl+C to abort)...' -ForegroundColor Cyan
             while (Test-WtwSourceGitRunning) { Start-Sleep -Milliseconds 500 }
-            Write-Host '  SourceGit closed.' -ForegroundColor Green
+            Write-WtwHost '  SourceGit closed.' -ForegroundColor Green
             return @{ proceed = $true; relaunch = $true }
         }
         'k' {
-            Write-Host '  Force-closing SourceGit...' -ForegroundColor Cyan
+            Write-WtwHost '  Force-closing SourceGit...' -ForegroundColor Cyan
             if (-not (Stop-WtwSourceGitProcess)) {
-                Write-Host '  Could not stop SourceGit — skipping write.' -ForegroundColor Red
+                Write-WtwHost '  Could not stop SourceGit — skipping write.' -ForegroundColor Red
                 return @{ proceed = $false; relaunch = $false }
             }
-            Write-Host '  SourceGit stopped.' -ForegroundColor Green
+            Write-WtwHost '  SourceGit stopped.' -ForegroundColor Green
             return @{ proceed = $true; relaunch = $true }
         }
         's' {
-            Write-Host '  Skipped SourceGit update.' -ForegroundColor DarkGray
+            Write-WtwHost '  Skipped SourceGit update.' -ForegroundColor DarkGray
             return @{ proceed = $false; relaunch = $false }
         }
         default {
             # 'i' or anything else → write while running; user restarts later
-            Write-Host '  Writing anyway — restart SourceGit to pick up the change.' -ForegroundColor Yellow
+            Write-WtwHost '  Writing anyway — restart SourceGit to pick up the change.' -ForegroundColor Yellow
             return @{ proceed = $true; relaunch = $false }
         }
     }
@@ -187,7 +187,7 @@ function Read-WtwSourceGitPreferences {
         $raw = Get-Content -Path $Path -Raw -ErrorAction Stop
         return ($raw | ConvertFrom-Json -Depth 100 -ErrorAction Stop)
     } catch {
-        Write-Host "  SourceGit: could not parse preference.json — skipping ($($_.Exception.Message))" -ForegroundColor Yellow
+        Write-WtwHost "  SourceGit: could not parse preference.json — skipping ($($_.Exception.Message))" -ForegroundColor Yellow
         return $null
     }
 }
@@ -361,7 +361,7 @@ function Add-WtwSourceGitRepository {
         if ($bookmark -gt 0) { $existing.Bookmark = $bookmark }
         $prefs.RepositoryNodes = $nodes
         Save-WtwSourceGitPreferences -Path $prefPath -Preferences $prefs
-        Write-Host "  SourceGit: updated entry '$Name' (bookmark $($existing.Bookmark))." -ForegroundColor Green
+        Write-WtwHost "  SourceGit: updated entry '$Name' (bookmark $($existing.Bookmark))." -ForegroundColor Green
     } else {
         $node = [PSCustomObject]@{
             Id           = $id
@@ -385,7 +385,7 @@ function Add-WtwSourceGitRepository {
                 $folder | Add-Member -NotePropertyName 'SubNodes' -NotePropertyValue @($subs + $node) -Force
                 $prefs.RepositoryNodes = $nodes
                 $placed = $true
-                Write-Host "  SourceGit: registered '$Name' under folder '$($folder.Name)' (bookmark $bookmark)." -ForegroundColor Green
+                Write-WtwHost "  SourceGit: registered '$Name' under folder '$($folder.Name)' (bookmark $bookmark)." -ForegroundColor Green
             } elseif (-not $skipNest -and ((Get-WtwPropertyNames -Object $owner.Entry) -contains 'sourceGitFolder') -and $owner.Entry.sourceGitFolder -eq $true) {
                 $folder = New-WtwSourceGitFolderNode -RepoName $owner.Name -RepoEntry $owner.Entry -Bookmark $bookmark
                 Move-WtwSourceGitMainIntoFolder -Preferences $prefs -Folder $folder -MainPath $owner.Entry.mainPath
@@ -395,18 +395,18 @@ function Add-WtwSourceGitRepository {
                     $prefs.RepositoryNodes = @($prefs.RepositoryNodes + $folder)
                 }
                 $placed = $true
-                Write-Host "  SourceGit: created folder '$($folder.Name)' and registered '$Name' (bookmark $bookmark)." -ForegroundColor Green
+                Write-WtwHost "  SourceGit: created folder '$($folder.Name)' and registered '$Name' (bookmark $bookmark)." -ForegroundColor Green
             }
         }
         if (-not $placed) {
             $prefs.RepositoryNodes = @($nodes + $node)
-            Write-Host "  SourceGit: registered '$Name' (bookmark $bookmark)." -ForegroundColor Green
+            Write-WtwHost "  SourceGit: registered '$Name' (bookmark $bookmark)." -ForegroundColor Green
         }
         Save-WtwSourceGitPreferences -Path $prefPath -Preferences $prefs
     }
 
     if ($decision.relaunch) {
-        Write-Host '  SourceGit: relaunching...' -ForegroundColor Cyan
+        Write-WtwHost '  SourceGit: relaunching...' -ForegroundColor Cyan
         Start-WtwSourceGitApp -OpenPath $Path | Out-Null
     }
 }
@@ -457,10 +457,10 @@ function Remove-WtwSourceGitRepository {
 
     $prefs.RepositoryNodes = @($pruned.Nodes)
     Save-WtwSourceGitPreferences -Path $prefPath -Preferences $prefs
-    Write-Host '  SourceGit: removed entry.' -ForegroundColor Green
+    Write-WtwHost '  SourceGit: removed entry.' -ForegroundColor Green
 
     if ($decision.relaunch) {
-        Write-Host '  SourceGit: relaunching...' -ForegroundColor Cyan
+        Write-WtwHost '  SourceGit: relaunching...' -ForegroundColor Cyan
         Start-WtwSourceGitApp | Out-Null
     }
 }
@@ -527,10 +527,10 @@ function Sync-WtwSourceGitRepoDisplayName {
     }
 
     Save-WtwSourceGitPreferences -Path $prefPath -Preferences $prefs
-    Write-Host "  SourceGit: repo display name is now '$display'." -ForegroundColor Green
+    Write-WtwHost "  SourceGit: repo display name is now '$display'." -ForegroundColor Green
 
     if ($decision.relaunch) {
-        Write-Host '  SourceGit: relaunching...' -ForegroundColor Cyan
+        Write-WtwHost '  SourceGit: relaunching...' -ForegroundColor Cyan
         Start-WtwSourceGitApp -OpenPath $mainPath | Out-Null
     }
 }
@@ -711,9 +711,9 @@ function Ensure-WtwSourceGitRepoFolder {
     }
     Move-WtwSourceGitMainIntoFolder -Preferences $prefs -Folder $folder -MainPath (Get-WtwPropertyValue -Object $RepoEntry -Name 'mainPath')
     Save-WtwSourceGitPreferences -Path $prefPath -Preferences $prefs
-    Write-Host "  SourceGit: using folder '$($folder.Name)' for $RepoName." -ForegroundColor Green
+    Write-WtwHost "  SourceGit: using folder '$($folder.Name)' for $RepoName." -ForegroundColor Green
     if ($decision.relaunch) {
-        Write-Host '  SourceGit: relaunching...' -ForegroundColor Cyan
+        Write-WtwHost '  SourceGit: relaunching...' -ForegroundColor Cyan
         Start-WtwSourceGitApp | Out-Null
     }
 }

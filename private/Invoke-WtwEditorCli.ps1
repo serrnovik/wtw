@@ -59,8 +59,8 @@ function Invoke-WtwEditorCli {
         $app = $macApps | Where-Object { Test-Path "/Applications/$_.app" } | Select-Object -First 1
         if ($app) {
             if ($PassThru) { return @{ Exe = 'open'; Arguments = @('-a', $app, $Path) } }
-            Write-Host "  '$Cmd' CLI not on PATH — opening /Applications/$app.app instead." -ForegroundColor DarkGray
-            Write-Host "  Tip: in $app, run Cmd-Shift-P → 'Shell Command: Install ... command in PATH' to enable the CLI." -ForegroundColor DarkGray
+            Write-WtwHost "  '$Cmd' CLI not on PATH — opening /Applications/$app.app instead." -ForegroundColor DarkGray
+            Write-WtwHost "  Tip: in $app, run Cmd-Shift-P → 'Shell Command: Install ... command in PATH' to enable the CLI." -ForegroundColor DarkGray
             & open -a $app $Path
             return
         }

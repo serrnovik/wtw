@@ -1,3 +1,70 @@
+function Test-WtwListTextMatch {
+    param(
+        [string] $Needle,
+        [string[]] $Candidates
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Needle)) { return $true }
+    $n = $Needle.Trim()
+    foreach ($candidate in @($Candidates)) {
+        if ([string]::IsNullOrEmpty($candidate)) { continue }
+        if ($candidate.IndexOf($n, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Test-WtwListRepoMatchesFilter {
+    param($Item, [string] $Filter)
+
+    $aliasBits = @()
+    if ($Item.Aliases) { $aliasBits = @($Item.Aliases -split "`n") }
+    return (Test-WtwListTextMatch -Needle $Filter -Candidates (@($Item.RepoName, $Item.Repo) + $aliasBits))
+}
+
+function Test-WtwListWorktreeMatchesFilter {
+    param($Item, [string] $Filter)
+
+    $aliasBits = @()
+    if ($Item.Aliases) { $aliasBits = @($Item.Aliases -split "`n") }
+    return (Test-WtwListTextMatch -Needle $Filter -Candidates (@($Item.TaskName, $Item.Task, $Item.PrettyName) + $aliasBits))
+}
+
+function Select-WtwListItemsByFilter {
+    param(
+        [array] $Items,
+        [string] $Filter
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Filter)) { return @($Items) }
+
+    $repoFieldHit = @{}
+    $worktreeHit = @{}
+    foreach ($item in @($Items)) {
+        if ($item.Kind -eq 'repo') {
+            if (Test-WtwListRepoMatchesFilter -Item $item -Filter $Filter) {
+                $repoFieldHit[[string]$item.RepoName] = $true
+            }
+        } elseif (Test-WtwListWorktreeMatchesFilter -Item $item -Filter $Filter) {
+            $worktreeHit["$($item.RepoName)/$($item.TaskName)"] = $true
+        }
+    }
+
+    $selected = [System.Collections.Generic.List[object]]::new()
+    foreach ($item in @($Items)) {
+        $repoName = [string]$item.RepoName
+        if ($item.Kind -eq 'repo') {
+            if ($repoFieldHit.ContainsKey($repoName) -or ($worktreeHit.Keys | Where-Object { $_ -like "$repoName/*" })) {
+                [void]$selected.Add($item)
+            }
+        } elseif ($repoFieldHit.ContainsKey($repoName) -or $worktreeHit.ContainsKey("$repoName/$($item.TaskName)")) {
+            [void]$selected.Add($item)
+        }
+    }
+    return @($selected)
+}
+
 function Get-WtwList {
     <#
     .SYNOPSIS
@@ -8,7 +75,11 @@ function Get-WtwList {
         Detailed mode (`wtw info`) shows a card layout with Emoji as its own
         field, clickable file links, and settings file paths.
     .PARAMETER Repo
-        Filter the listing to a specific repo by name or alias.
+        Filter the listing to a specific repo by exact name or alias.
+    .PARAMETER Filter
+        Case-insensitive substring across repo names, aliases, worktree tasks,
+        and pretty names. A matching repo includes all of its worktrees; a
+        matching worktree includes its parent repo row. Aliases: ``-f``, ``--filter``.
     .PARAMETER Detailed
         Show card-style output with clickable file links and settings paths.
     .PARAMETER Wide
@@ -21,12 +92,19 @@ function Get-WtwList {
     .EXAMPLE
         wtw list --wide
         Full table columns without shortening (legacy-style density).
+    .EXAMPLE
+        wtw list -f kul
+        Only kulissa-prefixed repos (and their worktrees), plus any worktree
+        whose task or alias contains ``kul``.
     #>
     [CmdletBinding()]
     param(
         [string] $Repo,
 
         [string] $Task,
+
+        [Alias('f')]
+        [string] $Filter,
 
         [Alias('d')]
         [switch] $Detailed,
@@ -40,7 +118,7 @@ function Get-WtwList {
     $repoNames = (Get-WtwPropertyNames -Object $registry.repos)
 
     if (-not $repoNames -or $repoNames.Count -eq 0) {
-        Write-Host '  No repos registered. Run "wtw init" inside a repo.' -ForegroundColor Yellow
+        Write-WtwHost '  No repos registered. Run "wtw init" inside a repo.' -ForegroundColor Yellow
         return
     }
 
@@ -52,11 +130,11 @@ function Get-WtwList {
                 $_ -eq $Repo -or ($Repo -in (Get-WtwRepoAliases $registry.repos.$_))
             })
         if ($known.Count -eq 0) {
-            Write-Host ''
-            Write-Host "  No repo matches '$Repo'." -ForegroundColor Yellow
-            Write-Host "  Registered: $(($repoNames | Sort-Object) -join ', ')" -ForegroundColor DarkGray
-            Write-Host "  Did you mean a flag? Use --detailed / --wide (with dashes)." -ForegroundColor DarkGray
-            Write-Host ''
+            Write-WtwHost ''
+            Write-WtwHost "  No repo matches '$Repo'." -ForegroundColor Yellow
+            Write-WtwHost "  Registered: $(($repoNames | Sort-Object) -join ', ')" -ForegroundColor DarkGray
+            Write-WtwHost "  Did you mean a flag? Use --detailed / --wide (with dashes)." -ForegroundColor DarkGray
+            Write-WtwHost ''
             return
         }
     }
@@ -148,6 +226,18 @@ function Get-WtwList {
         }
     }
 
+    if (-not [string]::IsNullOrWhiteSpace($Filter)) {
+        $beforeFilter = @($items).Count
+        $items = @(Select-WtwListItemsByFilter -Items $items -Filter $Filter)
+        if ($beforeFilter -gt 0 -and $items.Count -eq 0) {
+            Write-WtwHost ''
+            Write-WtwHost "  No repo or worktree matches '$Filter'." -ForegroundColor Yellow
+            Write-WtwHost "  -f / --filter is a substring (wtw list -f kul). Positional list still needs an exact repo." -ForegroundColor DarkGray
+            Write-WtwHost ''
+            return
+        }
+    }
+
     if ($Detailed) {
         Format-WtwDetailedList $items
     } else {
@@ -157,12 +247,12 @@ function Get-WtwList {
             @('Kind', 'Repo', 'Task', 'Aliases', 'Branch', 'Color', 'Path', 'Created')
         }
         $tableRows = Get-WtwListRowsForTable -FullItems $items -Wide:$Wide
-        Write-Host ''
+        Write-WtwHost ''
         Format-WtwTable -Items $tableRows -Columns $tableColumns
         if (-not $Wide) {
-            Write-Host '  Tip: wtw list --wide  for full aliases, paths, workspace, and branch names.' -ForegroundColor DarkGray
+            Write-WtwHost '  Tip: wtw list --wide  for full aliases, paths, workspace, and branch names.' -ForegroundColor DarkGray
         }
-        Write-Host ''
+        Write-WtwHost ''
     }
 }
 
@@ -177,7 +267,7 @@ function Show-WtwInfo {
 
     $target = & { Resolve-WtwTarget $Name } 6>$null
     if (-not $target) {
-        Write-Host "  No repo or worktree found matching '$Name'" -ForegroundColor Yellow
+        Write-WtwHost "  No repo or worktree found matching '$Name'" -ForegroundColor Yellow
         return
     }
 
@@ -201,12 +291,12 @@ function Write-WtwDetailedAliasesBlock {
     }
     $nonEmptyLines = @($lines | ForEach-Object { $_.TrimEnd() } | Where-Object { $_ })
     if ($nonEmptyLines.Count -eq 0) {
-        Write-Host "${Indent}Aliases   : " -ForegroundColor $ForegroundColor
+        Write-WtwHost "${Indent}Aliases   : " -ForegroundColor $ForegroundColor
         return
     }
-    Write-Host "${Indent}Aliases   : $($nonEmptyLines[0])" -ForegroundColor $ForegroundColor
+    Write-WtwHost "${Indent}Aliases   : $($nonEmptyLines[0])" -ForegroundColor $ForegroundColor
     for ($aliasLineIndex = 1; $aliasLineIndex -lt $nonEmptyLines.Count; $aliasLineIndex++) {
-        Write-Host "${Indent}            $($nonEmptyLines[$aliasLineIndex])" -ForegroundColor $ForegroundColor
+        Write-WtwHost "${Indent}            $($nonEmptyLines[$aliasLineIndex])" -ForegroundColor $ForegroundColor
     }
 }
 
@@ -215,11 +305,11 @@ function Format-WtwDetailedList {
 
     $esc = [char]27
 
-    Write-Host ''
-    Write-Host '  ╔╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╗' -ForegroundColor DarkGray
-    Write-Host '  ║  wtw — Worktree & Workspace Registry     ║' -ForegroundColor DarkGray
-    Write-Host '  ╚╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝' -ForegroundColor DarkGray
-    Write-Host ''
+    Write-WtwHost ''
+    Write-WtwHost '  ╔╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╗' -ForegroundColor DarkGray
+    Write-WtwHost '  ║  wtw — Worktree & Workspace Registry     ║' -ForegroundColor DarkGray
+    Write-WtwHost '  ╚╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝' -ForegroundColor DarkGray
+    Write-WtwHost ''
 
     foreach ($item in $Items) {
         $color = $item.Color
@@ -241,17 +331,17 @@ function Format-WtwDetailedList {
             } else {
                 $swatch = "  $repoLabel"
             }
-            Write-Host "  $swatch" -NoNewline
+            Write-WtwHost "  $swatch" -NoNewline
             if ($color -match '^#[0-9a-fA-F]{6}$') {
-                Write-Host " $color" -ForegroundColor DarkGray -NoNewline
+                Write-WtwHost " $color" -ForegroundColor DarkGray -NoNewline
             }
-            Write-Host "  $($item.Branch)" -ForegroundColor Yellow
-            Write-Host "    Emoji     : $($item.Emoji)" -ForegroundColor Gray
+            Write-WtwHost "  $($item.Branch)" -ForegroundColor Yellow
+            Write-WtwHost "    Emoji     : $($item.Emoji)" -ForegroundColor Gray
             Write-WtwDetailedAliasesBlock -Indent '    ' -Aliases $item.Aliases -ForegroundColor Gray
-            Write-Host "    Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor Gray
-            Write-Host "    Workspace : $($item.Workspace)" -ForegroundColor Gray
-            Write-Host "    Agent     : $($item.AgentProfile)" -ForegroundColor Gray
-            Write-Host ''
+            Write-WtwHost "    Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor Gray
+            Write-WtwHost "    Workspace : $($item.Workspace)" -ForegroundColor Gray
+            Write-WtwHost "    Agent     : $($item.AgentProfile)" -ForegroundColor Gray
+            Write-WtwHost ''
         } else {
             # Worktree entry (indented)
             $swatch = ''
@@ -263,25 +353,25 @@ function Format-WtwDetailedList {
             } else {
                 $swatch = '  '
             }
-            Write-Host "    ${swatch} " -NoNewline
+            Write-WtwHost "    ${swatch} " -NoNewline
             if ($color -match '^#[0-9a-fA-F]{6}$') {
-                Write-Host "$color " -ForegroundColor DarkGray -NoNewline
+                Write-WtwHost "$color " -ForegroundColor DarkGray -NoNewline
             }
-            Write-Host "$($item.Branch)" -ForegroundColor Yellow
+            Write-WtwHost "$($item.Branch)" -ForegroundColor Yellow
             if ($item.PrettyName) {
-                Write-Host "      Name      : $($item.PrettyName)" -ForegroundColor DarkGray
+                Write-WtwHost "      Name      : $($item.PrettyName)" -ForegroundColor DarkGray
             }
             $taskLabel = if ($item.TaskName -and $item.TaskName -ne '-') { $item.TaskName } else { $item.Task }
-            Write-Host "      Task      : $taskLabel" -ForegroundColor DarkGray
-            Write-Host "      Emoji     : $($item.Emoji)" -ForegroundColor DarkGray
+            Write-WtwHost "      Task      : $taskLabel" -ForegroundColor DarkGray
+            Write-WtwHost "      Emoji     : $($item.Emoji)" -ForegroundColor DarkGray
             Write-WtwDetailedAliasesBlock -Indent '      ' -Aliases $item.Aliases -ForegroundColor DarkGray
-            Write-Host "      Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor DarkGray
-            Write-Host "      Workspace : $($item.Workspace)" -ForegroundColor DarkGray
-            Write-Host "      Created   : $($item.Created)" -ForegroundColor DarkGray
+            Write-WtwHost "      Path      : ${esc}]8;;file://$($item.Path)${esc}\$($item.Path)${esc}]8;;${esc}\" -ForegroundColor DarkGray
+            Write-WtwHost "      Workspace : $($item.Workspace)" -ForegroundColor DarkGray
+            Write-WtwHost "      Created   : $($item.Created)" -ForegroundColor DarkGray
             if ($item.SupersetId) {
-                Write-Host "      Superset  : $($item.SupersetId)" -ForegroundColor DarkGray
+                Write-WtwHost "      Superset  : $($item.SupersetId)" -ForegroundColor DarkGray
             }
-            Write-Host ''
+            Write-WtwHost ''
         }
     }
 
@@ -291,15 +381,15 @@ function Format-WtwDetailedList {
     $colorsFile = Join-Path $wtwDir 'colors.json'
     $configFile = Join-Path $wtwDir 'config.json'
 
-    Write-Host '  ─── Settings ───' -ForegroundColor DarkGray
+    Write-WtwHost '  ─── Settings ───' -ForegroundColor DarkGray
     if (Test-Path $registryFile) {
-        Write-Host "    Registry : ${esc}]8;;file://${registryFile}${esc}\${registryFile}${esc}]8;;${esc}\"  -ForegroundColor DarkCyan
+        Write-WtwHost "    Registry : ${esc}]8;;file://${registryFile}${esc}\${registryFile}${esc}]8;;${esc}\"  -ForegroundColor DarkCyan
     }
     if (Test-Path $colorsFile) {
-        Write-Host "    Colors   : ${esc}]8;;file://${colorsFile}${esc}\${colorsFile}${esc}]8;;${esc}\" -ForegroundColor DarkCyan
+        Write-WtwHost "    Colors   : ${esc}]8;;file://${colorsFile}${esc}\${colorsFile}${esc}]8;;${esc}\" -ForegroundColor DarkCyan
     }
     if (Test-Path $configFile) {
-        Write-Host "    Config   : ${esc}]8;;file://${configFile}${esc}\${configFile}${esc}]8;;${esc}\" -ForegroundColor DarkCyan
+        Write-WtwHost "    Config   : ${esc}]8;;file://${configFile}${esc}\${configFile}${esc}]8;;${esc}\" -ForegroundColor DarkCyan
     }
-    Write-Host ''
+    Write-WtwHost ''
 }

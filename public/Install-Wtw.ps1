@@ -28,39 +28,39 @@ function Install-Wtw {
 
     # Prevent self-install (running from the global install itself)
     if ($sourceDir -eq $installDirResolved) {
-        Write-Host ''
-        Write-Host '  Cannot install from the global copy — it would delete itself.' -ForegroundColor Red
-        Write-Host '  To pull the latest published release instead:' -ForegroundColor Yellow
-        Write-Host ''
-        Write-Host '    wtw update' -ForegroundColor DarkGray
-        Write-Host ''
-        Write-Host '  To install your own build, run from the repo source:' -ForegroundColor Yellow
-        Write-Host ''
-        Write-Host '    cd <repo>/devops/worktree-workspace' -ForegroundColor DarkGray
-        Write-Host '    Import-Module ./wtw.psm1 -Force; wtw install' -ForegroundColor DarkGray
-        Write-Host ''
+        Write-WtwHost ''
+        Write-WtwHost '  Cannot install from the global copy — it would delete itself.' -ForegroundColor Red
+        Write-WtwHost '  To pull the latest published release instead:' -ForegroundColor Yellow
+        Write-WtwHost ''
+        Write-WtwHost '    wtw update' -ForegroundColor DarkGray
+        Write-WtwHost ''
+        Write-WtwHost '  To install your own build, run from the repo source:' -ForegroundColor Yellow
+        Write-WtwHost ''
+        Write-WtwHost '    cd <repo>/devops/worktree-workspace' -ForegroundColor DarkGray
+        Write-WtwHost '    Import-Module ./wtw.psm1 -Force; wtw install' -ForegroundColor DarkGray
+        Write-WtwHost ''
         return
     }
 
     # Check for git
     if (-not (Get-Command 'git' -ErrorAction SilentlyContinue)) {
-        Write-Host ''
-        Write-Host '  Git is required but not found.' -ForegroundColor Red
+        Write-WtwHost ''
+        Write-WtwHost '  Git is required but not found.' -ForegroundColor Red
         if ($IsMacOS) {
-            Write-Host '  Install via: brew install git' -ForegroundColor Yellow
+            Write-WtwHost '  Install via: brew install git' -ForegroundColor Yellow
         } elseif ($IsLinux) {
-            Write-Host '  Install via: sudo apt install git  (or your distro equivalent)' -ForegroundColor Yellow
+            Write-WtwHost '  Install via: sudo apt install git  (or your distro equivalent)' -ForegroundColor Yellow
         } else {
-            Write-Host '  Install from: https://git-scm.com/downloads/win' -ForegroundColor Yellow
+            Write-WtwHost '  Install from: https://git-scm.com/downloads/win' -ForegroundColor Yellow
         }
-        Write-Host ''
+        Write-WtwHost ''
         return
     }
 
-    Write-Host ''
-    Write-Host '  Installing wtw...' -ForegroundColor Cyan
-    Write-Host "  Source:  $sourceDir"
-    Write-Host "  Target:  $installDir"
+    Write-WtwHost ''
+    Write-WtwHost '  Installing wtw...' -ForegroundColor Cyan
+    Write-WtwHost "  Source:  $sourceDir"
+    Write-WtwHost "  Target:  $installDir"
 
     # Remove old install
     if (Test-Path $installDir) {
@@ -99,6 +99,11 @@ function Install-Wtw {
     if (Test-Path $shellSrc) {
         if (Test-Path $shellDest) { Remove-Item $shellDest -Recurse -Force }
         Copy-Item -Path $shellSrc -Destination $shellDest -Recurse -Force
+        ConvertTo-WtwUnixLineEndings -Path $shellDest
+        $installedShell = Join-Path $installDir 'shell'
+        if (Test-Path -LiteralPath $installedShell) {
+            ConvertTo-WtwUnixLineEndings -Path $installedShell
+        }
     }
 
     # Stamp where this copy came from. `wtw update` reads it to decide whether it
@@ -109,7 +114,7 @@ function Install-Wtw {
     try { $installedVersion = (Import-PowerShellDataFile -LiteralPath $manifestFile).ModuleVersion } catch { $installedVersion = $null }
     Write-WtwInstallRecord -InstallRoot $installDir -Origin 'Manual' -Version $installedVersion -SourcePath $sourceDir
 
-    Write-Host "  Module installed to $installDir" -ForegroundColor Green
+    Write-WtwHost "  Module installed to $installDir" -ForegroundColor Green
 
     # Check/update profile
     if (-not $SkipProfile) {
@@ -126,10 +131,10 @@ if (Test-Path $_wtwModule) {
         if (Test-Path $profilePath) {
             $profileContent = Get-Content $profilePath -Raw
             if ($profileContent -match 'wtw.*worktree.*workspace.*manager') {
-                Write-Host '  Profile already has wtw loader — skipping.' -ForegroundColor DarkGray
+                Write-WtwHost '  Profile already has wtw loader — skipping.' -ForegroundColor DarkGray
             } else {
                 Add-Content -Path $profilePath -Value $profileSnippet -Encoding utf8
-                Write-Host "  Added loader to profile: $profilePath" -ForegroundColor Green
+                Write-WtwHost "  Added loader to profile: $profilePath" -ForegroundColor Green
             }
         } else {
             # Create profile if it doesn't exist
@@ -138,7 +143,7 @@ if (Test-Path $_wtwModule) {
                 New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
             }
             Set-Content -Path $profilePath -Value $profileSnippet -Encoding utf8
-            Write-Host "  Created profile with wtw loader: $profilePath" -ForegroundColor Green
+            Write-WtwHost "  Created profile with wtw loader: $profilePath" -ForegroundColor Green
         }
     }
 
@@ -151,7 +156,7 @@ if (Test-Path $_wtwModule) {
                 New-Item -Path $cmdInstallDir -ItemType Directory -Force | Out-Null
             }
             Copy-Item -Path $cmdShimSrc -Destination (Join-Path $cmdInstallDir 'wtw.cmd') -Force
-            Write-Host "  cmd.exe shim installed: $(Join-Path $cmdInstallDir 'wtw.cmd')" -ForegroundColor Green
+            Write-WtwHost "  cmd.exe shim installed: $(Join-Path $cmdInstallDir 'wtw.cmd')" -ForegroundColor Green
 
             if (-not $SkipProfile) {
                 # Ensure the shim dir is on the user PATH (HKCU). Use the
@@ -167,10 +172,10 @@ if (Test-Path $_wtwModule) {
                 if (-not $alreadyOnPath) {
                     $newUserPath = if ($userPath) { "$userPath;$cmdInstallDir" } else { $cmdInstallDir }
                     [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
-                    Write-Host "  Added to user PATH: $cmdInstallDir" -ForegroundColor Green
-                    Write-Host '  Open a new cmd.exe / PowerShell window for PATH to take effect.' -ForegroundColor DarkGray
+                    Write-WtwHost "  Added to user PATH: $cmdInstallDir" -ForegroundColor Green
+                    Write-WtwHost '  Open a new cmd.exe / PowerShell window for PATH to take effect.' -ForegroundColor DarkGray
                 } else {
-                    Write-Host '  cmd shim dir already on user PATH — skipping.' -ForegroundColor DarkGray
+                    Write-WtwHost '  cmd shim dir already on user PATH — skipping.' -ForegroundColor DarkGray
                 }
                 # Patch current session too, so the user can test without restarting
                 if (-not ($env:Path -split ';' | Where-Object { $_ -ieq $cmdInstallDir })) {
@@ -201,26 +206,27 @@ if (Test-Path $_wtwModule) {
 
             if (Test-Path $sh.Rc) {
                 $rcContent = Get-Content $sh.Rc -Raw -ErrorAction SilentlyContinue
-                if ($rcContent -and $rcContent -match 'wtw.*worktree.*workspace.*manager') {
+                $wrapperName = Split-Path -Leaf $sh.Source
+                if (Test-WtwShellRcHasWrapper -RcContent $rcContent -WrapperFileName $wrapperName) {
                     $alreadyInstalled = $true
                 }
             }
 
             if ($alreadyInstalled) {
-                Write-Host "  $($sh.Shell) integration already in $($sh.Rc) — skipping." -ForegroundColor DarkGray
+                Write-WtwHost "  $($sh.Shell) integration already in $($sh.Rc) — skipping." -ForegroundColor DarkGray
             } else {
                 $addShell = Read-Host "  Add wtw to $($sh.Rc) for $($sh.Shell)? [y/N]"
                 if ($addShell -in @('y', 'Y', 'yes')) {
                     Add-Content -Path $sh.Rc -Value $snippet -Encoding utf8
-                    Write-Host "  Added wtw loader to $($sh.Rc)" -ForegroundColor Green
+                    Write-WtwHost "  Added wtw loader to $($sh.Rc)" -ForegroundColor Green
                 }
             }
         }
     }
 
     # Detect installed editors and offer to install Peacock extension
-    Write-Host ''
-    Write-Host '  Checking editors...' -ForegroundColor Cyan
+    Write-WtwHost ''
+    Write-WtwHost '  Checking editors...' -ForegroundColor Cyan
 
     # Editor candidates come from the shared family table
     # (private/Get-WtwEditorFamily.ps1). `CmdCandidates` is a fallback chain so a
@@ -263,35 +269,35 @@ if (Test-Path $_wtwModule) {
             $anyFound = $ed.CmdCandidates | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue }
             if ($anyFound) {
                 $stub = ($anyFound | Select-Object -First 1)
-                Write-Host "    $($ed.Name) — CLI '$stub' on PATH but not runnable (likely a stale stub from an old install)" -ForegroundColor Yellow
+                Write-WtwHost "    $($ed.Name) — CLI '$stub' on PATH but not runnable (likely a stale stub from an old install)" -ForegroundColor Yellow
             }
             # Case B: CLI not on PATH but app bundle exists — point at the
             # IDE's "Install in PATH" command palette entry.
             if ($IsMacOS -and $macAppHints.ContainsKey($ed.Name)) {
                 $installedApp = $macAppHints[$ed.Name] | Where-Object { (Test-Path $_.App) -and (Test-Path $_.Bin) } | Select-Object -First 1
                 if ($installedApp) {
-                    Write-Host "    $($ed.Name) — installed at $($installedApp.App), but '$($installedApp.Name)' is not on PATH." -ForegroundColor Yellow
-                    Write-Host "      Fix: open $($ed.Name) → Cmd-Shift-P → 'Shell Command: Install ''$($installedApp.Name)'' command in PATH'" -ForegroundColor DarkGray
+                    Write-WtwHost "    $($ed.Name) — installed at $($installedApp.App), but '$($installedApp.Name)' is not on PATH." -ForegroundColor Yellow
+                    Write-WtwHost "      Fix: open $($ed.Name) → Cmd-Shift-P → 'Shell Command: Install ''$($installedApp.Name)'' command in PATH'" -ForegroundColor DarkGray
                 }
             }
             continue
         }
 
         $installedEditors += @{ Name = $ed.Name; Cmd = $workingCmd; ExtCmd = $workingCmd }
-        Write-Host "    $($ed.Name) ($workingCmd)" -ForegroundColor Green -NoNewline
+        Write-WtwHost "    $($ed.Name) ($workingCmd)" -ForegroundColor Green -NoNewline
 
         # Check if Peacock is already installed
         $extensions = & $workingCmd --list-extensions 2>$null
         if ($extensions -and ($extensions -match $peacockExtId)) {
-            Write-Host "  — Peacock installed" -ForegroundColor DarkGray
+            Write-WtwHost "  — Peacock installed" -ForegroundColor DarkGray
         } else {
-            Write-Host "  — Peacock NOT installed" -ForegroundColor Yellow
+            Write-WtwHost "  — Peacock NOT installed" -ForegroundColor Yellow
         }
     }
 
     if ($installedEditors.Count -eq 0) {
-        Write-Host "    No supported editors found ($((Get-WtwEditorFamily | ForEach-Object { $_.Id }) -join ', '))." -ForegroundColor Yellow
-        Write-Host '    wtw works best with the Peacock extension for workspace colors.' -ForegroundColor DarkGray
+        Write-WtwHost "    No supported editors found ($((Get-WtwEditorFamily | ForEach-Object { $_.Id }) -join ', '))." -ForegroundColor Yellow
+        Write-WtwHost '    wtw works best with the Peacock extension for workspace colors.' -ForegroundColor DarkGray
     } else {
         # Check if any editors are missing Peacock
         $needPeacock = @()
@@ -303,24 +309,24 @@ if (Test-Path $_wtwModule) {
         }
 
         if ($needPeacock.Count -gt 0) {
-            Write-Host ''
+            Write-WtwHost ''
             $names = ($needPeacock | ForEach-Object { $_.Name }) -join ', '
-            Write-Host "  Peacock extension is recommended for workspace colors." -ForegroundColor Yellow
-            Write-Host "  Missing in: $names" -ForegroundColor DarkGray
+            Write-WtwHost "  Peacock extension is recommended for workspace colors." -ForegroundColor Yellow
+            Write-WtwHost "  Missing in: $names" -ForegroundColor DarkGray
             $install = Read-Host "  Install Peacock extension? [y/N]"
             if ($install -in @('y', 'Y', 'yes')) {
                 foreach ($ed in $needPeacock) {
-                    Write-Host "    Installing in $($ed.Name)..." -ForegroundColor Cyan -NoNewline
+                    Write-WtwHost "    Installing in $($ed.Name)..." -ForegroundColor Cyan -NoNewline
                     & $ed.ExtCmd --install-extension $peacockExtId 2>$null | Out-Null
                     if ($LASTEXITCODE -eq 0) {
-                        Write-Host " done" -ForegroundColor Green
+                        Write-WtwHost " done" -ForegroundColor Green
                     } else {
-                        Write-Host " failed" -ForegroundColor Red
+                        Write-WtwHost " failed" -ForegroundColor Red
                     }
                 }
             }
         } else {
-            Write-Host '  Peacock extension found in all editors.' -ForegroundColor Green
+            Write-WtwHost '  Peacock extension found in all editors.' -ForegroundColor Green
         }
     }
 
@@ -330,21 +336,22 @@ if (Test-Path $_wtwModule) {
         $claudeSkill = Join-Path $currentRepoRoot '.claude' 'skills' 'worktree-workspace' 'SKILL.md'
         $agentsSkill = Join-Path $currentRepoRoot '.agents' 'skills' 'worktree-workspace' 'SKILL.md'
         if (-not (Test-Path $claudeSkill) -or -not (Test-Path $agentsSkill)) {
-            Write-Host ''
-            Write-Host '  AI skill not found in this repo.' -ForegroundColor Yellow
-            Write-Host '  Install it so AI agents (Claude, Codex, Cursor, Gemini) can use wtw.' -ForegroundColor DarkGray
+            Write-WtwHost ''
+            Write-WtwHost '  AI skill not found in this repo.' -ForegroundColor Yellow
+            Write-WtwHost '  Install it so AI agents (Claude, Codex, Cursor, Gemini) can use wtw.' -ForegroundColor DarkGray
             $installSkill = Read-Host '  Install wtw AI skill? [y/N]'
             if ($installSkill -in @('y', 'Y', 'yes')) {
                 Install-WtwSkill -RepoRoot $currentRepoRoot
             } else {
-                Write-Host "  Skipped. Run 'wtw skill' later to install." -ForegroundColor DarkGray
+                Write-WtwHost "  Skipped. Run 'wtw skill' later to install." -ForegroundColor DarkGray
             }
         }
     }
 
-    Write-Host ''
-    Write-Host '  Done! Reload this session or restart the terminal:' -ForegroundColor Green
-    Write-Host '    wtw reload' -ForegroundColor DarkGray
-    Write-Host "    Import-Module $(Join-Path $installDir 'wtw.psm1') -Force" -ForegroundColor DarkGray
-    Write-Host ''
+    Sync-WtwCmuxRemoteProjects -Quiet
+
+    Write-WtwHost ''
+    Write-WtwHost '  Done! Restart your terminal or run:' -ForegroundColor Green
+    Write-WtwHost "    Import-Module $(Join-Path $installDir 'wtw.psm1') -Force" -ForegroundColor DarkGray
+    Write-WtwHost ''
 }

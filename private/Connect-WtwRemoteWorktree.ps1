@@ -42,13 +42,13 @@ function Connect-WtwRemoteWorktree {
     $color = $null
 
     if ($Name) {
-        Write-Host "  Resolving '$Name' on $($HostEntry.Name)..." -ForegroundColor DarkGray
+        Write-WtwHost "  Resolving '$Name' on $($HostEntry.Name)..." -ForegroundColor DarkGray
         $remote = Get-WtwRemoteTarget -HostEntry $HostEntry -Name $Name
         if (-not $remote -or -not $remote.Path) {
             # Said locally as well as remotely: the remote may be running an
             # older wtw whose message does not mention it.
             $numericHint = Get-WtwNumericNameHint -Name $Name
-            if ($numericHint) { Write-Host "  $numericHint" -ForegroundColor Yellow }
+            if ($numericHint) { Write-WtwHost "  $numericHint" -ForegroundColor Yellow }
             Show-WtwRemoteTargetSuggestions -HostEntry $HostEntry -Name $Name
             Write-Error "Could not resolve '$Name' on $($HostEntry.Name)."
             return
@@ -105,7 +105,7 @@ if (Test-Path -LiteralPath `$wtwTarget) {
     (New-WtwRemotePwshCommand -Encoded $encoded -HostEntry $HostEntry -Interactive)
 
     if ($PrintOnly) {
-        Write-Host "  ssh $($sshArgs -join ' ')" -ForegroundColor White
+        Write-WtwHost "  ssh $($sshArgs -join ' ')" -ForegroundColor White
         return
     }
 
@@ -115,8 +115,8 @@ if (Test-Path -LiteralPath `$wtwTarget) {
     }
 
     $title = $sessionTitle
-    Write-Host "  Connecting to $($HostEntry.Name)" -ForegroundColor Green -NoNewline
-    if ($remotePath) { Write-Host ": $remotePath" -ForegroundColor Green } else { Write-Host '' }
+    Write-WtwHost "  Connecting to $($HostEntry.Name)" -ForegroundColor Green -NoNewline
+    if ($remotePath) { Write-WtwHost ": $remotePath" -ForegroundColor Green } else { Write-WtwHost '' }
 
     Set-WtwTerminalColor -Color $color -Title $title
 

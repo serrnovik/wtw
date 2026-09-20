@@ -200,10 +200,10 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     if (-not (Test-Path $registryPath)) { return }
     $registry = Get-Content $registryPath -Raw | ConvertFrom-Json
 
-    # --repo value (previous token is --repo)
+    # --repo / -f / --filter value
     if ($elems.Count -ge 3 -and $wordToComplete -notmatch '^-') {
         $prev = $elems[$elems.Count - 2].Extent.Text
-        if ($prev -ieq '--repo' -and $subCommand -in @(
+        if (($prev -ieq '--repo' -or (($prev -ieq '-f' -or $prev -ieq '--filter') -and $subCommand -in @('list', 'ls'))) -and $subCommand -in @(
                 'create', 'remove', 'rm', 'open', 'unregister', 'unreg', 'edit', 'rename', 'ren', 'sync', 'list', 'ls'
             )) {
             $repos = Build-WtwRepoFilterList $registry

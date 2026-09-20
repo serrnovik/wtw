@@ -40,3 +40,12 @@ Describe 'Get-WtwCmuxTabLabel' {
         }
     }
 }
+
+Describe 'cmux tab title override' {
+    It 'writes the pinned label where agent-action.ps1 will re-read it' {
+        $path = Set-WtwCmuxTabTitleOverride -WorkspaceId 'workspace:4' -SurfaceId 'surface:9' -Title '🖥️🌳 🧊AT scoring'
+        $path | Should -Be (Get-WtwCmuxTabTitleOverridePath -WorkspaceId 'workspace:4' -SurfaceId 'surface:9')
+        (Get-Content -LiteralPath $path -Raw) | Should -Be '🖥️🌳 🧊AT scoring'
+        Remove-Item -LiteralPath $path -Force
+    }
+}

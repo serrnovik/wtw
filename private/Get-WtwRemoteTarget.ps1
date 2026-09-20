@@ -182,12 +182,12 @@ function Write-WtwSshFailure {
         [Parameter(Mandatory)] [string] $ErrorText
     )
 
-    Write-Host ''
+    Write-WtwHost ''
     foreach ($line in (Format-WtwSshError -HostEntry $HostEntry -ErrorText $ErrorText) -split "`n") {
         $color = if ($line -match '^\s*(Fix:|or:|  macOS:|  Windows:|  Linux:|wtw |ssh )') { 'Cyan' } else { 'Yellow' }
-        Write-Host "  $line" -ForegroundColor $color
+        Write-WtwHost "  $line" -ForegroundColor $color
     }
-    Write-Host ''
+    Write-WtwHost ''
 }
 
 function New-WtwRemoteScript {
@@ -293,7 +293,7 @@ function Invoke-WtwRemoteCommand {
     (New-WtwRemotePwshCommand -Encoded $encoded -HostEntry $HostEntry)
 
     # `6>$null` is load-bearing. A remote pwsh with redirected streams serialises
-    # its *information* stream — everything wtw prints with Write-Host — as a
+    # its *information* stream — everything wtw prints with Write-WtwHost — as a
     # CLIXML blob on stderr, in addition to the plain text already on stdout.
     # Local PowerShell recognises the `#< CLIXML` preamble and rehydrates those
     # records into ITS information stream, which the host then prints. Assignment
@@ -350,6 +350,8 @@ function Get-WtwRemoteTarget {
                     Color      = Get-WtwPropertyValue -Object $parsed -Name 'color'
                     Title      = Get-WtwPropertyValue -Object $parsed -Name 'title'
                     PrettyName = Get-WtwPropertyValue -Object $parsed -Name 'prettyName'
+                    Repo       = Get-WtwPropertyValue -Object $parsed -Name 'repo'
+                    RepoEmoji  = Get-WtwPropertyValue -Object $parsed -Name 'repoEmoji'
                 }
             } catch {
                 Write-Verbose "Remote __resolve_json returned unparseable JSON: $json"
@@ -377,12 +379,14 @@ function Get-WtwRemoteTarget {
     $fields = ($legacy.Output | Select-Object -First 1) -split "`t"
     if (-not $fields[0]) { return $null }
 
-    Write-Host "  Remote wtw predates --on; opening the folder (no workspace file)." -ForegroundColor DarkGray
+    Write-WtwHost "  Remote wtw predates --on; opening the folder (no workspace file)." -ForegroundColor DarkGray
     return @{
         Path       = $fields[0]
         Workspace  = $null
         Color      = if ($fields.Count -gt 1) { $fields[1] } else { $null }
         Title      = if ($fields.Count -gt 2) { $fields[2] } else { $null }
         PrettyName = $null
+        Repo       = $null
+        RepoEmoji  = $null
     }
 }

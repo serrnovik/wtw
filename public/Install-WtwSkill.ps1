@@ -43,9 +43,9 @@ function Install-WtwSkill {
         return
     }
 
-    Write-Host ''
-    Write-Host '  Installing wtw AI skills...' -ForegroundColor Cyan
-    Write-Host "  Repo: $RepoRoot" -ForegroundColor DarkGray
+    Write-WtwHost ''
+    Write-WtwHost '  Installing wtw AI skills...' -ForegroundColor Cyan
+    Write-WtwHost "  Repo: $RepoRoot" -ForegroundColor DarkGray
 
     $installed = @()
 
@@ -59,7 +59,7 @@ function Install-WtwSkill {
             }
             Copy-Item $claudeSource -Destination (Join-Path $claudeTarget 'SKILL.md') -Force
             $installed += 'Claude Code'
-            Write-Host "    .claude/skills/worktree-workspace/SKILL.md" -ForegroundColor Green
+            Write-WtwHost "    .claude/skills/worktree-workspace/SKILL.md" -ForegroundColor Green
         }
     }
 
@@ -73,16 +73,16 @@ function Install-WtwSkill {
             }
             Copy-Item $agentsSource -Destination (Join-Path $agentsTarget 'SKILL.md') -Force
             $installed += 'Codex/Cursor/Gemini'
-            Write-Host "    .agents/skills/worktree-workspace/SKILL.md" -ForegroundColor Green
+            Write-WtwHost "    .agents/skills/worktree-workspace/SKILL.md" -ForegroundColor Green
         }
     }
 
     if ($installed.Count -gt 0) {
-        Write-Host ''
-        Write-Host "  Installed for: $($installed -join ', ')" -ForegroundColor Green
-        Write-Host "  AI agents can now use 'wtw create', 'wtw go', 'wtw color', etc." -ForegroundColor DarkGray
+        Write-WtwHost ''
+        Write-WtwHost "  Installed for: $($installed -join ', ')" -ForegroundColor Green
+        Write-WtwHost "  AI agents can now use 'wtw create', 'wtw go', 'wtw color', etc." -ForegroundColor DarkGray
     } else {
-        Write-Host '  No skills installed.' -ForegroundColor Yellow
+        Write-WtwHost '  No skills installed.' -ForegroundColor Yellow
     }
-    Write-Host ''
+    Write-WtwHost ''
 }

@@ -90,15 +90,15 @@ function Open-WtwRemoteWorkspace {
     # "not resolvable" warning would be pure noise there.
     $viaOverride = Get-WtwPropertyValue -Object $HostEntry -Name 'ViaOverride'
     if (-not $SkipChecks -and -not $viaOverride -and -not (Test-WtwSshHostKnown -Name $HostEntry.Name)) {
-        Write-Host "  '$($HostEntry.Name)' is not resolvable by the ssh client — the editor resolves the host itself, not through wtw." -ForegroundColor Yellow
-        Write-Host "  Fix: wtw host sync" -ForegroundColor DarkGray
+        Write-WtwHost "  '$($HostEntry.Name)' is not resolvable by the ssh client — the editor resolves the host itself, not through wtw." -ForegroundColor Yellow
+        Write-WtwHost "  Fix: wtw host sync" -ForegroundColor DarkGray
     }
 
-    Write-Host "  Resolving '$Name' on $($HostEntry.Name)..." -ForegroundColor DarkGray
+    Write-WtwHost "  Resolving '$Name' on $($HostEntry.Name)..." -ForegroundColor DarkGray
     $remote = Get-WtwRemoteTarget -HostEntry $HostEntry -Name $Name
     if (-not $remote -or -not $remote.Path) {
         $numericHint = Get-WtwNumericNameHint -Name $Name
-        if ($numericHint) { Write-Host "  $numericHint" -ForegroundColor Yellow }
+        if ($numericHint) { Write-WtwHost "  $numericHint" -ForegroundColor Yellow }
         Show-WtwRemoteTargetSuggestions -HostEntry $HostEntry -Name $Name
         # Deliberately does not assert the target is missing — a connection
         # failure lands here too, and Get-WtwRemoteTarget has already warned with
@@ -112,22 +112,22 @@ function Open-WtwRemoteWorkspace {
     if ($PrintOnly) {
         $preview = Invoke-WtwEditorCli -Cmd $Editor -PreArgs $launch.PreArgs -PassThru
         if ($preview) {
-            Write-Host "  $($preview.Exe) $($preview.Arguments -join ' ')" -ForegroundColor White
+            Write-WtwHost "  $($preview.Exe) $($preview.Arguments -join ' ')" -ForegroundColor White
         } else {
-            Write-Host "  <$Editor CLI not found> $($launch.PreArgs -join ' ')" -ForegroundColor Yellow
+            Write-WtwHost "  <$Editor CLI not found> $($launch.PreArgs -join ' ')" -ForegroundColor Yellow
         }
         return
     }
 
     if (-not $SkipChecks) {
         if (-not (Test-WtwRemoteExtension -Cmd $Editor -Quiet)) {
-            Write-Host "  Continuing anyway — the editor will prompt if it cannot attach." -ForegroundColor DarkGray
+            Write-WtwHost "  Continuing anyway — the editor will prompt if it cannot attach." -ForegroundColor DarkGray
         }
         Set-WtwRemotePlatform -Cmd $Editor -HostName $HostEntry.Name -Platform $HostEntry.Platform | Out-Null
     }
 
     $label = if ($remote.Title) { $remote.Title } else { $Name }
-    Write-Host "  Opening $label on $($HostEntry.Name) in ${Editor}: $($remote.Path)" -ForegroundColor Green
+    Write-WtwHost "  Opening $label on $($HostEntry.Name) in ${Editor}: $($remote.Path)" -ForegroundColor Green
     Invoke-WtwEditorCli -Cmd $Editor -PreArgs $launch.PreArgs
 }
 
@@ -192,16 +192,16 @@ function Show-WtwRemoteTargetSuggestions {
         if ($digits) { $close = @($aliases | Where-Object { $_ -match $digits }) }
     }
 
-    Write-Host ''
+    Write-WtwHost ''
     if ($close.Count -gt 0) {
-        Write-Host "  Closest on $($HostEntry.Name):" -ForegroundColor Cyan
-        foreach ($a in ($close | Select-Object -First $Max)) { Write-Host "    $a" -ForegroundColor White }
+        Write-WtwHost "  Closest on $($HostEntry.Name):" -ForegroundColor Cyan
+        foreach ($a in ($close | Select-Object -First $Max)) { Write-WtwHost "    $a" -ForegroundColor White }
     } else {
-        Write-Host "  Nothing on $($HostEntry.Name) matches '$Name'. It has:" -ForegroundColor Yellow
-        foreach ($a in ($aliases | Select-Object -First $Max)) { Write-Host "    $a" -ForegroundColor DarkGray }
-        if ($aliases.Count -gt $Max) { Write-Host "    … and $($aliases.Count - $Max) more (wtw list --on $($HostEntry.Name))" -ForegroundColor DarkGray }
+        Write-WtwHost "  Nothing on $($HostEntry.Name) matches '$Name'. It has:" -ForegroundColor Yellow
+        foreach ($a in ($aliases | Select-Object -First $Max)) { Write-WtwHost "    $a" -ForegroundColor DarkGray }
+        if ($aliases.Count -gt $Max) { Write-WtwHost "    … and $($aliases.Count - $Max) more (wtw list --on $($HostEntry.Name))" -ForegroundColor DarkGray }
     }
-    Write-Host ''
+    Write-WtwHost ''
 }
 
 function Invoke-WtwRemoteWtw {
@@ -238,13 +238,13 @@ function Invoke-WtwRemoteWtw {
 
     $result = Invoke-WtwRemoteCommand -HostEntry $HostEntry -Arguments $Arguments -WorkingDirectory $WorkingDirectory
 
-    Write-Host ''
-    if ($Title) { Write-Host "  $Title" -ForegroundColor Cyan }
+    Write-WtwHost ''
+    if ($Title) { Write-WtwHost "  $Title" -ForegroundColor Cyan }
 
     foreach ($line in $result.Output) {
         # Strip CR so a Windows remote leaves no stray carriage returns; write
         # raw so embedded ANSI colour survives.
-        Write-Host ($line -replace "`r", '')
+        Write-WtwHost ($line -replace "`r", '')
     }
 
     if (-not $result.Success) {
@@ -254,7 +254,7 @@ function Invoke-WtwRemoteWtw {
         Write-Error "Command failed on $($HostEntry.Name)."
         return
     }
-    Write-Host ''
+    Write-WtwHost ''
 }
 
 function Get-WtwRemoteList {
@@ -290,21 +290,21 @@ function Get-WtwRemoteList {
         if ($result.Error) {
             Write-WtwSshFailure -HostEntry $HostEntry -ErrorText $result.Error
         } else {
-            Write-Host "  No output and no error text — is pwsh installed on $($HostEntry.Name)?" -ForegroundColor Yellow
+            Write-WtwHost "  No output and no error text — is pwsh installed on $($HostEntry.Name)?" -ForegroundColor Yellow
         }
         Write-Error "Could not reach wtw on $($HostEntry.Name)."
         return
     }
 
-    Write-Host ''
-    Write-Host "  wtw on $($HostEntry.Name)" -ForegroundColor Cyan
+    Write-WtwHost ''
+    Write-WtwHost "  wtw on $($HostEntry.Name)" -ForegroundColor Cyan
 
     foreach ($line in $result.Output) {
         # Strip CR so a Windows remote does not leave stray carriage returns
         # mid-line; write raw so embedded ANSI colour survives.
-        Write-Host ($line -replace "`r", '')
+        Write-WtwHost ($line -replace "`r", '')
     }
 
-    Write-Host "  Open one:  wtw --on $($HostEntry.Name) cursor <alias>" -ForegroundColor DarkGray
-    Write-Host ''
+    Write-WtwHost "  Open one:  wtw --on $($HostEntry.Name) cursor <alias>" -ForegroundColor DarkGray
+    Write-WtwHost ''
 }

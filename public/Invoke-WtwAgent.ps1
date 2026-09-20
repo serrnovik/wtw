@@ -16,11 +16,11 @@ function Invoke-WtwAgent {
     $action = if ($args.Count -gt 1) { [string] $args[1] } else { '' }
 
     if ($area -ne 'profile') {
-        Write-Host 'Usage:' -ForegroundColor Yellow
-        Write-Host '  wtw agent profile set <repo> <profile>'
-        Write-Host '  wtw agent profile get [repo]'
-        Write-Host '  wtw agent profile default <profile>'
-        Write-Host '  wtw agent profile list'
+        Write-WtwHost 'Usage:' -ForegroundColor Yellow
+        Write-WtwHost '  wtw agent profile set <repo> <profile>'
+        Write-WtwHost '  wtw agent profile get [repo]'
+        Write-WtwHost '  wtw agent profile default <profile>'
+        Write-WtwHost '  wtw agent profile list'
         return
     }
 
@@ -47,11 +47,11 @@ function Invoke-WtwAgent {
             Get-WtwAgentCtlProfileSetting
         }
         default {
-            Write-Host 'Usage:' -ForegroundColor Yellow
-            Write-Host '  wtw agent profile set <repo> <profile>'
-            Write-Host '  wtw agent profile get [repo]'
-            Write-Host '  wtw agent profile default <profile>'
-            Write-Host '  wtw agent profile list'
+            Write-WtwHost 'Usage:' -ForegroundColor Yellow
+            Write-WtwHost '  wtw agent profile set <repo> <profile>'
+            Write-WtwHost '  wtw agent profile get [repo]'
+            Write-WtwHost '  wtw agent profile default <profile>'
+            Write-WtwHost '  wtw agent profile list'
         }
     }
 }

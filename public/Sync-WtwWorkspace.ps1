@@ -44,10 +44,10 @@ function Resolve-WtwSyncTargetFromFile {
     } elseif ($ColorSource -eq 'Json') {
         $preferWorkspace = $false
     } elseif ($canPrompt) {
-        Write-Host ''
-        Write-Host '  Which color should drive this sync?' -ForegroundColor Cyan
-        Write-Host '    [J] colors.json assignment (default)' -ForegroundColor Gray
-        Write-Host '    [W] wtw.color in the workspace file' -ForegroundColor Gray
+        Write-WtwHost ''
+        Write-WtwHost '  Which color should drive this sync?' -ForegroundColor Cyan
+        Write-WtwHost '    [J] colors.json assignment (default)' -ForegroundColor Gray
+        Write-WtwHost '    [W] wtw.color in the workspace file' -ForegroundColor Gray
         $reply = Read-Host '  Press J or W (Enter = J)'
         $preferWorkspace = (($reply ?? '').Trim()) -match '^[Ww]'
     }
@@ -232,18 +232,18 @@ function Sync-WtwWorkspace {
         # No target, no --all: detect from cwd
         $detected = Resolve-WtwCurrentTarget
         if (-not $detected) {
-            Write-Host ''
-            Write-Host '  Usage:' -ForegroundColor Yellow
-            Write-Host '    wtw sync [name] [--dry-run]               Sync current or named workspace'
-            Write-Host '    wtw sync --all [--dry-run]                Sync all managed workspaces'
-            Write-Host '    wtw sync --all --repo proj                Sync one repo only'
-            Write-Host '    wtw sync --all --template <path>          Sync all with a new template'
-            Write-Host '    wtw sync <name> --color-source json       Skip prompt; use colors.json first'
-            Write-Host '    wtw sync <name> --color-source workspace  Skip prompt; use workspace peacock first'
-            Write-Host ''
+            Write-WtwHost ''
+            Write-WtwHost '  Usage:' -ForegroundColor Yellow
+            Write-WtwHost '    wtw sync [name] [--dry-run]               Sync current or named workspace'
+            Write-WtwHost '    wtw sync --all [--dry-run]                Sync all managed workspaces'
+            Write-WtwHost '    wtw sync --all --repo proj                Sync one repo only'
+            Write-WtwHost '    wtw sync --all --template <path>          Sync all with a new template'
+            Write-WtwHost '    wtw sync <name> --color-source json       Skip prompt; use colors.json first'
+            Write-WtwHost '    wtw sync <name> --color-source workspace  Skip prompt; use workspace peacock first'
+            Write-WtwHost ''
             return
         }
-        Write-Host "  Detected: $detected" -ForegroundColor DarkGray
+        Write-WtwHost "  Detected: $detected" -ForegroundColor DarkGray
         $targetPath = Resolve-WtwWorkspaceFile $detected $wsDir
         if (-not $targetPath) { return }
         $item = Resolve-WtwSyncTargetFromFile $targetPath $ColorSource $templateOverride
@@ -251,33 +251,33 @@ function Sync-WtwWorkspace {
     }
 
     if ($syncTargets.Count -eq 0) {
-        Write-Host '  No managed workspaces to sync.' -ForegroundColor DarkGray
+        Write-WtwHost '  No managed workspaces to sync.' -ForegroundColor DarkGray
         return
     }
 
-    Write-Host ''
-    Write-Host "  Syncing $($syncTargets.Count) workspace(s)..." -ForegroundColor Cyan
+    Write-WtwHost ''
+    Write-WtwHost "  Syncing $($syncTargets.Count) workspace(s)..." -ForegroundColor Cyan
     $synced = 0
 
     foreach ($item in $syncTargets) {
         if (-not $item.isManaged -and -not $Force) {
-            Write-Host "  SKIP: $($item.wsFile) (not wtw-managed, use --force)" -ForegroundColor Yellow
+            Write-WtwHost "  SKIP: $($item.wsFile) (not wtw-managed, use --force)" -ForegroundColor Yellow
             continue
         }
 
         $tpl = $item.templatePath
         if (-not $tpl -or -not (Test-Path $tpl)) {
-            Write-Host "  SKIP: $(Split-Path $item.wsFile -Leaf) (template not found)" -ForegroundColor Yellow
+            Write-WtwHost "  SKIP: $(Split-Path $item.wsFile -Leaf) (template not found)" -ForegroundColor Yellow
             continue
         }
 
         if (-not $item.codeFolderPath) {
-            Write-Host "  SKIP: $(Split-Path $item.wsFile -Leaf) (cannot determine code folder)" -ForegroundColor Yellow
+            Write-WtwHost "  SKIP: $(Split-Path $item.wsFile -Leaf) (cannot determine code folder)" -ForegroundColor Yellow
             continue
         }
 
         if ($DryRun) {
-            Write-Host "  WOULD SYNC: $(Split-Path $item.wsFile -Leaf) (template: $(Split-Path $tpl -Leaf))" -ForegroundColor DarkGray
+            Write-WtwHost "  WOULD SYNC: $(Split-Path $item.wsFile -Leaf) (template: $(Split-Path $tpl -Leaf))" -ForegroundColor DarkGray
             continue
         }
 
@@ -294,14 +294,14 @@ function Sync-WtwWorkspace {
             -Managed | Out-Null
 
         $synced++
-        Write-Host "  SYNCED: $(Split-Path $item.wsFile -Leaf)" -ForegroundColor Green
+        Write-WtwHost "  SYNCED: $(Split-Path $item.wsFile -Leaf)" -ForegroundColor Green
     }
 
-    Write-Host ''
+    Write-WtwHost ''
     if ($DryRun) {
-        Write-Host "  (dry-run: $($syncTargets.Count) workspace(s) would be synced)" -ForegroundColor DarkGray
+        Write-WtwHost "  (dry-run: $($syncTargets.Count) workspace(s) would be synced)" -ForegroundColor DarkGray
     } else {
-        Write-Host "  Synced $synced workspace(s)." -ForegroundColor Green
+        Write-WtwHost "  Synced $synced workspace(s)." -ForegroundColor Green
     }
-    Write-Host ''
+    Write-WtwHost ''
 }

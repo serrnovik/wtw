@@ -44,6 +44,108 @@ function Get-WtwCmuxWorkspaceName {
     return Get-WtwCmuxObjectValue -Object $Workspace -Names @('name', 'title', 'displayName')
 }
 
+function Test-WtwCmuxWorkspaceMatchesSession {
+    <#
+    .SYNOPSIS
+        True when a live workspace is the tab we just created or selected.
+    #>
+    [CmdletBinding()]
+    param(
+        [AllowNull()] $Workspace,
+        [AllowEmptyString()][string] $PrettyName,
+        [AllowEmptyString()][string] $StatusValue,
+        [AllowEmptyString()][string] $ProjectPath
+    )
+
+    if (-not $Workspace) { return $false }
+
+    $name = Get-WtwCmuxWorkspaceName -Workspace $Workspace
+    if ($PrettyName -and $name -and [string]::Equals($name, $PrettyName, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
+    if ($StatusValue) {
+        $description = Get-WtwCmuxObjectValue -Object $Workspace -Names @(
+            'description', 'desc', 'subtitle', 'sidebar.description', 'status'
+        )
+        if ($description -and [string]::Equals("$description", $StatusValue, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+        if (Get-Command ConvertFrom-WtwCmuxRemoteStatusValue -ErrorAction SilentlyContinue) {
+            $wanted = ConvertFrom-WtwCmuxRemoteStatusValue -StatusValue $StatusValue
+            $have = ConvertFrom-WtwCmuxRemoteStatusValue -StatusValue $description
+            if (
+                $wanted -and $have -and
+                [string]::Equals($wanted.HostSelector, $have.HostSelector, [System.StringComparison]::OrdinalIgnoreCase) -and
+                [string]::Equals("$($wanted.Name)", "$($have.Name)", [System.StringComparison]::OrdinalIgnoreCase)
+            ) {
+                return $true
+            }
+        }
+    }
+
+    if ($ProjectPath) {
+        $cwd = Get-WtwCmuxWorkspaceCwd -Workspace $Workspace
+        if ($cwd) {
+            $wantPath = [System.IO.Path]::GetFullPath($ProjectPath)
+            $havePath = [System.IO.Path]::GetFullPath("$cwd")
+            if ([string]::Equals($havePath, $wantPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $true
+            }
+        }
+    }
+
+    return $false
+}
+
+function Resolve-WtwCmuxCreatedWorkspaceRef {
+    <#
+    .SYNOPSIS
+        Identify the workspace we just created, not the tab that ran ``cmux``.
+    .DESCRIPTION
+        ``cmux current-workspace`` returns the caller's tab (the snowmain
+        terminal you typed ``wtw cmux`` in), even after ``new-workspace
+        --focus``. Adding that ref to the new group moves snowmain into
+        ``🧊AT/🛏️ chezmoi``. Prefer title/description/path identity.
+    #>
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()][string] $PrettyName,
+        [AllowEmptyString()][string] $StatusValue,
+        [AllowEmptyString()][string] $ProjectPath
+    )
+
+    $workspaces = @(Get-WtwCmuxLiveWorkspaces)
+
+    $matched = $workspaces | Where-Object {
+        Test-WtwCmuxWorkspaceMatchesSession -Workspace $_ -PrettyName $PrettyName -StatusValue $StatusValue
+    } | Select-Object -First 1
+    if (-not $matched -and $ProjectPath) {
+        $matched = $workspaces | Where-Object {
+            Test-WtwCmuxWorkspaceMatchesSession -Workspace $_ -ProjectPath $ProjectPath
+        } | Select-Object -First 1
+    }
+    if ($matched) {
+        return Get-WtwCmuxWorkspaceRef -Workspace $matched
+    }
+
+    $currentResult = Invoke-WtwCmuxCommand -ArgumentList @('current-workspace')
+    if ($currentResult.ExitCode -ne 0) { return $null }
+
+    $current = ConvertFrom-WtwCmuxCurrentWorkspaceOutput -Output $currentResult.Output
+    if (-not $current) { return $null }
+
+    $currentRef = Get-WtwCmuxWorkspaceRef -Workspace $current
+    $live = $workspaces | Where-Object {
+        [string]::Equals((Get-WtwCmuxWorkspaceRef -Workspace $_), "$currentRef", [System.StringComparison]::OrdinalIgnoreCase)
+    } | Select-Object -First 1
+    if ($live -and (Test-WtwCmuxWorkspaceMatchesSession -Workspace $live -PrettyName $PrettyName -StatusValue $StatusValue -ProjectPath $ProjectPath)) {
+        return $currentRef
+    }
+
+    return $null
+}
+
 function Get-WtwCmuxWorkspaceCwd {
     [CmdletBinding()]
     param([Parameter(Mandatory)] $Workspace)
@@ -305,6 +407,9 @@ function Open-WtwCmuxWorkspace {
         -RepoName $Target.RepoName `
         -TaskName $Target.TaskName | Out-Null
 
+    $groupSpec = Get-WtwCmuxLocalWorkspaceGroupSpec -Target $Target
+    $group = Ensure-WtwCmuxWorkspaceGroup -Spec $groupSpec
+
     $existing = Find-WtwCmuxWorkspace -ProjectPath $fullDir -PrettyName $prettyName
     if ($existing) {
         $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $existing
@@ -318,7 +423,8 @@ function Open-WtwCmuxWorkspace {
                     -StatusValue $statusValue `
                     -CurrentName (Get-WtwCmuxWorkspaceName -Workspace $existing) `
                     -CurrentColor (Get-WtwCmuxObjectValue -Object $existing -Names @('color', 'workspace.color', 'sidebar.color', 'sidebarState.color'))
-                Write-Host "  cmux: selected workspace '$prettyName'" -ForegroundColor Green
+                Add-WtwCmuxWorkspaceToGroup -Group $group -WorkspaceRef "$workspaceRef"
+                Write-WtwHost "  cmux: selected workspace '$prettyName' ($($groupSpec.Name))" -ForegroundColor Green
                 return
             }
         }
@@ -334,20 +440,28 @@ function Open-WtwCmuxWorkspace {
     if ($statusValue) {
         $cmuxArgs += @('--description', "wtw: $statusValue")
     }
+    $cmuxArgs += @(Get-WtwCmuxNewWorkspaceGroupArgs -Group $group)
+    if ($group) {
+        $cmuxArgs += @('--group-placement', 'top')
+    }
     $createResult = Invoke-WtwCmuxCommand -ArgumentList $cmuxArgs
+    if ($createResult.ExitCode -ne 0 -and $group) {
+        $withoutGroup = @($cmuxArgs | Where-Object { $_ -notin @('--group', $group.Ref, '--group-placement', 'top') })
+        $createResult = Invoke-WtwCmuxCommand -ArgumentList $withoutGroup
+    }
     if ($createResult.ExitCode -ne 0) {
         $appleScriptInit = Get-WtwCmuxLocalAppleScriptInitCommand -ProjectPath $fullDir
         if (Open-WtwCmuxAppleScriptWorkspace -ProjectPath $fullDir -PrettyName $prettyName -InitCommand $appleScriptInit) {
             if (Test-WtwCmuxSocketPermissionDenied -Output $createResult.Output) {
-                Write-Host "  cmux: opened via AppleScript fallback (socket access denied)." -ForegroundColor Green
+                Write-WtwHost "  cmux: opened via AppleScript fallback (socket access denied)." -ForegroundColor Green
             } else {
-                Write-Host "  cmux: opened via AppleScript fallback." -ForegroundColor Green
+                Write-WtwHost "  cmux: opened via AppleScript fallback." -ForegroundColor Green
             }
             return
         }
 
         if (Open-WtwCmuxAppPath -ProjectPath $fullDir) {
-            Write-Host "  Opening in cmux: $fullDir" -ForegroundColor Green
+            Write-WtwHost "  Opening in cmux: $fullDir" -ForegroundColor Green
             return
         }
 
@@ -355,21 +469,9 @@ function Open-WtwCmuxWorkspace {
         return
     }
 
-    $currentResult = Invoke-WtwCmuxCommand -ArgumentList @('current-workspace')
-    $workspaceRef = $null
-    if ($currentResult.ExitCode -eq 0) {
-        $currentWorkspace = ConvertFrom-WtwCmuxCurrentWorkspaceOutput -Output $currentResult.Output
-        if ($currentWorkspace) {
-            $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $currentWorkspace
-        }
-    }
-    if (-not $workspaceRef) {
-        $created = Find-WtwCmuxWorkspace -ProjectPath $fullDir -PrettyName $prettyName
-        if ($created) {
-            $workspaceRef = Get-WtwCmuxWorkspaceRef -Workspace $created
-        }
-    }
+    $workspaceRef = Resolve-WtwCmuxCreatedWorkspaceRef -PrettyName $prettyName -StatusValue $statusValue -ProjectPath $fullDir
 
     Set-WtwCmuxWorkspaceMetadata -WorkspaceRef "$workspaceRef" -PrettyName $prettyName -Color $color -StatusValue $statusValue -CurrentName $prettyName -CurrentColor $null
-    Write-Host "  Opening in cmux: $fullDir" -ForegroundColor Green
+    Add-WtwCmuxWorkspaceToGroup -Group $group -WorkspaceRef "$workspaceRef"
+    Write-WtwHost "  Opening in cmux: $fullDir ($($groupSpec.Name))" -ForegroundColor Green
 }

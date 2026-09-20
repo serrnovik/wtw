@@ -52,7 +52,7 @@ function Rename-WtwColorAssignmentKey {
     $names = Get-WtwPropertyNames -Object $colors.assignments
     if ($names -notcontains $OldKey) { return }
     if ($names -contains $NewKey) {
-        Write-Host "  Color assignment '$NewKey' already exists; dropping stale '$OldKey'." -ForegroundColor DarkGray
+        Write-WtwHost "  Color assignment '$NewKey' already exists; dropping stale '$OldKey'." -ForegroundColor DarkGray
         $colors.assignments.PSObject.Properties.Remove($OldKey)
         Save-WtwColors $colors
         return

@@ -40,79 +40,106 @@ function Invoke-Wtw {
         $rawArgs = $effectiveArgs[1..($effectiveArgs.Count - 1)]
     }
 
-    # Session freshness, then the Gallery hint. Both skipped for the internal
-    # `__*` commands whose stdout the shell wrappers parse. A stale in-memory
-    # copy (files on disk newer than this import) reloads and re-runs the
-    # original command; Confirm returns $true in that case so we stop here.
-    if ([string]$Command -notlike '__*') {
-        if ([string]$Command -ne 'reload') {
-            if (Confirm-WtwSessionModuleCurrent -OriginalArgs @($args)) {
-                return
-            }
-        }
+    # Newer-version hint. Emitted up front because the dispatch below returns
+    # from many branches. Cache-only, silent on failure, and skipped for the
+    # internal `__*` commands whose stdout the shell wrappers parse.
+    if ([string]$Command -notlike '__*' -and $Command -notin @('--version', '-v', 'version')) {
         Write-WtwUpdateNotice
     }
 
+    if ($Command -in @('--version', '-v', 'version')) {
+        Show-WtwVersion
+        return
+    }
+
+    # `wtw --on at` with no subcommand: open the remote machine as a cmux
+    # project (or ssh into home when cmux is not installed). `wtw at` alone
+    # stays a local go target — shorthand requires a following command.
+    if ($targetHost -and -not $Command) {
+        $hostEntry = Resolve-WtwHost -Name $targetHost
+        if (-not $hostEntry) {
+            if (Test-WtwIsLocalMachine -Name $targetHost) {
+                Write-Error "'$targetHost' is this machine — --on names the machine you want to reach."
+                return
+            }
+            $localNames = Get-WtwLocalMachineName
+            $whoAmI = if ($localNames.Count -gt 0) { " This machine is '$($localNames[0])'; hosts are the other machines you connect to." } else { '' }
+            Write-Error "Unknown host '$targetHost'. Configured hosts: $((Get-WtwHostNames) -join ', ').$whoAmI Add one with: wtw host add $targetHost --user <u> --address <ip>"
+            return
+        }
+
+        if (Test-WtwCmuxPresent) {
+            Open-WtwCmuxRemoteWorkspace -HostEntry $hostEntry -HostSelector $targetHost
+        } else {
+            Connect-WtwRemoteWorktree -HostEntry $hostEntry -Name ''
+        }
+        return
+    }
+
     if (-not $Command) {
-        Write-Host ''
-        Write-Host '  wtw - Git Worktree + Workspace Manager' -ForegroundColor Cyan
-        Write-Host ''
-        Write-Host '  Commands:' -ForegroundColor Yellow
-        Write-Host '    init [aliases]    Initialise current repo as a main repo (--template, --startup-script, --emoji)'
-        Write-Host '    add [path]        Adopt an existing on-disk worktree with full registration (workspace + color + cmux/SourceGit/etc.)'
-        Write-Host '    create <task>     Create worktree + branch (--emoji for identity glyph; --branch / --adopt to attach an existing branch)'
-        Write-Host '    list [repo] [-d|--detailed] [--wide]  List repos/worktrees'
-        Write-Host '    info <name>       Show full details for a repo or worktree  (alias: show)'
-        Write-Host '    go <name>         Switch to worktree (cd + session init)'
-        Write-Host '    open [name]       Open workspace in editor (default: current)'
-        Write-Host '    cursor [name]     Open in Cursor      (alias: cur)'
-        Write-Host '    code [name]       Open in VS Code     (alias: co)'
-        Write-Host '    antigravity [name] Open in Antigravity (alias: anti)'
-        Write-Host '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
-        Write-Host '    codium [name]     Open in VSCodium    (alias: vscodium)'
-        Write-Host '    chatgpt [name] [--skip-restart]  Open in ChatGPT (aliases: cgpt, codex)'
-        Write-Host '    droid [name]     Open in Factory desktop app (alias: factory)'
-        Write-Host '    cmux [name]       Open in cmux terminal workspace (alias: cm)'
-        Write-Host '    wmux [name]       Open in wmux terminal workspace (alias: wm)'
-        Write-Host '    claude [name]     Open Claude.ai app  (alias: cowork)'
-        Write-Host '    claudecode [name] [--prompt <text>]  New Claude Code chat in the worktree (alias: ccode)'
-        Write-Host '    t3 [name]         Add + open T3 Code project  (alias: t3code)'
-        Write-Host '    ss [name]         Find & open matching Superset workspace (alias: superset, supersetsh)'
-        Write-Host '    remove <task>     Remove worktree + workspace  (alias: rm, delete, del)'
-        Write-Host '    unregister <name> Drop repo or worktree from wtw registry only (alias: unreg)'
-        Write-Host '    edit [name]       Edit registry record: --name / --task / --alias / --key / --emoji / --sourcegit-folder  (alias: rename, ren)'
-        Write-Host '    workspace <name>  Generate workspace file only (no git worktree)'
-        Write-Host '    copy <name>       Standalone copy of workspace from template'
-        Write-Host '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
-        Write-Host '    sync [file|--all] Re-apply template to managed workspaces'
-        Write-Host '    clean             Clean stale worktrees and/or merged local branches'
-        Write-Host '    agent profile ... Configure agentctl profile overlays'
-        Write-Host '    install           Install wtw globally from this checkout (~/.wtw/module/)'
-        Write-Host '    update [--check]  Update the global install to the latest PowerShell Gallery release'
-        Write-Host '    reload [--check]  Re-import the installed (or current) module in this session'
-        Write-Host '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
-        Write-Host '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
-        Write-Host '                      Launch AI sandbox (sbx) with workspace folders mounted'
-        Write-Host '    host [list|add|remove|sync|test]  Manage remote machines for --on'
-        Write-Host ''
-        Write-Host '  Options:' -ForegroundColor Yellow
-        Write-Host '    --help, -h        Show this help'
-        Write-Host '    --on <host>       Open a worktree that lives on another machine over Remote-SSH.'
-        Write-Host '    --at <host>       Alias of --on.'
-        Write-Host '                      Shorthand: wtw <host> <editor> <name>'
-        Write-Host '                      Works with open/cursor/code/antigravity/windsurf/codium,'
-        Write-Host '                      list/info, go, and cmux.'
-        Write-Host '                      Extra flags: --print-only, --folder, --skip-checks'
-        Write-Host '    --via <transport> One-off: force this command over tailscale|zerotier|'
-        Write-Host '                      mdns|lan. Changes nothing on disk.'
-        Write-Host '    run <cmd> [--cwd <remote path>]   With --on: run any wtw command ON the'
-        Write-Host '                      remote (create/init/sync/... already route there).'
-        Write-Host '    go <name>         With --on: ssh into that worktree — pwsh in the right'
-        Write-Host '                      directory, local tab titled and coloured. (aliases:'
-        Write-Host '                      connect, conn, ssh)'
-        Write-Host '    cmux [name]       With --on: local cmux workspace whose terminal is that'
-        Write-Host '                      same ssh session (alias: cm). Name omitted → remote home.'
-        Write-Host ''
+        Write-WtwHost ''
+        Write-WtwHost '  wtw - Git Worktree + Workspace Manager' -ForegroundColor Cyan
+        Write-WtwHost ''
+        Write-WtwHost '  Commands:' -ForegroundColor Yellow
+        Write-WtwHost '    init [aliases]    Initialise current repo as a main repo (--template, --startup-script, --emoji)'
+        Write-WtwHost '    add [path]        Adopt an existing on-disk worktree with full registration (workspace + color + cmux/SourceGit/etc.)'
+        Write-WtwHost '    create <task>     Create worktree + branch (--emoji for identity glyph; --branch / --adopt to attach an existing branch)'
+        Write-WtwHost '    list [repo] [-f|--filter <text>] [-d|--detailed] [--wide]  List repos/worktrees'
+        Write-WtwHost '    info <name>       Show full details for a repo or worktree  (alias: show)'
+        Write-WtwHost '    go <name>         Switch to worktree (cd + session init)'
+        Write-WtwHost '    open [name]       Open workspace in editor (default: current)'
+        Write-WtwHost '    cursor [name]     Open in Cursor      (alias: cur)'
+        Write-WtwHost '    code [name]       Open in VS Code     (alias: co)'
+        Write-WtwHost '    antigravity [name] Open in Antigravity (alias: anti)'
+        Write-WtwHost '    windsurf [name]   Open in Windsurf    (alias: wind, ws)'
+        Write-WtwHost '    codium [name]     Open in VSCodium    (alias: vscodium)'
+        Write-WtwHost '    chatgpt [name] [--skip-restart]  Open in ChatGPT (aliases: cgpt, codex)'
+        Write-WtwHost '    droid [name]     Open in Factory desktop app (alias: factory)'
+        Write-WtwHost '    cmux [name]       Open in cmux terminal workspace (alias: cm)'
+        Write-WtwHost '    wmux [name]       Open in wmux terminal workspace (alias: wm)'
+        Write-WtwHost '    claude [name]     Open Claude.ai app  (alias: cowork)'
+        Write-WtwHost '    claudecode [name] [--prompt <text>]  New Claude Code chat in the worktree (alias: ccode)'
+        Write-WtwHost '    t3 [name]         Add + open T3 Code project  (alias: t3code)'
+        Write-WtwHost '    ss [name]         Find & open matching Superset workspace (alias: superset, supersetsh)'
+        Write-WtwHost '    remove <task>     Remove worktree + workspace  (alias: rm, delete, del)'
+        Write-WtwHost '    unregister <name> Drop repo or worktree from wtw registry only (alias: unreg)'
+        Write-WtwHost '    edit [name]       Edit registry record: --name / --task / --alias / --key / --emoji / --sourcegit-folder  (alias: rename, ren)'
+        Write-WtwHost '    workspace <name>  Generate workspace file only (no git worktree)'
+        Write-WtwHost '    copy <name>       Standalone copy of workspace from template'
+        Write-WtwHost '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
+        Write-WtwHost '    sync [file|--all] Re-apply template to managed workspaces'
+        Write-WtwHost '    clean             Clean stale worktrees and/or merged local branches'
+        Write-WtwHost '    agent profile ... Configure agentctl profile overlays'
+        Write-WtwHost '    install           Install wtw globally from this checkout (~/.wtw/module/)'
+        Write-WtwHost '    update [--check]  Update the global install to the latest PowerShell Gallery release'
+        Write-WtwHost '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
+        Write-WtwHost '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
+        Write-WtwHost '                      Launch AI sandbox (sbx) with workspace folders mounted'
+        Write-WtwHost '    host [list|self|add|remove|sync|test]  Manage remote machines for --on'
+        Write-WtwHost '    self [--emoji X] [--label X]  This machine''s cmux group badge (🍏SP)'
+        Write-WtwHost '    version           Print the installed module version'
+        Write-WtwHost ''
+        Write-WtwHost '  Options:' -ForegroundColor Yellow
+        Write-WtwHost '    --help, -h        Show this help'
+        Write-WtwHost '    --version, -v     Print the installed module version (alias: wtw version)'
+        Write-WtwHost '    --on <host>       Open a worktree that lives on another machine over Remote-SSH.'
+        Write-WtwHost '    --at <host>       Alias of --on.'
+        Write-WtwHost '                      Shorthand: wtw <host> <editor> <name>'
+        Write-WtwHost '                      Works with open/cursor/code/antigravity/windsurf/codium,'
+        Write-WtwHost '                      list/info, go, and cmux.'
+        Write-WtwHost '                      Extra flags: --print-only, --folder, --skip-checks'
+        Write-WtwHost '    --via <transport> One-off: force this command over tailscale|zerotier|'
+        Write-WtwHost '                      mdns|lan. Changes nothing on disk.'
+        Write-WtwHost '    run <cmd> [--cwd <remote path>]   With --on: run any wtw command ON the'
+        Write-WtwHost '                      remote (create/init/sync/... already route there).'
+        Write-WtwHost '    go <name>         With --on: ssh into that worktree — pwsh in the right'
+        Write-WtwHost '                      directory, local tab titled and coloured. (aliases:'
+        Write-WtwHost '                      connect, conn, ssh)'
+        Write-WtwHost '    cmux [name]       With --on: local cmux workspace whose terminal is that'
+        Write-WtwHost '                      same ssh session (alias: cm). Name omitted → remote home.'
+        Write-WtwHost '    (no command)      With --on: open the machine as a cmux project (ssh home'
+        Write-WtwHost '                      if cmux is missing). Same as `wtw --on <host> cmux`.'
+        Write-WtwHost ''
         return
     }
 
@@ -159,7 +186,7 @@ function Invoke-Wtw {
                 return
             }
             $hostEntry = $retargeted
-            Write-Host "  via $requestedVia → $($hostEntry.Name)" -ForegroundColor DarkGray
+            Write-WtwHost "  via $requestedVia → $($hostEntry.Name)" -ForegroundColor DarkGray
             # Consumed locally — the remote CLI has no --via.
             $rawArgs = Remove-WtwFlagWithValue -ArgList $rawArgs -Flag 'via'
         }
@@ -216,13 +243,13 @@ function Invoke-Wtw {
             if (-not $target) { Write-Error "Usage: wtw info <name> --on $($hostEntry.Name)"; return }
             $remote = Get-WtwRemoteTarget -HostEntry $hostEntry -Name $target
             if (-not $remote) { Write-Error "'$target' did not resolve on $($hostEntry.Name)."; return }
-            Write-Host ''
-            Write-Host "  $($remote.Title ?? $target)  on $($hostEntry.Name)" -ForegroundColor Cyan
-            Write-Host "    path       $($remote.Path)"
-            if ($remote.Workspace) { Write-Host "    workspace  $($remote.Workspace)" }
-            if ($remote.Color)     { Write-Host "    color      $($remote.Color)" }
-            Write-Host "    uri        $(ConvertTo-WtwRemoteUri -Path $remote.Path -HostName $hostEntry.Name -Platform $hostEntry.Platform)" -ForegroundColor DarkGray
-            Write-Host ''
+            Write-WtwHost ''
+            Write-WtwHost "  $($remote.Title ?? $target)  on $($hostEntry.Name)" -ForegroundColor Cyan
+            Write-WtwHost "    path       $($remote.Path)"
+            if ($remote.Workspace) { Write-WtwHost "    workspace  $($remote.Workspace)" }
+            if ($remote.Color)     { Write-WtwHost "    color      $($remote.Color)" }
+            Write-WtwHost "    uri        $(ConvertTo-WtwRemoteUri -Path $remote.Path -HostName $hostEntry.Name -Platform $hostEntry.Platform)" -ForegroundColor DarkGray
+            Write-WtwHost ''
             return
         }
 
@@ -305,8 +332,30 @@ function Invoke-Wtw {
             }
             New-WtwWorktree @splat
         }
-        'list'    { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
-        'ls'      { if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }; Get-WtwList @splat }
+        'list'    {
+            if ($splat.Contains('f') -and $splat['f'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '-f / --filter needs a value. Example: wtw list -f kul'
+                return
+            }
+            if ($splat.Contains('Filter') -and $splat['Filter'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '-f / --filter needs a value. Example: wtw list -f kul'
+                return
+            }
+            if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }
+            Get-WtwList @splat
+        }
+        'ls'      {
+            if ($splat.Contains('f') -and $splat['f'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '-f / --filter needs a value. Example: wtw list -f kul'
+                return
+            }
+            if ($splat.Contains('Filter') -and $splat['Filter'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error '-f / --filter needs a value. Example: wtw list -f kul'
+                return
+            }
+            if ($pos.Count -gt 0) { $splat['Repo'] = $pos[0] }
+            Get-WtwList @splat
+        }
         'info'    { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Show-WtwInfo @splat }
         'show'    { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Show-WtwInfo @splat }
         'go'      { if ($pos.Count -gt 0) { $splat['Name'] = Join-WtwTargetName $pos }; Enter-WtwWorktree @splat }
@@ -358,6 +407,10 @@ function Invoke-Wtw {
             if ($pos.Count -gt 1) { $splat['Name'] = $pos[1] }
             Invoke-WtwHost @splat
         }
+        'self'      {
+            $splat['Action'] = 'self'
+            Invoke-WtwHost @splat
+        }
         'agent'     { Invoke-WtwAgent @rawArgs }
         'install'   { Install-Wtw @splat }
         # `update` is no longer an alias of `install`. Install copies a checkout
@@ -365,7 +418,6 @@ function Invoke-Wtw {
         # release. Aliasing them meant `wtw update` from a normal shell hit
         # Install-Wtw's self-install guard and refused to do anything.
         'update'    { Update-Wtw @splat }
-        'reload'    { Invoke-WtwReloadSession @splat }
         'skill'     { Install-WtwSkill @splat }
         'sbx'       {
             if ($pos.Count -gt 0) { $splat['Instruction'] = $pos -join ' ' }
@@ -436,12 +488,13 @@ function Invoke-Wtw {
                 title      = if ($target.TaskName) { "$($target.RepoName)/$($target.TaskName)" } else { $target.RepoName }
                 prettyName = if ($display) { $display.PrettyName } else { $null }
                 repo       = $target.RepoName
+                repoEmoji  = (Get-WtwRepoEmoji -RepoEntry $target.RepoEntry)
                 task       = $target.TaskName
             } | ConvertTo-Json -Compress -Depth 5 | Write-Output
         }
         '__resolve' {
             # Output: path\tcolor\ttitle\tstartup_script\tworktree_id\tworktree_index
-            # Used by wtw.zsh/wtw.bash — must be clean stdout (no Write-Host noise)
+            # Used by wtw.zsh/wtw.bash — must be clean stdout (no Write-WtwHost noise)
             # Optional: --shell zsh|bash to resolve per-shell session script
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name> [--shell zsh|bash]"; return }
             $shellType = $splat['Shell'] ?? ''
@@ -510,8 +563,17 @@ function Invoke-Wtw {
         '__cmux_init_current' {
             # PowerShell cmux startup path. Applies the normal wtw terminal title,
             # env vars, and session script for the cwd target, then refreshes cmux
-            # workspace metadata.
+            # workspace metadata. Inside a remote SSH workspace this is
+            # ``wtw --on <host> go [name]``.
             Initialize-WtwCmuxCurrentSession -ApplyTerminalSession
+        }
+        '__cmux_remote_shell' {
+            # Command Palette / tab-bar "pwsh": SSH into the current remote
+            # project when this workspace is a wtw-remote session, otherwise
+            # a nested local pwsh (same as the old tab body).
+            if (-not (Connect-WtwCmuxCurrentRemoteSession)) {
+                & pwsh -NoLogo
+            }
         }
         default   {
             # Check if command is an editor shortcut (cursor, cur, code, co, anti, etc.)
@@ -523,10 +585,10 @@ function Invoke-Wtw {
             } else {
                 # Fallback: treat unknown command as "go <name>"
                 $implicitName = Join-WtwTargetName (@($Command) + @($pos))
-                Write-Host "  → " -ForegroundColor DarkGray -NoNewline
-                Write-Host "wtw $implicitName" -ForegroundColor White -NoNewline
-                Write-Host "  interpreted as  " -ForegroundColor DarkGray -NoNewline
-                Write-Host "wtw go $implicitName" -ForegroundColor Cyan
+                Write-WtwHost "  → " -ForegroundColor DarkGray -NoNewline
+                Write-WtwHost "wtw $implicitName" -ForegroundColor White -NoNewline
+                Write-WtwHost "  interpreted as  " -ForegroundColor DarkGray -NoNewline
+                Write-WtwHost "wtw go $implicitName" -ForegroundColor Cyan
                 Enter-WtwWorktree -Name $implicitName @splat
             }
         }

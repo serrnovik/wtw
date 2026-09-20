@@ -19,8 +19,8 @@ function Open-WtwSupersetWorkspace {
     )
 
     if (-not (Get-Command superset -ErrorAction SilentlyContinue)) {
-        Write-Host '  Superset CLI not installed.' -ForegroundColor Yellow
-        Write-Host '    Install: brew install superset-sh/tap/superset' -ForegroundColor DarkGray
+        Write-WtwHost '  Superset CLI not installed.' -ForegroundColor Yellow
+        Write-WtwHost '    Install: brew install superset-sh/tap/superset' -ForegroundColor DarkGray
         return
     }
 
@@ -44,14 +44,14 @@ function Open-WtwSupersetWorkspace {
     # Fetch projects
     $projectsJson = & superset projects list --json 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host '  Superset: not logged in or service unreachable.' -ForegroundColor Yellow
-        Write-Host '    superset auth login' -ForegroundColor DarkGray
+        Write-WtwHost '  Superset: not logged in or service unreachable.' -ForegroundColor Yellow
+        Write-WtwHost '    superset auth login' -ForegroundColor DarkGray
         return
     }
     try {
         $projects = $projectsJson | ConvertFrom-Json
     } catch {
-        Write-Host '  Superset: could not parse projects list.' -ForegroundColor Yellow
+        Write-WtwHost '  Superset: could not parse projects list.' -ForegroundColor Yellow
         return
     }
 
@@ -61,12 +61,12 @@ function Open-WtwSupersetWorkspace {
     } | Select-Object -First 1
 
     if (-not $project) {
-        Write-Host "  Superset: no project matches repo '$repoName'." -ForegroundColor Yellow
-        Write-Host '    Create one in the Superset desktop app (no CLI verb yet).' -ForegroundColor DarkGray
+        Write-WtwHost "  Superset: no project matches repo '$repoName'." -ForegroundColor Yellow
+        Write-WtwHost '    Create one in the Superset desktop app (no CLI verb yet).' -ForegroundColor DarkGray
         if ($projects.Count -gt 0) {
-            Write-Host '    Existing projects:' -ForegroundColor DarkGray
+            Write-WtwHost '    Existing projects:' -ForegroundColor DarkGray
             foreach ($p in $projects) {
-                Write-Host "      - $($p.name) (slug: $($p.slug))" -ForegroundColor DarkGray
+                Write-WtwHost "      - $($p.name) (slug: $($p.slug))" -ForegroundColor DarkGray
             }
         }
         return
@@ -75,14 +75,14 @@ function Open-WtwSupersetWorkspace {
     # Fetch local workspaces
     $wsJson = & superset workspaces list --local --json 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host '  Superset: workspaces list failed.' -ForegroundColor Yellow
-        Write-Host "    $wsJson" -ForegroundColor DarkGray
+        Write-WtwHost '  Superset: workspaces list failed.' -ForegroundColor Yellow
+        Write-WtwHost "    $wsJson" -ForegroundColor DarkGray
         return
     }
     try {
         $workspaces = $wsJson | ConvertFrom-Json
     } catch {
-        Write-Host '  Superset: could not parse workspaces list.' -ForegroundColor Yellow
+        Write-WtwHost '  Superset: could not parse workspaces list.' -ForegroundColor Yellow
         return
     }
 
@@ -94,34 +94,34 @@ function Open-WtwSupersetWorkspace {
     } | Select-Object -First 1
 
     if ($ws) {
-        Write-Host "  Superset: found workspace '$($ws.name)' (branch: $($ws.branch))" -ForegroundColor Green
-        Write-Host "    project: $($project.name)" -ForegroundColor DarkGray
-        Write-Host "    id:      $($ws.id)" -ForegroundColor DarkGray
+        Write-WtwHost "  Superset: found workspace '$($ws.name)' (branch: $($ws.branch))" -ForegroundColor Green
+        Write-WtwHost "    project: $($project.name)" -ForegroundColor DarkGray
+        Write-WtwHost "    id:      $($ws.id)" -ForegroundColor DarkGray
         $supersetPath = Join-Path $HOME ".superset/worktrees/$($project.slug)/$($ws.name)"
         if (Test-Path $supersetPath) {
-            Write-Host "    path:    $supersetPath" -ForegroundColor DarkGray
+            Write-WtwHost "    path:    $supersetPath" -ForegroundColor DarkGray
         }
         Repair-WtwSupersetProjectPath -ProjectId $project.id -ExpectedRepoPath $Target.RepoEntry.mainPath
-        Write-Host '  Opening Superset workspace...' -ForegroundColor Cyan
-        Write-Host "    $ superset ws open $($ws.id)" -ForegroundColor DarkGray
+        Write-WtwHost '  Opening Superset workspace...' -ForegroundColor Cyan
+        Write-WtwHost "    $ superset ws open $($ws.id)" -ForegroundColor DarkGray
         $openResult = & superset ws open $ws.id 2>&1
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  Superset: ws open failed: $openResult" -ForegroundColor Yellow
-            Write-Host '  Falling back to launching the app...' -ForegroundColor DarkGray
+            Write-WtwHost "  Superset: ws open failed: $openResult" -ForegroundColor Yellow
+            Write-WtwHost '  Falling back to launching the app...' -ForegroundColor DarkGray
             & open -a Superset
         }
         return
     }
 
     # Not found — print helpful guidance
-    Write-Host "  Superset: no workspace for branch '$branch' in project '$($project.name)'." -ForegroundColor Yellow
+    Write-WtwHost "  Superset: no workspace for branch '$branch' in project '$($project.name)'." -ForegroundColor Yellow
     if ($projectWorkspaces.Count -gt 0) {
-        Write-Host "    Existing workspaces in '$($project.name)':" -ForegroundColor DarkGray
+        Write-WtwHost "    Existing workspaces in '$($project.name)':" -ForegroundColor DarkGray
         foreach ($w in $projectWorkspaces) {
-            Write-Host "      - $($w.name)  (branch: $($w.branch))" -ForegroundColor DarkGray
+            Write-WtwHost "      - $($w.name)  (branch: $($w.branch))" -ForegroundColor DarkGray
         }
     }
-    Write-Host ''
-    Write-Host '  To create one in Superset (uses its own worktree on a different branch):' -ForegroundColor DarkGray
-    Write-Host "    superset workspaces create --local --project $($project.id) --name <name> --branch <new-branch> --base-branch $branch" -ForegroundColor DarkGray
+    Write-WtwHost ''
+    Write-WtwHost '  To create one in Superset (uses its own worktree on a different branch):' -ForegroundColor DarkGray
+    Write-WtwHost "    superset workspaces create --local --project $($project.id) --name <name> --branch <new-branch> --base-branch $branch" -ForegroundColor DarkGray
 }

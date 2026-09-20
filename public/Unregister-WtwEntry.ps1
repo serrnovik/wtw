@@ -63,15 +63,15 @@ function Unregister-WtwEntry {
 
     if ($target.TaskName) {
         $task = $target.TaskName
-        Write-Host ''
-        Write-Host "  Unregister worktree from wtw: $repoName / $task" -ForegroundColor Yellow
-        Write-Host "  Path: $($target.WorktreeEntry.path)"
-        Write-Host "  (Git checkout and files are not modified.)" -ForegroundColor DarkGray
+        Write-WtwHost ''
+        Write-WtwHost "  Unregister worktree from wtw: $repoName / $task" -ForegroundColor Yellow
+        Write-WtwHost "  Path: $($target.WorktreeEntry.path)"
+        Write-WtwHost "  (Git checkout and files are not modified.)" -ForegroundColor DarkGray
 
         if (-not $Force) {
             $confirm = Read-Host '  Confirm unregister from wtw only? [y/N]'
             if ($confirm -notin @('y', 'Y', 'yes')) {
-                Write-Host '  Cancelled.' -ForegroundColor DarkGray
+                Write-WtwHost '  Cancelled.' -ForegroundColor DarkGray
                 return
             }
         }
@@ -105,25 +105,25 @@ function Unregister-WtwEntry {
             Save-WtwColors $colors
         }
 
-        Write-Host ''
-        Write-Host "  Unregistered worktree '$task' from $repoName (registry only)." -ForegroundColor Green
+        Write-WtwHost ''
+        Write-WtwHost "  Unregistered worktree '$task' from $repoName (registry only)." -ForegroundColor Green
         return
     }
 
     # Whole repo
-    Write-Host ''
-    Write-Host "  Unregister repo from wtw: $repoName" -ForegroundColor Yellow
-    Write-Host "  Main path: $($repoEntry.mainPath)"
+    Write-WtwHost ''
+    Write-WtwHost "  Unregister repo from wtw: $repoName" -ForegroundColor Yellow
+    Write-WtwHost "  Main path: $($repoEntry.mainPath)"
     if ($repoEntry.worktrees -and (Get-WtwPropertyNames -Object $repoEntry.worktrees).Count -gt 0) {
         $wtNames = (Get-WtwPropertyNames -Object $repoEntry.worktrees) -join ', '
-        Write-Host "  Also drops registry entries for worktrees: $wtNames"
+        Write-WtwHost "  Also drops registry entries for worktrees: $wtNames"
     }
-    Write-Host "  (Git, checkouts, and workspace files are not modified.)" -ForegroundColor DarkGray
+    Write-WtwHost "  (Git, checkouts, and workspace files are not modified.)" -ForegroundColor DarkGray
 
     if (-not $Force) {
         $confirm = Read-Host '  Confirm unregister entire repo from wtw? [y/N]'
         if ($confirm -notin @('y', 'Y', 'yes')) {
-            Write-Host '  Cancelled.' -ForegroundColor DarkGray
+            Write-WtwHost '  Cancelled.' -ForegroundColor DarkGray
             return
         }
     }
@@ -154,6 +154,6 @@ function Unregister-WtwEntry {
     $colors.assignments = $newAssignments
     Save-WtwColors $colors
 
-    Write-Host ''
-    Write-Host "  Unregistered repo '$repoName' from wtw (registry only)." -ForegroundColor Green
+    Write-WtwHost ''
+    Write-WtwHost "  Unregistered repo '$repoName' from wtw (registry only)." -ForegroundColor Green
 }

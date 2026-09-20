@@ -48,7 +48,7 @@ function Invoke-WtwClean {
         return
     }
 
-    Write-Host ''
+    Write-WtwHost ''
     $scope = Resolve-WtwCleanScope -All:$All -Worktrees:$Worktrees -Branches:$Branches
     if (-not $scope) { return }
 
@@ -64,7 +64,7 @@ function Invoke-WtwClean {
         Invoke-WtwCleanMergedBranches -Registry $registry -DryRun:$DryRun -Force:$Force
     }
     if (-not $didWork) {
-        Write-Host '  Nothing selected.' -ForegroundColor DarkGray
+        Write-WtwHost '  Nothing selected.' -ForegroundColor DarkGray
     }
 }
 
@@ -77,7 +77,7 @@ function Invoke-WtwCleanWorktrees {
         [switch] $Force
     )
 
-    Write-Host '  Scanning for stale worktrees...' -ForegroundColor Cyan
+    Write-WtwHost '  Scanning for stale worktrees...' -ForegroundColor Cyan
 
     $supersetGuard = @{}
     if (Get-Command superset -ErrorAction SilentlyContinue) {
@@ -195,21 +195,21 @@ function Invoke-WtwCleanWorktrees {
     }
 
     if ($staleItems.Count -eq 0) {
-        Write-Host '  No stale worktrees found.' -ForegroundColor Green
+        Write-WtwHost '  No stale worktrees found.' -ForegroundColor Green
         return
     }
 
     $staleItems = @($staleItems | Sort-Object -Property Size -Descending)
     $totalSize = ($staleItems | Measure-Object -Property Size -Sum).Sum
 
-    Write-Host ''
-    Write-Host "  Found $($staleItems.Count) stale worktrees ($(Format-Size $totalSize) total)" -ForegroundColor Yellow
-    Write-Host ''
+    Write-WtwHost ''
+    Write-WtwHost "  Found $($staleItems.Count) stale worktrees ($(Format-Size $totalSize) total)" -ForegroundColor Yellow
+    Write-WtwHost ''
     Format-WtwTable $staleItems @('Source', 'Repo', 'SizeStr', 'Modified', 'Path')
-    Write-Host ''
+    Write-WtwHost ''
 
     if ($DryRun) {
-        Write-Host '  (dry-run: no changes made)' -ForegroundColor DarkGray
+        Write-WtwHost '  (dry-run: no changes made)' -ForegroundColor DarkGray
         return
     }
 
@@ -220,7 +220,7 @@ function Invoke-WtwCleanWorktrees {
     $removedCount = 0
 
     foreach ($item in $staleItems) {
-        Write-Host "  Removing: $($item.Path)..." -ForegroundColor Cyan -NoNewline
+        Write-WtwHost "  Removing: $($item.Path)..." -ForegroundColor Cyan -NoNewline
 
         try {
             $parentRepo = $null
@@ -242,9 +242,9 @@ function Invoke-WtwCleanWorktrees {
 
             $removedSize += $item.Size
             $removedCount++
-            Write-Host ' done' -ForegroundColor Green
+            Write-WtwHost ' done' -ForegroundColor Green
         } catch {
-            Write-Host " FAILED: $_" -ForegroundColor Red
+            Write-WtwHost " FAILED: $_" -ForegroundColor Red
         }
     }
 
@@ -255,8 +255,8 @@ function Invoke-WtwCleanWorktrees {
         }
     }
 
-    Write-Host ''
-    Write-Host "  Removed $removedCount worktrees, freed $(Format-Size $removedSize)" -ForegroundColor Green
+    Write-WtwHost ''
+    Write-WtwHost "  Removed $removedCount worktrees, freed $(Format-Size $removedSize)" -ForegroundColor Green
 }
 
 function Invoke-WtwCleanMergedBranches {
@@ -267,7 +267,7 @@ function Invoke-WtwCleanMergedBranches {
         [switch] $Force
     )
 
-    Write-Host '  Scanning for merged local branches...' -ForegroundColor Cyan
+    Write-WtwHost '  Scanning for merged local branches...' -ForegroundColor Cyan
 
     $items = @()
     $skipped = @()
@@ -284,25 +284,25 @@ function Invoke-WtwCleanMergedBranches {
     }
 
     if ($items.Count -eq 0) {
-        Write-Host '  No leftover merged branches found.' -ForegroundColor Green
+        Write-WtwHost '  No leftover merged branches found.' -ForegroundColor Green
         if ($skipped.Count -gt 0) {
-            Write-Host "  Still checked out in a worktree (use wtw remove): $($skipped -join ', ')" -ForegroundColor DarkGray
+            Write-WtwHost "  Still checked out in a worktree (use wtw remove): $($skipped -join ', ')" -ForegroundColor DarkGray
         }
         return
     }
 
-    Write-Host ''
-    Write-Host "  Found $($items.Count) merged local branch(es)" -ForegroundColor Yellow
-    Write-Host ''
+    Write-WtwHost ''
+    Write-WtwHost "  Found $($items.Count) merged local branch(es)" -ForegroundColor Yellow
+    Write-WtwHost ''
     Format-WtwTable $items @('Repo', 'Branch', 'Into', 'Status')
-    Write-Host ''
+    Write-WtwHost ''
     if ($skipped.Count -gt 0) {
-        Write-Host "  Skipped (still in a worktree): $($skipped -join ', ')" -ForegroundColor DarkGray
-        Write-Host ''
+        Write-WtwHost "  Skipped (still in a worktree): $($skipped -join ', ')" -ForegroundColor DarkGray
+        Write-WtwHost ''
     }
 
     if ($DryRun) {
-        Write-Host '  (dry-run: no changes made)' -ForegroundColor DarkGray
+        Write-WtwHost '  (dry-run: no changes made)' -ForegroundColor DarkGray
         return
     }
 
@@ -313,18 +313,18 @@ function Invoke-WtwCleanMergedBranches {
     foreach ($item in $items) {
         $repo = $Registry.repos.($item.Repo)
         $mainPath = Get-WtwPropertyValue -Object $repo -Name 'mainPath'
-        Write-Host "  Deleting $($item.Repo)/$($item.Branch)..." -ForegroundColor Cyan -NoNewline
+        Write-WtwHost "  Deleting $($item.Repo)/$($item.Branch)..." -ForegroundColor Cyan -NoNewline
         git -C $mainPath branch -d $item.Branch 2>$null
         if ($LASTEXITCODE -eq 0) {
             $removed++
-            Write-Host ' done' -ForegroundColor Green
+            Write-WtwHost ' done' -ForegroundColor Green
         } else {
-            Write-Host ' FAILED (not fully merged, or still checked out)' -ForegroundColor Red
+            Write-WtwHost ' FAILED (not fully merged, or still checked out)' -ForegroundColor Red
         }
     }
 
-    Write-Host ''
-    Write-Host "  Deleted $removed merged branch(es)." -ForegroundColor Green
+    Write-WtwHost ''
+    Write-WtwHost "  Deleted $removed merged branch(es)." -ForegroundColor Green
 }
 
 function Get-DirectorySize {

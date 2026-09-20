@@ -39,16 +39,16 @@ function Remove-WtwWorktree {
     $Task      = $target.TaskName
     $wt        = $target.WorktreeEntry
 
-    Write-Host ''
-    Write-Host "  Removing worktree: $Task" -ForegroundColor Yellow
-    Write-Host "  Path:     $($wt.path)"
-    Write-Host "  Branch:   $($wt.branch)"
-    Write-Host "  Workspace: $($wt.workspace)"
+    Write-WtwHost ''
+    Write-WtwHost "  Removing worktree: $Task" -ForegroundColor Yellow
+    Write-WtwHost "  Path:     $($wt.path)"
+    Write-WtwHost "  Branch:   $($wt.branch)"
+    Write-WtwHost "  Workspace: $($wt.workspace)"
 
     if (-not $Force) {
         $confirm = Read-Host '  Confirm removal? [y/N]'
         if ($confirm -notin @('y', 'Y', 'yes')) {
-            Write-Host '  Cancelled.' -ForegroundColor DarkGray
+            Write-WtwHost '  Cancelled.' -ForegroundColor DarkGray
             return
         }
     }
@@ -114,11 +114,11 @@ function Remove-WtwWorktree {
 
     # Remove git worktree
     if (Test-Path $wt.path) {
-        Write-Host '  Removing git worktree...' -ForegroundColor Cyan
+        Write-WtwHost '  Removing git worktree...' -ForegroundColor Cyan
         $result = git -C $repoEntry.mainPath worktree remove $wt.path --force 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "git worktree remove failed: $result"
-            Write-Host '  Falling back to manual removal...' -ForegroundColor Yellow
+            Write-WtwHost '  Falling back to manual removal...' -ForegroundColor Yellow
             Remove-Item -Path $wt.path -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
@@ -126,7 +126,7 @@ function Remove-WtwWorktree {
     # Remove workspace file
     if ($wt.workspace -and (Test-Path $wt.workspace)) {
         Remove-Item -Path $wt.workspace -Force
-        Write-Host "  Removed workspace: $($wt.workspace)" -ForegroundColor Green
+        Write-WtwHost "  Removed workspace: $($wt.workspace)" -ForegroundColor Green
     }
 
     # Prune
@@ -158,6 +158,6 @@ function Remove-WtwWorktree {
         Save-WtwColors $colors
     }
 
-    Write-Host ''
-    Write-Host "  Removed '$Task' from $repoName." -ForegroundColor Green
+    Write-WtwHost ''
+    Write-WtwHost "  Removed '$Task' from $repoName." -ForegroundColor Green
 }

@@ -116,7 +116,7 @@ function Format-WtwTable {
     )
 
     if ($Items.Count -eq 0) {
-        Write-Host '  (none)' -ForegroundColor DarkGray
+        Write-WtwHost '  (none)' -ForegroundColor DarkGray
         return
     }
 
@@ -154,9 +154,9 @@ function Format-WtwTable {
 
     # Header
     $header = ($Columns | ForEach-Object { $_.PadRight($widths[$_]) }) -join (' ' * $columnSeparatorWidth)
-    Write-Host "  $header" -ForegroundColor Cyan
+    Write-WtwHost "  $header" -ForegroundColor Cyan
     $sep = ($Columns | ForEach-Object { '-' * $widths[$_] }) -join (' ' * $columnSeparatorWidth)
-    Write-Host "  $sep" -ForegroundColor DarkGray
+    Write-WtwHost "  $sep" -ForegroundColor DarkGray
 
     # Rows (each logical row may span multiple terminal lines)
     foreach ($item in $Items) {
@@ -201,7 +201,7 @@ function Format-WtwTable {
                 $segments.Add($pieceText.PadRight($widths[$col]))
             }
             $rowText = ($segments.ToArray() -join (' ' * $columnSeparatorWidth))
-            Write-Host "  $rowText"
+            Write-WtwHost "  $rowText"
         }
     }
 }

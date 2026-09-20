@@ -129,12 +129,13 @@ function Resolve-WtwCleanScope {
     }
 
     if (-not $PSBoundParameters.ContainsKey('Choice')) {
-        Write-Host '  Clean what?' -ForegroundColor Yellow
-        Write-Host '    worktrees  stale AI / detached worktrees'
-        Write-Host '    branches   local branches already merged into the default branch'
-        Write-Host '    all        both'
-        Write-Host ''
-        $Choice = Read-Host '  Select'
+        Write-WtwHost '  Clean what?' -ForegroundColor Yellow
+        Write-WtwHost '    worktrees  stale AI / detached worktrees'
+        Write-WtwHost '    branches   local branches already merged into the default branch'
+        Write-WtwHost '    all        both'
+        Write-WtwHost ''
+        Write-WtwHost '  Select: ' -ForegroundColor Yellow -NoNewline
+        $Choice = Read-Host
     }
 
     $token = if ($null -eq $Choice) { '' } else { $Choice.Trim().ToLowerInvariant() }
@@ -144,7 +145,7 @@ function Resolve-WtwCleanScope {
         '^(branches?|br|b|2)$' { return [PSCustomObject]@{ Worktrees = $false; Branches = $true } }
     }
 
-    Write-Host '  Cancelled.' -ForegroundColor DarkGray
+    Write-WtwHost '  Cancelled.' -ForegroundColor DarkGray
     return $null
 }
 
@@ -166,15 +167,16 @@ function Select-WtwCleanItems {
 
     if ($Force -or @($Items).Count -eq 0) { return @($Items) }
 
-    Write-Host '  Options:' -ForegroundColor Yellow
-    Write-Host "    all    - Remove all $Noun"
-    Write-Host '    none   - Cancel'
-    Write-Host '    1,3,5  - Remove specific items (by number)'
-    Write-Host ''
-    $selection = Read-Host '  Select'
+    Write-WtwHost '  Options:' -ForegroundColor Yellow
+    Write-WtwHost "    all    - Remove all $Noun"
+    Write-WtwHost '    none   - Cancel'
+    Write-WtwHost '    1,3,5  - Remove specific items (by number)'
+    Write-WtwHost ''
+    Write-WtwHost '  Select: ' -ForegroundColor Yellow -NoNewline
+    $selection = Read-Host
 
     if ($selection -eq 'none' -or -not $selection) {
-        Write-Host '  Cancelled.' -ForegroundColor DarkGray
+        Write-WtwHost '  Cancelled.' -ForegroundColor DarkGray
         return $null
     }
 

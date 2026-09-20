@@ -15,17 +15,17 @@ function New-WtwSupersetWorkspace {
     )
 
     if (-not (Get-Command superset -ErrorAction SilentlyContinue)) {
-        Write-Host '  Superset: CLI not installed — skipping workspace creation.' -ForegroundColor DarkGray
+        Write-WtwHost '  Superset: CLI not installed — skipping workspace creation.' -ForegroundColor DarkGray
         return $null
     }
 
     $projectsJson = & superset projects list --json 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host '  Superset: not logged in or unreachable — skipping workspace creation.' -ForegroundColor Yellow
+        Write-WtwHost '  Superset: not logged in or unreachable — skipping workspace creation.' -ForegroundColor Yellow
         return $null
     }
     try { $projects = $projectsJson | ConvertFrom-Json } catch {
-        Write-Host '  Superset: could not parse projects list.' -ForegroundColor Yellow
+        Write-WtwHost '  Superset: could not parse projects list.' -ForegroundColor Yellow
         return $null
     }
 
@@ -35,7 +35,7 @@ function New-WtwSupersetWorkspace {
     } | Select-Object -First 1
 
     if (-not $project) {
-        Write-Host "  Superset: no project matches repo '$RepoName' — skipping workspace creation." -ForegroundColor Yellow
+        Write-WtwHost "  Superset: no project matches repo '$RepoName' — skipping workspace creation." -ForegroundColor Yellow
         return $null
     }
 
@@ -44,11 +44,11 @@ function New-WtwSupersetWorkspace {
     }
 
     $wsName = if ($PrettyName) { $PrettyName } else { $Branch }
-    Write-Host "  Superset: creating workspace '$wsName'..." -ForegroundColor Cyan
+    Write-WtwHost "  Superset: creating workspace '$wsName'..." -ForegroundColor Cyan
 
     $wsJson = & superset ws create --local --project $project.id --name $wsName --branch $Branch --json 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "  Superset: workspace creation failed: $wsJson" -ForegroundColor Yellow
+        Write-WtwHost "  Superset: workspace creation failed: $wsJson" -ForegroundColor Yellow
         return $null
     }
 
@@ -78,15 +78,15 @@ function New-WtwSupersetWorkspace {
                     $wsId = $matchedWorkspace.id
                 }
             } catch {
-                Write-Host '  Superset: could not parse workspace list for id lookup.' -ForegroundColor Yellow
+                Write-WtwHost '  Superset: could not parse workspace list for id lookup.' -ForegroundColor Yellow
             }
         }
     }
 
     if ($wsId) {
-        Write-Host "  Superset: workspace created (id: $wsId)" -ForegroundColor Green
+        Write-WtwHost "  Superset: workspace created (id: $wsId)" -ForegroundColor Green
     } else {
-        Write-Host "  Superset: workspace created (id unknown — check 'superset ws list')" -ForegroundColor Yellow
+        Write-WtwHost "  Superset: workspace created (id unknown — check 'superset ws list')" -ForegroundColor Yellow
     }
     return $wsId
 }
@@ -104,16 +104,16 @@ function Remove-WtwSupersetWorkspace {
     if (-not $WorkspaceId) { return }
 
     if (-not (Get-Command superset -ErrorAction SilentlyContinue)) {
-        Write-Host "  Superset: CLI not installed — skipping workspace removal (id: $WorkspaceId)." -ForegroundColor DarkGray
-        Write-Host '    Remove manually in the Superset desktop app.' -ForegroundColor DarkGray
+        Write-WtwHost "  Superset: CLI not installed — skipping workspace removal (id: $WorkspaceId)." -ForegroundColor DarkGray
+        Write-WtwHost '    Remove manually in the Superset desktop app.' -ForegroundColor DarkGray
         return
     }
 
-    Write-Host "  Superset: removing workspace $WorkspaceId..." -ForegroundColor Cyan
+    Write-WtwHost "  Superset: removing workspace $WorkspaceId..." -ForegroundColor Cyan
     $result = & superset ws delete $WorkspaceId --local 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "  Superset: workspace removal failed: $result" -ForegroundColor Yellow
+        Write-WtwHost "  Superset: workspace removal failed: $result" -ForegroundColor Yellow
     } else {
-        Write-Host '  Superset: workspace removed.' -ForegroundColor Green
+        Write-WtwHost '  Superset: workspace removed.' -ForegroundColor Green
     }
 }

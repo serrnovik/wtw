@@ -144,3 +144,51 @@ $completionPath = Join-Path $PSScriptRoot 'completions' 'wtw.auto-completion.ps1
 if (Test-Path $completionPath) {
     . $completionPath
 }
+
+# `wtw update` Force-reimports while Update-Wtw from the previous copy is still
+# running. That stack frame can no longer see module-private helpers. Global
+# proxies let the in-flight caller finish; the body runs in this module.
+Set-Item -Path Function:Global:Write-WtwHost -Value {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, ValueFromPipeline, ValueFromRemainingArguments)]
+        [AllowEmptyString()]
+        [AllowNull()]
+        [object[]] $Object,
+
+        [ConsoleColor] $ForegroundColor,
+        [ConsoleColor] $BackgroundColor,
+        [switch] $NoNewline
+    )
+
+    $mod = Get-Module wtw | Select-Object -First 1
+    $splat = @{}
+    if ($PSBoundParameters.ContainsKey('Object')) { $splat.Object = $Object }
+    elseif ($null -ne $Object) { $splat.Object = $Object }
+    if ($PSBoundParameters.ContainsKey('ForegroundColor')) { $splat.ForegroundColor = $ForegroundColor }
+    if ($PSBoundParameters.ContainsKey('BackgroundColor')) { $splat.BackgroundColor = $BackgroundColor }
+    if ($NoNewline) { $splat.NoNewline = $true }
+
+    if ($mod) {
+        & $mod { param($s) & ${function:Write-WtwHost} @s } $splat
+        return
+    }
+    $text = if ($null -eq $Object) { '' } else { ($Object | ForEach-Object { "$_" }) -join ' ' }
+    Write-Host $text -NoNewline:$NoNewline
+} -Force
+
+Set-Item -Path Function:Global:Sync-WtwCmuxRemoteProjects -Value {
+    [CmdletBinding()]
+    param(
+        [string] $ConfigPath,
+        [switch] $Quiet
+    )
+
+    $mod = Get-Module wtw | Select-Object -First 1
+    if (-not $mod) { return }
+    $splat = @{}
+    if ($PSBoundParameters.ContainsKey('ConfigPath')) { $splat.ConfigPath = $ConfigPath }
+    if ($Quiet) { $splat.Quiet = $true }
+    & $mod { param($s) & ${function:Sync-WtwCmuxRemoteProjects} @s } $splat
+} -Force
+

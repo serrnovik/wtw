@@ -44,26 +44,26 @@ function Invoke-WtwAgentCtlAttach {
 
     $agentctlCommand = Get-Command agentctl -ErrorAction SilentlyContinue
     if (-not $agentctlCommand) {
-        Write-Host '  agentctl: skipped (not found on PATH)' -ForegroundColor DarkGray
+        Write-WtwHost '  agentctl: skipped (not found on PATH)' -ForegroundColor DarkGray
         return $false
     }
 
     if ($Config -and ((Get-WtwPropertyNames -Object $Config) -contains 'agentctl')) {
         $agentctlConfig = $Config.agentctl
         if ($agentctlConfig -and ((Get-WtwPropertyNames -Object $agentctlConfig) -contains 'enabled') -and $agentctlConfig.enabled -eq $false) {
-            Write-Host '  agentctl: skipped (disabled in ~/.wtw/config.json)' -ForegroundColor DarkGray
+            Write-WtwHost '  agentctl: skipped (disabled in ~/.wtw/config.json)' -ForegroundColor DarkGray
             return $false
         }
     }
 
     $profile = Get-WtwAgentCtlProfile -RepoName $RepoName -RepoEntry $RepoEntry -Config $Config
-    Write-Host "  agentctl: attaching profile '$profile'..." -ForegroundColor Cyan
+    Write-WtwHost "  agentctl: attaching profile '$profile'..." -ForegroundColor Cyan
 
     Push-Location -LiteralPath $WorktreePath
     try {
         $output = & $agentctlCommand.Source repo attach --profile $profile 2>&1
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "  agentctl: attached profile '$profile'" -ForegroundColor Green
+            Write-WtwHost "  agentctl: attached profile '$profile'" -ForegroundColor Green
             return $true
         }
 

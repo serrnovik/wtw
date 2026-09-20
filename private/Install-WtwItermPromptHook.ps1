@@ -36,9 +36,9 @@ function Install-WtwItermPromptHook {
             $r = [convert]::ToInt32($hex.Substring(0, 2), 16)
             $g = [convert]::ToInt32($hex.Substring(2, 2), 16)
             $b = [convert]::ToInt32($hex.Substring(4, 2), 16)
-            Write-Host "${esc}]6;1;bg;red;brightness;${r}${bel}" -NoNewline
-            Write-Host "${esc}]6;1;bg;green;brightness;${g}${bel}" -NoNewline
-            Write-Host "${esc}]6;1;bg;blue;brightness;${b}${bel}" -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;red;brightness;${r}${bel}" -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;green;brightness;${g}${bel}" -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;blue;brightness;${b}${bel}" -NoNewline
         }
         & $priorBlock
     }.GetNewClosure()

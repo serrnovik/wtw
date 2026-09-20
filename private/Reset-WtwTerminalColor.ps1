@@ -26,18 +26,18 @@ function Reset-WtwTerminalColor {
             & tmux set-option -p -u pane-border-style 2>$null
         } catch { Write-Verbose "tmux color: $_" }
     } elseif ($env:TERM_PROGRAM -eq 'iTerm.app') {
-        Write-Host "${esc}]6;1;bg;*;default${bel}" -NoNewline
+        Write-WtwHost "${esc}]6;1;bg;*;default${bel}" -NoNewline
         $env:WTW_TAB_COLOR = ''
     } elseif ($env:WT_SESSION) {
-        Write-Host "${esc}]9;9;${esc}\" -NoNewline
+        Write-WtwHost "${esc}]9;9;${esc}\" -NoNewline
     } elseif ($env:KITTY_PID -or $env:TERM_PROGRAM -eq 'kitty') {
         # Kitty: reset by setting to empty
-        Write-Host "${esc}]30;${bel}" -NoNewline
+        Write-WtwHost "${esc}]30;${bel}" -NoNewline
     } elseif ($env:KONSOLE_VERSION) {
-        Write-Host "${esc}]30;${bel}" -NoNewline
+        Write-WtwHost "${esc}]30;${bel}" -NoNewline
     } elseif ($env:WEZTERM_PANE) {
         # WezTerm: clear user var
-        Write-Host "${esc}]1337;SetUserVar=wtw_color=$(
+        Write-WtwHost "${esc}]1337;SetUserVar=wtw_color=$(
             [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes(''))
         )${bel}" -NoNewline
     }

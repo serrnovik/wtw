@@ -61,10 +61,10 @@ function Copy-WtwWorkspace {
     # Full concrete copy — no wtw.managed metadata, just resolved placeholders
     $color = New-WtwColor -RepoName $repoName -TaskName $Name
 
-    Write-Host ''
-    Write-Host "  Copying workspace: $Name" -ForegroundColor Cyan
-    Write-Host "  Code folder: $codeFolderPath"
-    Write-Host "  Color:       $color"
+    Write-WtwHost ''
+    Write-WtwHost "  Copying workspace: $Name" -ForegroundColor Cyan
+    Write-WtwHost "  Code folder: $codeFolderPath"
+    Write-WtwHost "  Color:       $color"
 
     New-WtwWorkspaceFile `
         -RepoName $repoName `
@@ -75,13 +75,13 @@ function Copy-WtwWorkspace {
         -Color $color | Out-Null
     # Note: no -Managed flag — standalone copy
 
-    Write-Host "  Created:     $wsFile" -ForegroundColor Green
+    Write-WtwHost "  Created:     $wsFile" -ForegroundColor Green
 
     if ($Open) {
         $editor = Get-WtwPropertyValue -Object $config -Name 'editor' -DefaultValue 'code'
-        Write-Host "  Opening in ${editor}..." -ForegroundColor Green
+        Write-WtwHost "  Opening in ${editor}..." -ForegroundColor Green
         Invoke-WtwEditorCli -Cmd $editor -Path $wsFile
     }
 
-    Write-Host ''
+    Write-WtwHost ''
 }

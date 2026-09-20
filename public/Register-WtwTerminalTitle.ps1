@@ -27,7 +27,7 @@ function Register-WtwTerminalTitle {
         [string] The PR number found for this branch, or $null.
     .EXAMPLE
         $pr = Register-WtwTerminalTitle -RepoRoot $PSScriptRoot -TabColor (Get-GitWorkspaceColor -path $PSScriptRoot)
-        if ($pr) { Write-Host "  PR: #$pr" -ForegroundColor DarkCyan }
+        if ($pr) { Write-WtwHost "  PR: #$pr" -ForegroundColor DarkCyan }
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -118,9 +118,9 @@ function Register-WtwTerminalTitle {
             $r   = [convert]::ToInt32($hex.Substring(0, 2), 16)
             $g   = [convert]::ToInt32($hex.Substring(2, 2), 16)
             $b   = [convert]::ToInt32($hex.Substring(4, 2), 16)
-            Write-Host "${esc}]6;1;bg;red;brightness;${r}${bel}"   -NoNewline
-            Write-Host "${esc}]6;1;bg;green;brightness;${g}${bel}" -NoNewline
-            Write-Host "${esc}]6;1;bg;blue;brightness;${b}${bel}"  -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;red;brightness;${r}${bel}"   -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;green;brightness;${g}${bel}" -NoNewline
+            Write-WtwHost "${esc}]6;1;bg;blue;brightness;${b}${bel}"  -NoNewline
         }
 
         # Restore error state before delegating to the underlying prompt

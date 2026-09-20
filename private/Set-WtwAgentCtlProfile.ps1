@@ -89,9 +89,9 @@ function Set-WtwAgentCtlRepoProfile {
     Save-WtwConfig $config
 
     if ($resolvedRepoName -eq $RepoName) {
-        Write-Host "  agentctl profile for '$resolvedRepoName': $Profile" -ForegroundColor Green
+        Write-WtwHost "  agentctl profile for '$resolvedRepoName': $Profile" -ForegroundColor Green
     } else {
-        Write-Host "  agentctl profile for '$resolvedRepoName' ($RepoName): $Profile" -ForegroundColor Green
+        Write-WtwHost "  agentctl profile for '$resolvedRepoName' ($RepoName): $Profile" -ForegroundColor Green
     }
     if (-not (Test-WtwAgentCtlProfileExists -Profile $Profile)) {
         Write-Warning "Profile '$Profile' was saved, but ~/.config/agent-profile/$Profile.md does not exist yet."
@@ -109,7 +109,7 @@ function Set-WtwAgentCtlDefaultProfile {
     $config.agentctl.defaultProfile = $Profile
     Save-WtwConfig $config
 
-    Write-Host "  default agentctl profile: $Profile" -ForegroundColor Green
+    Write-WtwHost "  default agentctl profile: $Profile" -ForegroundColor Green
     if (-not (Test-WtwAgentCtlProfileExists -Profile $Profile)) {
         Write-Warning "Profile '$Profile' was saved, but ~/.config/agent-profile/$Profile.md does not exist yet."
     }
@@ -127,22 +127,22 @@ function Get-WtwAgentCtlProfileSetting {
         $resolvedRepoName = Resolve-WtwAgentCtlRepoName -RepoName $RepoName
         $profile = Get-WtwAgentCtlProfile -RepoName $resolvedRepoName -RepoEntry ([PSCustomObject]@{}) -Config $config
         if ($resolvedRepoName -eq $RepoName) {
-            Write-Host "${resolvedRepoName}: $profile"
+            Write-WtwHost "${resolvedRepoName}: $profile"
         } else {
-            Write-Host "${resolvedRepoName} ($RepoName): $profile"
+            Write-WtwHost "${resolvedRepoName} ($RepoName): $profile"
         }
         return
     }
 
-    Write-Host "agentctl enabled: $($config.agentctl.enabled)"
-    Write-Host "default profile:  $($config.agentctl.defaultProfile)"
-    Write-Host 'repo profiles:'
+    Write-WtwHost "agentctl enabled: $($config.agentctl.enabled)"
+    Write-WtwHost "default profile:  $($config.agentctl.defaultProfile)"
+    Write-WtwHost 'repo profiles:'
     $names = @((Get-WtwPropertyNames -Object $config.agentctl.repoProfiles) | Sort-Object)
     if ($names.Count -eq 0) {
-        Write-Host '  (none)'
+        Write-WtwHost '  (none)'
         return
     }
     foreach ($name in $names) {
-        Write-Host "  ${name}: $($config.agentctl.repoProfiles.$name)"
+        Write-WtwHost "  ${name}: $($config.agentctl.repoProfiles.$name)"
     }
 }

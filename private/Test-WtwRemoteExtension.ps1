@@ -37,7 +37,7 @@ function Test-WtwRemoteExtension {
     # Any remote-ssh-ish extension counts, whatever it is called.
     $present = $installed | Where-Object { $_ -match 'remote-ssh|remote-openssh' } | Select-Object -First 1
     if ($present) {
-        if (-not $Quiet) { Write-Host "  $($member.Name): $present" -ForegroundColor DarkGray }
+        if (-not $Quiet) { Write-WtwHost "  $($member.Name): $present" -ForegroundColor DarkGray }
         return $present
     }
 
@@ -45,21 +45,21 @@ function Test-WtwRemoteExtension {
     if (-not $candidate) { return $null }
 
     if (-not $Install) {
-        Write-Host "  $($member.Name) has no Remote-SSH extension installed." -ForegroundColor Yellow
+        Write-WtwHost "  $($member.Name) has no Remote-SSH extension installed." -ForegroundColor Yellow
         $answer = Read-Host "  Install $candidate? [y/N]"
         if ($answer -notin @('y', 'Y', 'yes')) {
-            Write-Host "  Skipped. A remote open will fail until it is installed." -ForegroundColor DarkGray
+            Write-WtwHost "  Skipped. A remote open will fail until it is installed." -ForegroundColor DarkGray
             return $null
         }
     }
 
-    Write-Host "  Installing $candidate in $($member.Name)..." -ForegroundColor Cyan -NoNewline
+    Write-WtwHost "  Installing $candidate in $($member.Name)..." -ForegroundColor Cyan -NoNewline
     & $cli --install-extension $candidate 2>$null | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host ' done' -ForegroundColor Green
+        Write-WtwHost ' done' -ForegroundColor Green
         return $candidate
     }
-    Write-Host ' failed' -ForegroundColor Red
+    Write-WtwHost ' failed' -ForegroundColor Red
     return $null
 }
 
@@ -101,7 +101,7 @@ function Set-WtwRemotePlatform {
 
     $settingsPath = Get-WtwEditorSettingsPath -Member $member
     if (-not $settingsPath -or -not (Test-Path $settingsPath)) {
-        Write-Host "  $($member.Name): no user settings.json found — set remote.SSH.remotePlatform manually if the connection fails." -ForegroundColor DarkGray
+        Write-WtwHost "  $($member.Name): no user settings.json found — set remote.SSH.remotePlatform manually if the connection fails." -ForegroundColor DarkGray
         return $false
     }
 
@@ -119,7 +119,7 @@ function Set-WtwRemotePlatform {
     $settings | Add-Member -NotePropertyName 'remote.SSH.remotePlatform' -NotePropertyValue $map -Force
 
     $settings | ConvertTo-Json -Depth 20 | Set-Content -Path $settingsPath -Encoding utf8
-    Write-Host "  $($member.Name): pinned remote.SSH.remotePlatform[$HostName] = windows" -ForegroundColor Green
-    Write-Host "  (comments in settings.json were dropped; original saved as $(Split-Path $backup -Leaf))" -ForegroundColor DarkGray
+    Write-WtwHost "  $($member.Name): pinned remote.SSH.remotePlatform[$HostName] = windows" -ForegroundColor Green
+    Write-WtwHost "  (comments in settings.json were dropped; original saved as $(Split-Path $backup -Leaf))" -ForegroundColor DarkGray
     return $true
 }

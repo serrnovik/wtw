@@ -116,39 +116,39 @@ function Resolve-WtwCodexStateConflict {
 
     if (-not (Test-WtwCodexAppRunning)) { return @{ proceed = $true; relaunch = $false } }
 
-    Write-Host ''
-    Write-Host '  ChatGPT is running — it overwrites project labels on exit.' -ForegroundColor Yellow
-    Write-Host "  How should I $OperationLabel"'?' -ForegroundColor Yellow
-    Write-Host '    [c] Close ChatGPT yourself, then write (I will wait, then relaunch)'
-    Write-Host '    [k] Force-kill ChatGPT, write, relaunch'
-    Write-Host '    [i] Ignore — write anyway (ChatGPT may overwrite it)'
-    Write-Host '    [s] Skip — open without changing the sidebar label'
+    Write-WtwHost ''
+    Write-WtwHost '  ChatGPT is running — it overwrites project labels on exit.' -ForegroundColor Yellow
+    Write-WtwHost "  How should I $OperationLabel"'?' -ForegroundColor Yellow
+    Write-WtwHost '    [c] Close ChatGPT yourself, then write (I will wait, then relaunch)'
+    Write-WtwHost '    [k] Force-kill ChatGPT, write, relaunch'
+    Write-WtwHost '    [i] Ignore — write anyway (ChatGPT may overwrite it)'
+    Write-WtwHost '    [s] Skip — open without changing the sidebar label'
 
     $answer = (Read-Host '  Choice [c/k/i/s]').Trim().ToLowerInvariant()
     if (-not $answer) { $answer = 'c' }
 
     switch ($answer) {
         'c' {
-            Write-Host '  Waiting for ChatGPT to close (Ctrl+C to abort)...' -ForegroundColor Cyan
+            Write-WtwHost '  Waiting for ChatGPT to close (Ctrl+C to abort)...' -ForegroundColor Cyan
             while (Test-WtwCodexAppRunning) { Start-Sleep -Milliseconds 500 }
-            Write-Host '  ChatGPT closed.' -ForegroundColor Green
+            Write-WtwHost '  ChatGPT closed.' -ForegroundColor Green
             return @{ proceed = $true; relaunch = $true }
         }
         'k' {
-            Write-Host '  Force-closing ChatGPT...' -ForegroundColor Cyan
+            Write-WtwHost '  Force-closing ChatGPT...' -ForegroundColor Cyan
             if (-not (Stop-WtwCodexProcess)) {
-                Write-Host '  Could not stop ChatGPT — skipping label update.' -ForegroundColor Red
+                Write-WtwHost '  Could not stop ChatGPT — skipping label update.' -ForegroundColor Red
                 return @{ proceed = $false; relaunch = $false }
             }
-            Write-Host '  ChatGPT stopped.' -ForegroundColor Green
+            Write-WtwHost '  ChatGPT stopped.' -ForegroundColor Green
             return @{ proceed = $true; relaunch = $true }
         }
         's' {
-            Write-Host '  Skipped ChatGPT label update.' -ForegroundColor DarkGray
+            Write-WtwHost '  Skipped ChatGPT label update.' -ForegroundColor DarkGray
             return @{ proceed = $false; relaunch = $false }
         }
         default {
-            Write-Host '  Writing anyway — quit ChatGPT before restarting if it does not stick.' -ForegroundColor Yellow
+            Write-WtwHost '  Writing anyway — quit ChatGPT before restarting if it does not stick.' -ForegroundColor Yellow
             return @{ proceed = $true; relaunch = $false }
         }
     }
@@ -371,7 +371,7 @@ function Set-WtwCodexProjectLabel {
         try {
             $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
         } catch {
-            Write-Host "  ChatGPT: could not parse desktop state — skipping sidebar label update." -ForegroundColor Yellow
+            Write-WtwHost "  ChatGPT: could not parse desktop state — skipping sidebar label update." -ForegroundColor Yellow
             return $false
         }
     } else {
@@ -398,7 +398,7 @@ function Set-WtwCodexProjectLabel {
         $state | ConvertTo-Json -Depth 80 -Compress | Set-Content -Path $GlobalStatePath -Encoding utf8
         return $true
     } catch {
-        Write-Host "  ChatGPT: could not save desktop state — skipping sidebar label update." -ForegroundColor Yellow
+        Write-WtwHost "  ChatGPT: could not save desktop state — skipping sidebar label update." -ForegroundColor Yellow
         return $false
     }
 }
@@ -472,7 +472,7 @@ function Remove-WtwCodexProjectLabel {
     try {
         $state = Get-Content -Path $GlobalStatePath -Raw | ConvertFrom-Json
     } catch {
-        Write-Host "  ChatGPT: could not parse desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
+        Write-WtwHost "  ChatGPT: could not parse desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
         return $false
     }
 
@@ -508,7 +508,7 @@ function Remove-WtwCodexProjectLabel {
         $state | ConvertTo-Json -Depth 80 -Compress | Set-Content -Path $GlobalStatePath -Encoding utf8
         return $true
     } catch {
-        Write-Host "  ChatGPT: could not save desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
+        Write-WtwHost "  ChatGPT: could not save desktop state — skipping sidebar cleanup." -ForegroundColor Yellow
         return $false
     }
 }
@@ -555,7 +555,7 @@ function Register-WtwCodexProject {
     $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
     $codexHome = Get-WtwCodexHome
     if (-not (Test-WtwCodexPresent -CodexHome $codexHome)) {
-        Write-Host '  ChatGPT: not installed/present — skipping project registration.' -ForegroundColor DarkGray
+        Write-WtwHost '  ChatGPT: not installed/present — skipping project registration.' -ForegroundColor DarkGray
         return $null
     }
 
@@ -568,16 +568,16 @@ function Register-WtwCodexProject {
         Set-WtwCodexProjectLabel -ProjectPath $fullPath -PrettyName $PrettyName -GlobalStatePath (Join-Path $codexHome '.codex-global-state.json')
     }
 
-    Write-Host "  ChatGPT: trusted project $fullPath" -ForegroundColor Green
+    Write-WtwHost "  ChatGPT: trusted project $fullPath" -ForegroundColor Green
     if ($createdProjectConfig) {
-        Write-Host '  ChatGPT: created .codex/config.toml' -ForegroundColor Green
+        Write-WtwHost '  ChatGPT: created .codex/config.toml' -ForegroundColor Green
     }
     if ($labelUpdated) {
-        Write-Host "  ChatGPT: sidebar label '$PrettyName'" -ForegroundColor Green
+        Write-WtwHost "  ChatGPT: sidebar label '$PrettyName'" -ForegroundColor Green
     } elseif ($isAppRunning) {
-        Write-Host "  ChatGPT: app is running; run 'wtw chatgpt' to close/relaunch and finalize sidebar label '$PrettyName'." -ForegroundColor DarkGray
+        Write-WtwHost "  ChatGPT: app is running; run 'wtw chatgpt' to close/relaunch and finalize sidebar label '$PrettyName'." -ForegroundColor DarkGray
     } else {
-        Write-Host "  ChatGPT: run 'wtw chatgpt' from the worktree to open it in ChatGPT Desktop." -ForegroundColor DarkGray
+        Write-WtwHost "  ChatGPT: run 'wtw chatgpt' from the worktree to open it in ChatGPT Desktop." -ForegroundColor DarkGray
     }
 
     return $fullPath
@@ -603,8 +603,8 @@ function Unregister-WtwCodexProject {
     Remove-WtwCodexProjectTrust -ProjectPath $fullPath -ConfigPath (Join-Path $codexHome 'config.toml')
     $labelRemoved = Remove-WtwCodexProjectLabel -ProjectPath $fullPath -GlobalStatePath (Join-Path $codexHome '.codex-global-state.json')
 
-    Write-Host "  ChatGPT: removed project metadata for $fullPath" -ForegroundColor Green
+    Write-WtwHost "  ChatGPT: removed project metadata for $fullPath" -ForegroundColor Green
     if ($labelRemoved) {
-        Write-Host '  ChatGPT: removed sidebar label/root entries.' -ForegroundColor Green
+        Write-WtwHost '  ChatGPT: removed sidebar label/root entries.' -ForegroundColor Green
     }
 }

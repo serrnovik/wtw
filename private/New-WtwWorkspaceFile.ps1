@@ -68,7 +68,7 @@ function New-WtwWorkspaceFile {
                         )
                         $validFolders += $folder
                     } else {
-                        Write-Host "  Skipping folder: missing environment variable $($missingEnvVars -join ', ')" -ForegroundColor DarkGray
+                        Write-WtwHost "  Skipping folder: missing environment variable $($missingEnvVars -join ', ')" -ForegroundColor DarkGray
                     }
                 } else {
                     $validFolders += $folder

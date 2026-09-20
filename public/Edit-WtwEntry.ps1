@@ -98,7 +98,7 @@ function Edit-WtwEntry {
             Write-Error "Not inside a registered repo. Specify a target or cd into a repo."
             return
         }
-        if ($nameFromCwd) { Write-Host "  Detected: $Name" -ForegroundColor DarkGray }
+        if ($nameFromCwd) { Write-WtwHost "  Detected: $Name" -ForegroundColor DarkGray }
     }
 
     $target = if ($Repo) { Resolve-WtwTarget -Name $Name -RepoAlias $Repo } else { Resolve-WtwTarget $Name }
@@ -173,7 +173,7 @@ function Show-WtwEditableRecord {
     $repoEntry = $Target.RepoEntry
     $aliases = Get-WtwRepoAliases $repoEntry
 
-    Write-Host ''
+    Write-WtwHost ''
     if ($Target.TaskName) {
         $wt = $Target.WorktreeEntry
         $pretty = Get-WtwPropertyValue -Object $wt -Name 'prettyName'
@@ -183,41 +183,41 @@ function Show-WtwEditableRecord {
         $derived = ($aliases | ForEach-Object { "$_-$($Target.TaskName)" }) -join ', '
         $custom = @(Get-WtwWorktreeAliases $wt)
         $shownAliases = @($custom + @($derived | Where-Object { $_ })) -join ', '
-        Write-Host "  Worktree  $repoName / $($Target.TaskName)" -ForegroundColor Cyan
-        if ($pretty) { Write-Host "    Name      : $pretty" }
-        Write-Host "    Task      : $($Target.TaskName)"
-        Write-Host "    Emoji     : $(if ($glyph) { $glyph } else { '(none)' })"
-        Write-Host "    Branch    : $(Get-WtwPropertyValue -Object $wt -Name 'branch')"
-        Write-Host "    Path      : $(Get-WtwPropertyValue -Object $wt -Name 'path')"
-        if ($ws) { Write-Host "    Workspace : $ws" }
-        if ($color) { Write-Host "    Color     : $color" }
-        if ($shownAliases) { Write-Host "    Aliases   : $shownAliases" }
-        Write-Host ''
-        Write-Host "  wtw edit $($Target.TaskName) --name <pretty>   display name" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $($Target.TaskName) --task <key>      go-target / derived aliases" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $($Target.TaskName) --alias 'onboarding video'   extra typed name" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $($Target.TaskName) --emoji 🦔         override identity glyph" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $($Target.TaskName) --emoji auto      restore name-derived glyph" -ForegroundColor DarkGray
+        Write-WtwHost "  Worktree  $repoName / $($Target.TaskName)" -ForegroundColor Cyan
+        if ($pretty) { Write-WtwHost "    Name      : $pretty" }
+        Write-WtwHost "    Task      : $($Target.TaskName)"
+        Write-WtwHost "    Emoji     : $(if ($glyph) { $glyph } else { '(none)' })"
+        Write-WtwHost "    Branch    : $(Get-WtwPropertyValue -Object $wt -Name 'branch')"
+        Write-WtwHost "    Path      : $(Get-WtwPropertyValue -Object $wt -Name 'path')"
+        if ($ws) { Write-WtwHost "    Workspace : $ws" }
+        if ($color) { Write-WtwHost "    Color     : $color" }
+        if ($shownAliases) { Write-WtwHost "    Aliases   : $shownAliases" }
+        Write-WtwHost ''
+        Write-WtwHost "  wtw edit $($Target.TaskName) --name <pretty>   display name" -ForegroundColor DarkGray
+        Write-WtwHost "  wtw edit $($Target.TaskName) --task <key>      go-target / derived aliases" -ForegroundColor DarkGray
+        Write-WtwHost "  wtw edit $($Target.TaskName) --alias 'onboarding video'   extra typed name" -ForegroundColor DarkGray
+        Write-WtwHost "  wtw edit $($Target.TaskName) --emoji 🦔         override identity glyph" -ForegroundColor DarkGray
+        Write-WtwHost "  wtw edit $($Target.TaskName) --emoji auto      restore name-derived glyph" -ForegroundColor DarkGray
     } else {
         $emoji = Get-WtwRepoEmoji -RepoEntry $repoEntry
-        Write-Host "  Repo  $repoName" -ForegroundColor Cyan
-        Write-Host "    Key       : $repoName"
-        Write-Host "    Emoji     : $(if ($emoji) { $emoji } else { '(none)' })"
+        Write-WtwHost "  Repo  $repoName" -ForegroundColor Cyan
+        Write-WtwHost "    Key       : $repoName"
+        Write-WtwHost "    Emoji     : $(if ($emoji) { $emoji } else { '(none)' })"
         $folderOn = $false
         if ((Get-WtwPropertyNames -Object $repoEntry) -contains 'sourceGitFolder') {
             $folderOn = [bool]$repoEntry.sourceGitFolder
         }
-        Write-Host "    Aliases   : $($aliases -join ', ')"
-        Write-Host "    Path      : $(Get-WtwPropertyValue -Object $repoEntry -Name 'mainPath')"
-        Write-Host "    SG folder : $(if ($folderOn) { 'yes' } else { 'if one already exists' })"
-        Write-Host ''
-        Write-Host "  wtw edit $repoName --alias a,b     typed names for wtw go" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $repoName --key <name>    registry key" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $repoName --emoji 🎸      SourceGit / list prefix" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $repoName --emoji none    clear prefix" -ForegroundColor DarkGray
-        Write-Host "  wtw edit $repoName --sourcegit-folder   group worktrees in SourceGit" -ForegroundColor DarkGray
+        Write-WtwHost "    Aliases   : $($aliases -join ', ')"
+        Write-WtwHost "    Path      : $(Get-WtwPropertyValue -Object $repoEntry -Name 'mainPath')"
+        Write-WtwHost "    SG folder : $(if ($folderOn) { 'yes' } else { 'if one already exists' })"
+        Write-WtwHost ''
+        Write-WtwHost "  wtw edit $repoName --alias a,b     typed names for wtw go" -ForegroundColor DarkGray
+        Write-WtwHost "  wtw edit $repoName --key <name>    registry key" -ForegroundColor DarkGray
+        Write-WtwHost "  wtw edit $repoName --emoji 🎸      SourceGit / list prefix" -ForegroundColor DarkGray
+        Write-WtwHost "  wtw edit $repoName --emoji none    clear prefix" -ForegroundColor DarkGray
+        Write-WtwHost "  wtw edit $repoName --sourcegit-folder   group worktrees in SourceGit" -ForegroundColor DarkGray
     }
-    Write-Host ''
+    Write-WtwHost ''
 }
 
 function Edit-WtwWorktreeRecord {
@@ -243,7 +243,7 @@ function Edit-WtwWorktreeRecord {
             return
         }
         if ($newTask -ne $Task) {
-            Write-Host "  Normalized task: $newTask" -ForegroundColor DarkCyan
+            Write-WtwHost "  Normalized task: $newTask" -ForegroundColor DarkCyan
         }
     }
 
@@ -325,7 +325,7 @@ function Edit-WtwWorktreeRecord {
     }
 
     if ($changed.Count -eq 0) {
-        Write-Host '  Nothing to change.' -ForegroundColor DarkGray
+        Write-WtwHost '  Nothing to change.' -ForegroundColor DarkGray
         return
     }
 
@@ -365,15 +365,15 @@ function Edit-WtwWorktreeRecord {
                             $registry.repos.$repoName.worktrees.$newTask = $saved
                             Save-WtwRegistry $registry
                             $wsFile = $migratedWorkspace
-                            Write-Host "  Workspace file: $(Split-Path $wsFile -Leaf)" -ForegroundColor DarkGray
+                            Write-WtwHost "  Workspace file: $(Split-Path $wsFile -Leaf)" -ForegroundColor DarkGray
                         }
                     } else {
-                        Write-Host '  Keeping existing workspace filename (Cursor Agents label not migrated).' -ForegroundColor DarkGray
+                        Write-WtwHost '  Keeping existing workspace filename (Cursor Agents label not migrated).' -ForegroundColor DarkGray
                     }
                 }
             }
 
-            Write-Host '  Syncing workspace...' -ForegroundColor DarkGray
+            Write-WtwHost '  Syncing workspace...' -ForegroundColor DarkGray
             Sync-WtwWorkspace -Target $wsFile -ColorSource Json
         }
 
@@ -382,9 +382,9 @@ function Edit-WtwWorktreeRecord {
         }
     }
 
-    Write-Host ''
-    Write-Host "  Updated $repoName / $newTask ($($changed -join '; '))." -ForegroundColor Green
-    Write-Host ''
+    Write-WtwHost ''
+    Write-WtwHost "  Updated $repoName / $newTask ($($changed -join '; '))." -ForegroundColor Green
+    Write-WtwHost ''
 }
 
 function Edit-WtwRepoRecord {
@@ -504,7 +504,7 @@ function Edit-WtwRepoRecord {
     }
 
     if ($changed.Count -eq 0) {
-        Write-Host '  Nothing to change.' -ForegroundColor DarkGray
+        Write-WtwHost '  Nothing to change.' -ForegroundColor DarkGray
         return
     }
 
@@ -519,7 +519,7 @@ function Edit-WtwRepoRecord {
 
     if ($newKey -ne $oldKey -and -not $NoSync) {
         foreach ($ws in @($workspacesToUpdate)) {
-            Write-Host '  Syncing workspace...' -ForegroundColor DarkGray
+            Write-WtwHost '  Syncing workspace...' -ForegroundColor DarkGray
             Sync-WtwWorkspace -Target $ws -ColorSource Json
         }
     }
@@ -535,10 +535,10 @@ function Edit-WtwRepoRecord {
         }
     }
 
-    Write-Host ''
-    Write-Host "  Updated repo $newKey ($($changed -join '; '))." -ForegroundColor Green
-    Write-Host "  New shell aliases apply in a new terminal, or re-source the wtw wrapper." -ForegroundColor DarkGray
-    Write-Host ''
+    Write-WtwHost ''
+    Write-WtwHost "  Updated repo $newKey ($($changed -join '; '))." -ForegroundColor Green
+    Write-WtwHost "  New shell aliases apply in a new terminal, or re-source the wtw wrapper." -ForegroundColor DarkGray
+    Write-WtwHost ''
 }
 
 function Test-WtwRepoIdentityCollision {

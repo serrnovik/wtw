@@ -3,6 +3,8 @@ BeforeAll {
     # The notice helpers are private; dot-source them plus the strict-mode-safe
     # property reader they depend on.
     . "$PSScriptRoot/../private/Get-WtwPropertyNames.ps1"
+    . "$PSScriptRoot/../private/Get-WtwShellTheme.ps1"
+    . "$PSScriptRoot/../private/Write-WtwHost.ps1"
     . "$PSScriptRoot/../private/Write-WtwUpdateNotice.ps1"
     # The notice picks its update command from how wtw was installed.
     . "$PSScriptRoot/../private/Get-WtwInstallInfo.ps1"

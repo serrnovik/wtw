@@ -143,8 +143,8 @@ function New-WtwWorktree {
         return
     }
     if ($rawTask -ne $Task) {
-        Write-Host "  Normalized task/branch: $Task" -ForegroundColor DarkCyan
-        Write-Host "    (from: $rawTask)" -ForegroundColor DarkGray
+        Write-WtwHost "  Normalized task/branch: $Task" -ForegroundColor DarkCyan
+        Write-WtwHost "    (from: $rawTask)" -ForegroundColor DarkGray
     }
 
     $repoName, $repoEntry = Resolve-WtwRepo -RepoAlias $Repo
@@ -165,8 +165,8 @@ function New-WtwWorktree {
         return
     }
     if ($FolderName -and $folderSuffix -ne $FolderName) {
-        Write-Host "  Normalized folder name: $folderSuffix" -ForegroundColor DarkCyan
-        Write-Host "    (from: $FolderName)" -ForegroundColor DarkGray
+        Write-WtwHost "  Normalized folder name: $folderSuffix" -ForegroundColor DarkCyan
+        Write-WtwHost "    (from: $FolderName)" -ForegroundColor DarkGray
     }
     $worktreePath = Join-Path $repoEntry.worktreeParent "${repoName}_${folderSuffix}"
 
@@ -178,7 +178,7 @@ function New-WtwWorktree {
     if (-not $Branch) { $Branch = $Task }
 
     # Create git worktree
-    Write-Host "  Creating worktree..." -ForegroundColor Cyan
+    Write-WtwHost "  Creating worktree..." -ForegroundColor Cyan
     $mainRepo = $repoEntry.mainPath
 
     # Resolve -From upfront so we fail fast with a clear message rather
@@ -203,7 +203,7 @@ function New-WtwWorktree {
                 Write-Error "--from current: cwd is on a detached HEAD; check out a branch first or pass an explicit ref."
                 return
             }
-            Write-Host "  --from current → '$cwdBranch'" -ForegroundColor DarkGray
+            Write-WtwHost "  --from current → '$cwdBranch'" -ForegroundColor DarkGray
             $From = $cwdBranch
         }
         $resolved = git -C $mainRepo rev-parse --verify "$From^{commit}" 2>&1
@@ -211,7 +211,7 @@ function New-WtwWorktree {
             Write-Error "--from '$From' is not a valid ref in $repoName : $resolved"
             return
         }
-        Write-Host "  Stack base: $From ($($resolved.Substring(0, 12)))" -ForegroundColor Cyan
+        Write-WtwHost "  Stack base: $From ($($resolved.Substring(0, 12)))" -ForegroundColor Cyan
     }
 
     # Fail fast if -GtTrack is set but `gt` isn't on PATH — otherwise the
@@ -238,7 +238,7 @@ function New-WtwWorktree {
             $branchExists = ($LASTEXITCODE -eq 0)
         }
         if ($branchExists) {
-            Write-Host "  --branch '$Branch' refers to an existing ref; adopting (implies --adopt)." -ForegroundColor DarkCyan
+            Write-WtwHost "  --branch '$Branch' refers to an existing ref; adopting (implies --adopt)." -ForegroundColor DarkCyan
             $NoBranch = $true
         }
     }
@@ -261,7 +261,7 @@ function New-WtwWorktree {
         $isLocalBranch = ($LASTEXITCODE -eq 0)
 
         if ($isLocalBranch) {
-            Write-Host "  Adopting local branch: $Branch" -ForegroundColor Cyan
+            Write-WtwHost "  Adopting local branch: $Branch" -ForegroundColor Cyan
             $result = git -C $mainRepo worktree add $worktreePath $Branch 2>&1
         } else {
             # Treat as a remote-tracking ref (e.g. origin/foo). Derive the
@@ -277,7 +277,7 @@ function New-WtwWorktree {
                 Write-Error "--no-branch: cannot create local branch '$localName' tracking '$Branch' — a local branch named '$localName' already exists. Run 'wtw create $Task --no-branch --branch $localName' to adopt the local one instead."
                 return
             }
-            Write-Host "  Adopting remote branch: $Branch → local '$localName' (tracking)" -ForegroundColor Cyan
+            Write-WtwHost "  Adopting remote branch: $Branch → local '$localName' (tracking)" -ForegroundColor Cyan
             $result = git -C $mainRepo worktree add -b $localName --track $worktreePath $Branch 2>&1
             if ($LASTEXITCODE -eq 0) { $Branch = $localName }
         }
@@ -292,8 +292,8 @@ function New-WtwWorktree {
         return
     }
 
-    Write-Host "  Worktree: $worktreePath" -ForegroundColor Green
-    Write-Host "  Branch:   $Branch" -ForegroundColor Green
+    Write-WtwHost "  Worktree: $worktreePath" -ForegroundColor Green
+    Write-WtwHost "  Branch:   $Branch" -ForegroundColor Green
 
     # All post-worktree-add setup (color, pretty name, workspace file, registry,
     # Superset/Codex/cmux/wmux/SourceGit/agentctl) is shared with `wtw add`.
@@ -327,7 +327,7 @@ function New-WtwWorktree {
     # in current Graphite. The legacy name still works but prints a
     # deprecation warning that drowns the real output. Use the new name.
     if ($GtTrack) {
-        Write-Host "  Tracking with Graphite..." -ForegroundColor Cyan
+        Write-WtwHost "  Tracking with Graphite..." -ForegroundColor Cyan
         Push-Location -LiteralPath $worktreePath
         try {
             $gtArgs = @('track')
@@ -335,20 +335,20 @@ function New-WtwWorktree {
             $gtOut = & gt @gtArgs 2>&1
             if ($LASTEXITCODE -eq 0) {
                 $parentLabel = if ($From) { " (parent: $From)" } else { '' }
-                Write-Host "  Graphite: tracked${parentLabel}" -ForegroundColor Green
+                Write-WtwHost "  Graphite: tracked${parentLabel}" -ForegroundColor Green
             } else {
                 Write-Warning "  gt track failed (exit $LASTEXITCODE): $gtOut"
                 # The most common cause is a stale/missing trunk
                 # configuration — point the user at the fix.
                 if ("$gtOut" -match 'bad revision|trunk|init') {
-                    Write-Host "    Likely cause: Graphite trunk is unset or stale. From the main repo:" -ForegroundColor DarkGray
-                    Write-Host "      gt init             # interactive: pick trunk (usually 'main')" -ForegroundColor DarkGray
-                    Write-Host "      gt repo sync        # refresh remote state" -ForegroundColor DarkGray
-                    Write-Host "    Then inside ${worktreePath}:" -ForegroundColor DarkGray
+                    Write-WtwHost "    Likely cause: Graphite trunk is unset or stale. From the main repo:" -ForegroundColor DarkGray
+                    Write-WtwHost "      gt init             # interactive: pick trunk (usually 'main')" -ForegroundColor DarkGray
+                    Write-WtwHost "      gt repo sync        # refresh remote state" -ForegroundColor DarkGray
+                    Write-WtwHost "    Then inside ${worktreePath}:" -ForegroundColor DarkGray
                     $reTry = if ($From) { "      gt track --parent $From" } else { '      gt track' }
-                    Write-Host $reTry -ForegroundColor DarkGray
+                    Write-WtwHost $reTry -ForegroundColor DarkGray
                 } else {
-                    Write-Host "    Worktree is fine — re-run 'gt track' manually inside $worktreePath." -ForegroundColor DarkGray
+                    Write-WtwHost "    Worktree is fine — re-run 'gt track' manually inside $worktreePath." -ForegroundColor DarkGray
                 }
             }
         } finally {
@@ -360,6 +360,6 @@ function New-WtwWorktree {
         Open-WtwWorkspace -Name $Task -Repo $repoName
     }
 
-    Write-Host ''
-    Write-Host "  Done! Use 'wtw go $Task' to switch." -ForegroundColor Green
+    Write-WtwHost ''
+    Write-WtwHost "  Done! Use 'wtw go $Task' to switch." -ForegroundColor Green
 }

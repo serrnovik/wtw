@@ -268,20 +268,20 @@ function Sync-WtwSshConfig {
     if (-not (Test-Path $script:WtwSshConfigPath)) {
         Set-Content -Path $script:WtwSshConfigPath -Value "$includeLine`n" -Encoding utf8
         if (-not $IsWindows) { & chmod 600 $script:WtwSshConfigPath 2>$null }
-        if (-not $Quiet) { Write-Host "  Created $script:WtwSshConfigPath with the wtw include." -ForegroundColor Green }
+        if (-not $Quiet) { Write-WtwHost "  Created $script:WtwSshConfigPath with the wtw include." -ForegroundColor Green }
         return $managedPath
     }
 
     $existing = Get-Content -Path $script:WtwSshConfigPath -Raw
     if ($existing -match [regex]::Escape($script:WtwSshManagedRelative)) {
-        if (-not $Quiet) { Write-Host "  Wrote $managedPath (already included)." -ForegroundColor Green }
+        if (-not $Quiet) { Write-WtwHost "  Wrote $managedPath (already included)." -ForegroundColor Green }
         return $managedPath
     }
 
     Set-Content -Path $script:WtwSshConfigPath -Value "$includeLine`n`n$existing" -Encoding utf8
     if (-not $Quiet) {
-        Write-Host "  Wrote $managedPath" -ForegroundColor Green
-        Write-Host "  Prepended '$includeLine' to $script:WtwSshConfigPath" -ForegroundColor Green
+        Write-WtwHost "  Wrote $managedPath" -ForegroundColor Green
+        Write-WtwHost "  Prepended '$includeLine' to $script:WtwSshConfigPath" -ForegroundColor Green
     }
     return $managedPath
 }

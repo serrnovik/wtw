@@ -1,6 +1,8 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
     . "$PSScriptRoot/../private/Get-WtwPropertyNames.ps1"
+    . "$PSScriptRoot/../private/Get-WtwShellTheme.ps1"
+    . "$PSScriptRoot/../private/Write-WtwHost.ps1"
     . "$PSScriptRoot/../private/Write-WtwUpdateNotice.ps1"
     . "$PSScriptRoot/../private/Get-WtwInstallInfo.ps1"
     . "$PSScriptRoot/../private/Write-WtwInstallRecord.ps1"
@@ -296,6 +298,44 @@ Describe 'Update-Wtw' {
             Should -Invoke Get-WtwUpdateStatus -Times 1 -Exactly
         }
     }
+
+    It 'finishes after Import-Module -Force by talking to the loaded module' {
+        InModuleScope wtw {
+            Mock Get-WtwInstallInfo { [pscustomobject]@{
+                    Flavour = 'Gallery'; ModuleRoot = (Join-Path $HOME '.wtw/module')
+                    InstallRoot = (Join-Path $HOME '.wtw/module'); Version = [version]'1.0.0'
+                    SourcePath = ''; SourceCommit = ''; InstalledAtUtc = $null
+                    GalleryCopies = @(); ShadowedBy = $null; UpdateCommand = 'wtw update'
+                } }
+            Mock Get-WtwUpdateStatus { [pscustomobject]@{
+                    CurrentVersion = [version]'1.0.0'; LatestVersion = [version]'9.9.9'
+                    UpdateAvailable = $true; Status = 'Available'; CheckedAtUtc = [DateTime]::UtcNow; Source = 'gallery'
+                } }
+            Mock Test-Path { $true } -ParameterFilter { $LiteralPath -like '*wtw.psm1' }
+            Mock Save-WtwGalleryPackage { Join-Path $TestDrive 'stage-parent' 'wtw' }
+            Mock Install-WtwStagedModule { $true }
+            Mock Write-WtwInstallRecord { }
+            Mock Import-Module { }
+            Mock Sync-WtwCmuxRemoteProjects { }
+            Mock Remove-Item { }
+
+            $output = (Update-Wtw -Yes 6>&1 | Out-String)
+
+            $output | Should -Match 'wtw 9\.9\.9 installed'
+            $output | Should -Match 'Reloaded the module in this session'
+            Should -Invoke Import-Module -Times 1 -Exactly
+            Should -Invoke Sync-WtwCmuxRemoteProjects -Times 1 -Exactly
+        }
+    }
+}
+
+Describe 'wtw update reload compat' {
+    It 'registers a global Write-WtwHost proxy for in-flight updates' {
+        Test-Path Function:Global:Write-WtwHost | Should -BeTrue
+        $proxy = Get-Content Function:Global:Write-WtwHost
+        $out = & $proxy -Object 'compat-ok' 6>&1 | Out-String
+        $out | Should -Match 'compat-ok'
+    }
 }
 
 Describe 'Invoke-Wtw update dispatch' {
@@ -309,6 +349,16 @@ Describe 'Invoke-Wtw update dispatch' {
             Invoke-Wtw 'update' 6>&1 | Out-Null
             Should -Invoke Update-Wtw -Times 1 -Exactly
             Should -Invoke Install-Wtw -Times 0 -Exactly
+        }
+    }
+}
+
+Describe 'Invoke-Wtw version dispatch' {
+    It 'prints the module version for --version, -v, and version' {
+        foreach ($token in @('--version', '-v', 'version')) {
+            $out = @(& { Invoke-Wtw $token } 6>$null)
+            $out[0] | Should -Match '^wtw \d+\.\d+\.\d+'
+            $out[1] | Should -BeLike '*worktree-workspace*'
         }
     }
 }

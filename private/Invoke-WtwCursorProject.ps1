@@ -155,34 +155,34 @@ function Resolve-WtwCursorStateConflict {
 
     if (-not (Test-WtwCursorAppRunning)) { return $true }
 
-    Write-Host ''
-    Write-Host '  Cursor is running — it can overwrite Agents workspace metadata on exit.' -ForegroundColor Yellow
-    Write-Host "  Close Cursor once to migrate the Agents label to '$PrettyName'." -ForegroundColor Yellow
-    Write-Host '    [c] Close Cursor yourself, then migrate (I will wait)'
-    Write-Host '    [k] Force-close Cursor, then migrate'
-    Write-Host '    [s] Skip — open with the existing Agents label'
+    Write-WtwHost ''
+    Write-WtwHost '  Cursor is running — it can overwrite Agents workspace metadata on exit.' -ForegroundColor Yellow
+    Write-WtwHost "  Close Cursor once to migrate the Agents label to '$PrettyName'." -ForegroundColor Yellow
+    Write-WtwHost '    [c] Close Cursor yourself, then migrate (I will wait)'
+    Write-WtwHost '    [k] Force-close Cursor, then migrate'
+    Write-WtwHost '    [s] Skip — open with the existing Agents label'
 
     $answer = (Read-Host '  Choice [c/k/s]').Trim().ToLowerInvariant()
     if (-not $answer) { $answer = 'c' }
 
     switch ($answer) {
         'c' {
-            Write-Host '  Waiting for Cursor to close (Ctrl+C to abort)...' -ForegroundColor Cyan
+            Write-WtwHost '  Waiting for Cursor to close (Ctrl+C to abort)...' -ForegroundColor Cyan
             while (Test-WtwCursorAppRunning) { Start-Sleep -Milliseconds 500 }
-            Write-Host '  Cursor closed.' -ForegroundColor Green
+            Write-WtwHost '  Cursor closed.' -ForegroundColor Green
             return $true
         }
         'k' {
-            Write-Host '  Force-closing Cursor...' -ForegroundColor Cyan
+            Write-WtwHost '  Force-closing Cursor...' -ForegroundColor Cyan
             if (-not (Stop-WtwCursorProcess)) {
-                Write-Host '  Could not stop Cursor — skipping Agents label migration.' -ForegroundColor Red
+                Write-WtwHost '  Could not stop Cursor — skipping Agents label migration.' -ForegroundColor Red
                 return $false
             }
-            Write-Host '  Cursor stopped.' -ForegroundColor Green
+            Write-WtwHost '  Cursor stopped.' -ForegroundColor Green
             return $true
         }
         default {
-            Write-Host '  Skipped Cursor Agents label migration.' -ForegroundColor DarkGray
+            Write-WtwHost '  Skipped Cursor Agents label migration.' -ForegroundColor DarkGray
             return $false
         }
     }
@@ -237,18 +237,18 @@ function Move-WtwCursorWorkspaceForAgents {
     if ($oldPath -eq $newPath) { return $oldPath }
 
     if (Test-Path $newPath) {
-        Write-Host "  Cursor: Agents label target already exists; keeping '$oldPath'." -ForegroundColor Yellow
+        Write-WtwHost "  Cursor: Agents label target already exists; keeping '$oldPath'." -ForegroundColor Yellow
         return $oldPath
     }
     if (Test-WtwCursorAppRunning) {
-        Write-Host '  Cursor: close Cursor before migrating an existing Agents workspace label.' -ForegroundColor Yellow
+        Write-WtwHost '  Cursor: close Cursor before migrating an existing Agents workspace label.' -ForegroundColor Yellow
         return $oldPath
     }
 
     $sqlite = Get-WtwSqliteCommand
     $statePath = Get-WtwCursorGlobalStatePath -DataHome $DataHome
     if ((Test-Path $statePath) -and -not $sqlite) {
-        Write-Host '  Cursor: sqlite3 is required to preserve Agents history; label migration skipped.' -ForegroundColor Yellow
+        Write-WtwHost '  Cursor: sqlite3 is required to preserve Agents history; label migration skipped.' -ForegroundColor Yellow
         return $oldPath
     }
 
@@ -260,7 +260,7 @@ function Move-WtwCursorWorkspaceForAgents {
     $oldStoragePath = Join-Path $workspaceStorageRoot $oldId
     $newStoragePath = Join-Path $workspaceStorageRoot $newId
     if ((Test-Path $oldStoragePath) -and (Test-Path $newStoragePath)) {
-        Write-Host "  Cursor: workspace state already exists for '$newPath'; migration skipped." -ForegroundColor Yellow
+        Write-WtwHost "  Cursor: workspace state already exists for '$newPath'; migration skipped." -ForegroundColor Yellow
         return $oldPath
     }
 
@@ -370,12 +370,12 @@ where instr(key, $oldIdLiteral) > 0
         if ($movedWorkspace -and (Test-Path $newPath) -and -not (Test-Path $oldPath)) {
             Move-Item -LiteralPath $newPath -Destination $oldPath
         }
-        Write-Host "  Cursor: Agents label migration failed: $($_.Exception.Message)" -ForegroundColor Red
+        Write-WtwHost "  Cursor: Agents label migration failed: $($_.Exception.Message)" -ForegroundColor Red
         return $oldPath
     }
 
-    Write-Host "  Cursor: Agents workspace label '$PrettyName'" -ForegroundColor Green
-    Write-Host "  Cursor: migration backup $backupRoot" -ForegroundColor DarkGray
+    Write-WtwHost "  Cursor: Agents workspace label '$PrettyName'" -ForegroundColor Green
+    Write-WtwHost "  Cursor: migration backup $backupRoot" -ForegroundColor DarkGray
     return $newPath
 }
 
@@ -389,14 +389,14 @@ function Read-WtwCursorRecentlyOpenedState {
 
     $sqlite = Get-WtwSqliteCommand
     if (-not $sqlite) {
-        Write-Host '  Cursor: sqlite3 not found - skipping recent workspace registration.' -ForegroundColor DarkGray
+        Write-WtwHost '  Cursor: sqlite3 not found - skipping recent workspace registration.' -ForegroundColor DarkGray
         return $null
     }
 
     $sql = "select value from ItemTable where key = 'history.recentlyOpenedPathsList' limit 1;"
     $value = & $sqlite $StatePath $sql 2>$null
     if ($LASTEXITCODE -ne 0) {
-        Write-Host '  Cursor: could not read state.vscdb - skipping recent workspace registration.' -ForegroundColor Yellow
+        Write-WtwHost '  Cursor: could not read state.vscdb - skipping recent workspace registration.' -ForegroundColor Yellow
         return $null
     }
 
@@ -408,7 +408,7 @@ function Read-WtwCursorRecentlyOpenedState {
     try {
         return $raw | ConvertFrom-Json
     } catch {
-        Write-Host '  Cursor: could not parse recently-opened state - skipping update.' -ForegroundColor Yellow
+        Write-WtwHost '  Cursor: could not parse recently-opened state - skipping update.' -ForegroundColor Yellow
         return $null
     }
 }
@@ -422,7 +422,7 @@ function Save-WtwCursorRecentlyOpenedState {
 
     $sqlite = Get-WtwSqliteCommand
     if (-not $sqlite) {
-        Write-Host '  Cursor: sqlite3 not found - skipping recent workspace registration.' -ForegroundColor DarkGray
+        Write-WtwHost '  Cursor: sqlite3 not found - skipping recent workspace registration.' -ForegroundColor DarkGray
         return $false
     }
 
@@ -441,7 +441,7 @@ function Save-WtwCursorRecentlyOpenedState {
 
     & $sqlite $StatePath $sql 2>$null
     if ($LASTEXITCODE -ne 0) {
-        Write-Host '  Cursor: could not save state.vscdb - skipping recent workspace registration.' -ForegroundColor Yellow
+        Write-WtwHost '  Cursor: could not save state.vscdb - skipping recent workspace registration.' -ForegroundColor Yellow
         return $false
     }
 
@@ -535,7 +535,7 @@ function Register-WtwCursorProject {
 
     if (-not (Test-Path $WorkspacePath)) { return $null }
     if (-not (Test-WtwCursorPresent)) {
-        Write-Host '  Cursor: not installed/present - skipping recent workspace registration.' -ForegroundColor DarkGray
+        Write-WtwHost '  Cursor: not installed/present - skipping recent workspace registration.' -ForegroundColor DarkGray
         return $null
     }
 
@@ -544,7 +544,7 @@ function Register-WtwCursorProject {
     if (Set-WtwCursorRecentWorkspace @splat) {
         $label = if ($PrettyName) { " '$PrettyName'" } else { '' }
         $colorLabel = if ($Color) { " ($Color)" } else { '' }
-        Write-Host "  Cursor: registered recent workspace${label}${colorLabel}" -ForegroundColor Green
+        Write-WtwHost "  Cursor: registered recent workspace${label}${colorLabel}" -ForegroundColor Green
         return [System.IO.Path]::GetFullPath($WorkspacePath)
     }
 
@@ -561,6 +561,6 @@ function Unregister-WtwCursorProject {
     $splat = @{ WorkspacePath = $WorkspacePath }
     if ($StatePath) { $splat.StatePath = $StatePath }
     if (Remove-WtwCursorRecentWorkspace @splat) {
-        Write-Host '  Cursor: removed recent workspace metadata.' -ForegroundColor Green
+        Write-WtwHost '  Cursor: removed recent workspace metadata.' -ForegroundColor Green
     }
 }

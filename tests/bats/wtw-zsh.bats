@@ -13,6 +13,10 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     zsh -n "$SHELL_FILE"
 }
 
+@test "wtw.zsh has unix line endings" {
+    ! grep -q $'\r' "$SHELL_FILE"
+}
+
 @test "wtw.zsh defines wtw function after sourcing" {
     command -v zsh &>/dev/null || skip "zsh not installed"
     run zsh -c "source '$SHELL_FILE' 2>/dev/null; type wtw"
@@ -142,11 +146,13 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
         _wtw_pwsh=mock_pwsh
         wtw __cmux_init_current
         wtw __cmux_apply_current
+        wtw __cmux_remote_shell
         wtw --on at go auth
     "
     [ "$status" -eq 0 ]
     [[ "$output" == *"Invoke-Wtw '__cmux_init_current'"* ]]
     [[ "$output" == *"Invoke-Wtw '__cmux_apply_current'"* ]]
+    [[ "$output" == *"Invoke-Wtw '__cmux_remote_shell'"* ]]
     [[ "$output" == *"Invoke-Wtw '--on' 'at' 'go' 'auth'"* ]]
     [[ "$output" != *"__resolve"* ]]
 }
