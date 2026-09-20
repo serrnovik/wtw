@@ -93,6 +93,66 @@ Describe 'cmux machine/project group names' {
         $spec.Name | Should -Be '🧊AT'
         $spec.Key | Should -Be 'wtw.group.arctictroll'
     }
+
+    It 'maps a remote repo key onto the local canonical name and emoji' {
+        Mock Get-WtwRegistry {
+            [PSCustomObject]@{
+                repos = [PSCustomObject]@{
+                    snowmain1 = [PSCustomObject]@{
+                        emoji   = '🎸'
+                        aliases = @('sn', 'snowmain', 'snowmain1')
+                    }
+                }
+            }
+        }
+
+        $spec = Get-WtwCmuxRemoteWorkspaceGroupSpec `
+            -HostEntry @{ Name = 'arctictroll'; Emoji = '🧊'; Label = 'AT'; Separator = ' ' } `
+            -Session ([PSCustomObject]@{ RepoName = 'snowmain'; RepoEmoji = $null })
+        $spec.Name | Should -Be '🧊AT/🎸 snowmain1'
+        $spec.Key | Should -Be 'wtw.group.arctictroll.snowmain1'
+        $spec.RepoId | Should -Be 'snowmain1'
+    }
+
+    It 'leaves the remote repo name when two local repos share that alias' {
+        Mock Get-WtwRegistry {
+            [PSCustomObject]@{
+                repos = [PSCustomObject]@{
+                    snowmain1 = [PSCustomObject]@{ aliases = @('snowmain') }
+                    snowmain2 = [PSCustomObject]@{ aliases = @('snowmain') }
+                }
+            }
+        }
+
+        $spec = Get-WtwCmuxRemoteWorkspaceGroupSpec `
+            -HostEntry @{ Name = 'arctictroll'; Emoji = '🧊'; Label = 'AT'; Separator = ' ' } `
+            -Session ([PSCustomObject]@{ RepoName = 'snowmain'; RepoEmoji = $null })
+        $spec.Name | Should -Be '🧊AT/snowmain'
+        $spec.Key | Should -Be 'wtw.group.arctictroll.snowmain'
+    }
+
+    It 'uses the local worktree repo when the remote session omitted repo' {
+        Mock Get-WtwRegistry {
+            [PSCustomObject]@{
+                repos = [PSCustomObject]@{
+                    snowmain1 = [PSCustomObject]@{ emoji = '🎸'; aliases = @('snowmain1') }
+                }
+            }
+        }
+        Mock Resolve-WtwTarget {
+            [PSCustomObject]@{
+                RepoName  = 'snowmain1'
+                RepoEntry = [PSCustomObject]@{ emoji = '🎸' }
+            }
+        }
+
+        $spec = Get-WtwCmuxRemoteWorkspaceGroupSpec `
+            -HostEntry @{ Name = 'arctictroll'; Emoji = '🧊'; Label = 'AT'; Separator = ' ' } `
+            -Session ([PSCustomObject]@{ RepoName = ''; RepoEmoji = $null; Name = 'overlay' })
+        $spec.Name | Should -Be '🧊AT/🎸 snowmain1'
+        $spec.Key | Should -Be 'wtw.group.arctictroll.snowmain1'
+    }
+
 }
 
 Describe 'Ensure-WtwCmuxWorkspaceGroup' {
@@ -176,6 +236,67 @@ Describe 'Ensure-WtwCmuxWorkspaceGroup' {
             $group.Ref | Should -Be 'workspace_group:1'
             $group.Name | Should -Be '🍏SP/🎸 snowmain1'
             $script:renamed | Should -BeTrue
+        }
+    }
+
+    It 'reuses a group created under the remote repo key after local canonicalization' {
+        InModuleScope wtw {
+            $script:renamed = $false
+            $script:created = $false
+            Mock Get-WtwRegistry {
+                [PSCustomObject]@{
+                    repos = [PSCustomObject]@{
+                        snowmain1 = [PSCustomObject]@{
+                            emoji   = '🎸'
+                            aliases = @('snowmain', 'snowmain1')
+                        }
+                    }
+                }
+            }
+            Mock Invoke-WtwCmuxCommand {
+                $command = $ArgumentList -join ' '
+                if ($command -eq 'workspace-group list --json') {
+                    return [PSCustomObject]@{
+                        ExitCode = 0
+                        Output   = @'
+{
+  "groups": [
+    {
+      "ref": "workspace_group:6",
+      "name": "🧊AT/snowmain",
+      "idempotency_key": "wtw.group.arctictroll.snowmain",
+      "member_workspace_refs": ["workspace:15"]
+    }
+  ]
+}
+'@
+                    }
+                }
+                if ($ArgumentList[0] -eq 'workspace-group' -and $ArgumentList[1] -eq 'rename') {
+                    $script:renamed = $true
+                    $ArgumentList | Should -Contain 'workspace_group:6'
+                    $ArgumentList | Should -Contain '🧊AT/🎸 snowmain1'
+                    return [PSCustomObject]@{ ExitCode = 0; Output = '' }
+                }
+                if ($ArgumentList[0] -eq 'workspace-group' -and $ArgumentList[1] -eq 'create') {
+                    $script:created = $true
+                    throw "should reuse the snowmain alias group, not create $($ArgumentList -join ' ')"
+                }
+                throw "unexpected cmux $($ArgumentList -join ' ')"
+            }
+
+            $group = Ensure-WtwCmuxWorkspaceGroup -Spec ([PSCustomObject]@{
+                    Name      = '🧊AT/🎸 snowmain1'
+                    Key       = 'wtw.group.arctictroll.snowmain1'
+                    MachineId = 'arctictroll'
+                    RepoId    = 'snowmain1'
+                    Cwd       = $TestDrive
+                })
+
+            $group.Ref | Should -Be 'workspace_group:6'
+            $group.Name | Should -Be '🧊AT/🎸 snowmain1'
+            $script:renamed | Should -BeTrue
+            $script:created | Should -BeFalse
         }
     }
 }
