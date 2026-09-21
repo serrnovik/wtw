@@ -23,13 +23,39 @@ function Initialize-WtwCmuxCurrentSession {
 
     $remote = Get-WtwCmuxCurrentRemoteSession
     if ($remote) {
+        $prettyName = Get-WtwCmuxRemoteSessionPrettyName -Remote $remote
         if ($setTabLabel) {
             & $setTabLabel `
-                -PrettyName (Get-WtwCmuxRemoteSessionPrettyName -Remote $remote) `
+                -PrettyName $prettyName `
                 -GetTabLabel $getTabLabel `
                 -SetOverride $setOverride `
                 -InvokeRawCommand $invokeRawCommand `
                 -CmuxBin $cmuxBin
+        } elseif ($prettyName -and $env:CMUX_WORKSPACE_ID -and $env:CMUX_SURFACE_ID) {
+            # After Restore-WtwInstalledModule, Get-Command / by-name lookup of
+            # private helpers can miss. Pin the override with the same path
+            # formula Set-WtwCmuxTabTitleOverride uses.
+            $icon = if ($env:WTW_TAB_ICON) { $env:WTW_TAB_ICON } else { '🖥️🌳' }
+            $tabLabel = if ($getTabLabel) {
+                & $getTabLabel -PrettyName $prettyName
+            } else {
+                "$icon $($prettyName.Trim())".Trim()
+            }
+            if ($setOverride) {
+                & $setOverride -WorkspaceId $env:CMUX_WORKSPACE_ID -SurfaceId $env:CMUX_SURFACE_ID -Title $tabLabel | Out-Null
+            } else {
+                $safe = ($env:CMUX_WORKSPACE_ID + '.' + $env:CMUX_SURFACE_ID) -replace '[^\w.-]', '_'
+                $path = Join-Path ([System.IO.Path]::GetTempPath()) "wtw-cmux-tab-$safe"
+                Set-Content -LiteralPath $path -Value $tabLabel -Encoding utf8 -NoNewline
+            }
+            if ($invokeRawCommand) {
+                & $invokeRawCommand -CmuxBin $cmuxBin -ArgumentList @(
+                    'rename-tab',
+                    '--workspace', $env:CMUX_WORKSPACE_ID,
+                    '--surface', $env:CMUX_SURFACE_ID,
+                    $tabLabel
+                ) | Out-Null
+            }
         }
         if ($ApplyTerminalSession) {
             Connect-WtwRemoteWorktree -HostEntry $remote.HostEntry -Name $remote.Name

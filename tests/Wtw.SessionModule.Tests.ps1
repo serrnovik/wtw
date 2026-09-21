@@ -116,26 +116,37 @@ Describe 'Confirm-WtwSessionModuleCurrent' {
     It 'auto-imports a newer copy of the same module and re-runs the command' {
         InModuleScope wtw {
             $script:reinvoked = $false
-            Mock Test-WtwIsPesterRun { $false }
-            Mock Import-WtwSessionModule {}
-            Mock Get-Command { { $script:reinvoked = $true } }
-            Mock Test-Path { $true }
-            Mock Get-WtwSessionModuleStatus {
-                [pscustomobject]@{
-                    Stale            = $true
-                    LoadedRoot       = 'C:\mod'
-                    ReloadRoot       = 'C:\mod'
-                    ReloadModulePath = 'C:\mod\wtw.psm1'
-                    LoadedVersion    = [version]'0.2.26'
-                    ReloadVersion    = [version]'0.2.28'
+            $oldCi = $env:CI
+            try {
+                # Confirm skips auto-import when $env:CI is set (Woodpecker).
+                Remove-Item Env:CI -ErrorAction SilentlyContinue
+                Mock Test-WtwIsPesterRun { $false }
+                Mock Import-WtwSessionModule {}
+                Mock Get-Command { { $script:reinvoked = $true } }
+                Mock Test-Path { $true }
+                Mock Get-WtwSessionModuleStatus {
+                    [pscustomobject]@{
+                        Stale            = $true
+                        LoadedRoot       = 'C:\mod'
+                        ReloadRoot       = 'C:\mod'
+                        ReloadModulePath = 'C:\mod\wtw.psm1'
+                        LoadedVersion    = [version]'0.2.26'
+                        ReloadVersion    = [version]'0.2.28'
+                    }
                 }
-            }
 
-            $did = Confirm-WtwSessionModuleCurrent -OriginalArgs @('list')
-            $did | Should -BeTrue
-            $script:reinvoked | Should -BeTrue
-            Should -Invoke Import-WtwSessionModule -Times 1 -Exactly -ParameterFilter {
-                $ModulePath -eq 'C:\mod\wtw.psm1'
+                $did = Confirm-WtwSessionModuleCurrent -OriginalArgs @('list')
+                $did | Should -BeTrue
+                $script:reinvoked | Should -BeTrue
+                Should -Invoke Import-WtwSessionModule -Times 1 -Exactly -ParameterFilter {
+                    $ModulePath -eq 'C:\mod\wtw.psm1'
+                }
+            } finally {
+                if ($null -eq $oldCi) {
+                    Remove-Item Env:CI -ErrorAction SilentlyContinue
+                } else {
+                    $env:CI = $oldCi
+                }
             }
         }
     }

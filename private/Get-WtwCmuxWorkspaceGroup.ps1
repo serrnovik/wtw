@@ -190,7 +190,12 @@ function Get-WtwCmuxRemoteWorkspaceGroupSpec {
     if (-not $localMatch -and -not $remoteRepoName) {
         $hint = [string](Get-WtwPropertyValue -Object $Session -Name 'Name')
         if ($hint) {
-            $localTarget = Resolve-WtwTarget -Name $hint -SkipFuzzy -ErrorAction SilentlyContinue
+            $localTarget = $null
+            try {
+                $localTarget = Resolve-WtwTarget -Name $hint -SkipFuzzy -ErrorAction SilentlyContinue
+            } catch {
+                $localTarget = $null
+            }
             if ($localTarget -and $localTarget.RepoName) {
                 $localMatch = [PSCustomObject]@{
                     Name  = [string]$localTarget.RepoName

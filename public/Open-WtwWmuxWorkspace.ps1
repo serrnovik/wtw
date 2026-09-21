@@ -41,6 +41,7 @@ with wmux.exe itself via ELECTRON_RUN_AS_NODE when `node` is not on PATH.
     if (-not $result.Success) {
         Write-WtwHost "  wmux: $($result.Reason)" -ForegroundColor Yellow
         Write-WtwHost "  Target would be: '$($metadata.PrettyName)' -> $($metadata.Path)" -ForegroundColor DarkGray
+        $global:LASTEXITCODE = 1
         return
     }
 
@@ -48,4 +49,5 @@ with wmux.exe itself via ELECTRON_RUN_AS_NODE when `node` is not on PATH.
     $verb = if ($result.Created) { 'created' } else { 'opened' }
     Write-WtwHost "  wmux: $verb workspace '$($metadata.PrettyName)'$colorSuffix" -ForegroundColor Green
     Write-WtwHost "  Path: $($metadata.Path)" -ForegroundColor DarkGray
+    $global:LASTEXITCODE = 0
 }

@@ -13,7 +13,6 @@ Describe 'Open-WtwWmuxWorkspace' {
         Mock Test-WtwWmuxPresent { $true } -ModuleName wtw
         Mock Test-WtwWmuxRunning { $true } -ModuleName wtw
         Mock Get-WtwWmuxShell { $null } -ModuleName wtw
-        Mock Save-WtwWmuxWorkspaceName { } -ModuleName wtw
         Mock Invoke-WtwWmuxCommand {
             $script:wmuxCalls.Add(($ArgumentList -join ' '))
             $command = $ArgumentList -join ' '

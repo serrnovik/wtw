@@ -26,5 +26,5 @@ function Get-WtwAllTargetNames {
             }
         }
     }
-    return $targets | Select-Object -Unique
+    return @($targets | Select-Object -Unique)
 }

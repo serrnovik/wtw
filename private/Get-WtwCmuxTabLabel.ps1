@@ -49,7 +49,7 @@ function Get-WtwCmuxTabTitleOverridePath {
         [Parameter(Mandatory)][string] $SurfaceId
     )
 
-    $safe = ($WorkspaceId + '.' + $SurfaceId) -replace '[^\w:.-]', '_'
+    $safe = ($WorkspaceId + '.' + $SurfaceId) -replace '[^\w.-]', '_'
     return Join-Path ([System.IO.Path]::GetTempPath()) "wtw-cmux-tab-$safe"
 }
 
@@ -63,7 +63,7 @@ function Set-WtwCmuxTabTitleOverride {
 
     # Inline the path so this still works after Restore-WtwInstalledModule
     # invalidates by-name lookup of other private helpers.
-    $safe = ($WorkspaceId + '.' + $SurfaceId) -replace '[^\w:.-]', '_'
+    $safe = ($WorkspaceId + '.' + $SurfaceId) -replace '[^\w.-]', '_'
     $path = Join-Path ([System.IO.Path]::GetTempPath()) "wtw-cmux-tab-$safe"
     Set-Content -LiteralPath $path -Value $Title -Encoding utf8 -NoNewline
     return $path

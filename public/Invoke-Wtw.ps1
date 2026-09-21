@@ -47,6 +47,14 @@ function Invoke-Wtw {
         Write-WtwUpdateNotice
     }
 
+    # Same-folder stale session: import the newer copy and re-run. Skipped for
+    # `__*` (wrappers parse stdout), version, and `reload` (it is the check).
+    if ([string]$Command -notlike '__*' -and $Command -notin @('--version', '-v', 'version', 'reload')) {
+        if (Confirm-WtwSessionModuleCurrent -OriginalArgs @($args)) {
+            return
+        }
+    }
+
     if ($Command -in @('--version', '-v', 'version')) {
         Show-WtwVersion
         return
@@ -112,6 +120,7 @@ function Invoke-Wtw {
         Write-WtwHost '    agent profile ... Configure agentctl profile overlays'
         Write-WtwHost '    install           Install wtw globally from this checkout (~/.wtw/module/)'
         Write-WtwHost '    update [--check]  Update the global install to the latest PowerShell Gallery release'
+        Write-WtwHost '    reload [--check]  Re-import wtw in this session after an install/update'
         Write-WtwHost '    skill [--agent X] Install AI skill into current repo (claude/agents/all)'
         Write-WtwHost '    sbx [task] [--name <n>] [--agent <a>] [--writable] [--dry-run]'
         Write-WtwHost '                      Launch AI sandbox (sbx) with workspace folders mounted'
@@ -418,6 +427,7 @@ function Invoke-Wtw {
         # release. Aliasing them meant `wtw update` from a normal shell hit
         # Install-Wtw's self-install guard and refused to do anything.
         'update'    { Update-Wtw @splat }
+        'reload'    { Invoke-WtwReloadSession @splat }
         'skill'     { Install-WtwSkill @splat }
         'sbx'       {
             if ($pos.Count -gt 0) { $splat['Instruction'] = $pos -join ' ' }

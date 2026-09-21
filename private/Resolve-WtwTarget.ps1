@@ -346,10 +346,11 @@ function Resolve-WtwTarget {
         return $null
     }
 
+    $fuzzy = $null
     if (-not $SkipFuzzy) {
-        $allTargets = Get-WtwAllTargetNames $registry
+        $allTargets = @(Get-WtwAllTargetNames $registry)
         $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
-        if ($fuzzy.Match -and (ConvertTo-WtwLookupKey $fuzzy.Match) -ne (ConvertTo-WtwLookupKey $Name)) {
+        if ($fuzzy -and $fuzzy.Match -and (ConvertTo-WtwLookupKey $fuzzy.Match) -ne (ConvertTo-WtwLookupKey $Name)) {
             return (Resolve-WtwTarget -Name $fuzzy.Match -RepoAlias $RepoAlias -SkipFuzzy)
         }
     }
@@ -370,7 +371,7 @@ function Resolve-WtwTarget {
         return $null
     }
 
-    if ($fuzzy.Suggestions.Count -gt 0) {
+    if ($fuzzy -and $fuzzy.Suggestions -and @($fuzzy.Suggestions).Count -gt 0) {
         $suggestions = $fuzzy.Suggestions -join ', '
         Write-Error "Could not resolve '$Name'. Did you mean: ${suggestions}?"
         return $null

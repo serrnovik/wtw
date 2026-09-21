@@ -81,16 +81,20 @@ function Update-Wtw {
     Write-WtwShadowWarning -Info $info -Yes:$Yes -Check:$Check
 
     $current = $installed.Version
+    $galleryOlder = $installedPresent -and $null -ne $current -and $status.LatestVersion -lt $current
     $upToDate = $installedPresent -and $null -ne $current -and $status.LatestVersion -le $current
 
+    # --force reinstalls the same published version. It must not replace a
+    # newer local/Gallery copy with an older Gallery package.
+    if ($galleryOlder) {
+        Write-WtwHost ("    {0} is newer than the published {1} — nothing to do." -f $current, $status.LatestVersion) -ForegroundColor Green
+        Write-WtwHost '    --force will not install an older Gallery copy.' -ForegroundColor DarkGray
+        Write-WtwHost ''
+        return
+    }
+
     if ($upToDate -and -not $Force) {
-        # Equal, or a local build ahead of the Gallery. Neither is a problem, so
-        # neither gets a warning.
-        if ($status.LatestVersion -lt $current) {
-            Write-WtwHost ("    {0} is newer than the published {1} — nothing to do." -f $current, $status.LatestVersion) -ForegroundColor Green
-        } else {
-            Write-WtwHost '    Up to date.' -ForegroundColor Green
-        }
+        Write-WtwHost '    Up to date.' -ForegroundColor Green
         Write-WtwHost ''
         return
     }

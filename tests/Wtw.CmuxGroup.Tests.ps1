@@ -66,7 +66,7 @@ Describe 'cmux machine/project group names' {
         }
 
         $spec = Get-WtwCmuxRemoteWorkspaceGroupSpec -HostEntry $hostEntry -Session $session
-        $spec.Name | Should -Be '🧊AT/🎭 kulissa-landing'
+        $spec.Name | Should -Be '🧊AT/🎭 kulissa landing'
         $spec.Key | Should -Be 'wtw.group.arctictroll.kulissa-landing'
     }
 
@@ -82,7 +82,7 @@ Describe 'cmux machine/project group names' {
         $spec = Get-WtwCmuxRemoteWorkspaceGroupSpec `
             -HostEntry @{ Name = 'arctictroll'; Emoji = '🧊'; Label = 'AT'; Separator = ' ' } `
             -Session ([PSCustomObject]@{ RepoName = 'kulissa-landing'; RepoEmoji = $null })
-        $spec.Name | Should -Be '🧊AT/🎭 kulissa-landing'
+        $spec.Name | Should -Be '🧊AT/🎭 kulissa landing'
     }
 
     It 'uses only the host badge when a remote home session has no repo' {

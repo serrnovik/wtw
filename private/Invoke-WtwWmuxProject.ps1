@@ -228,6 +228,62 @@ function Test-WtwWmuxPresent {
     return [bool](Get-WtwWmuxInvoker)
 }
 
+function ConvertTo-WtwWmuxCliOutput {
+    <#
+    .SYNOPSIS
+        Drop packaged-Electron NODE_OPTIONS stderr so only CLI text remains.
+    #>
+    [CmdletBinding()]
+    param($Raw)
+
+    $lines = foreach ($item in @($Raw)) {
+        foreach ($line in ("$item" -split '\r?\n')) { $line }
+    }
+    $kept = foreach ($line in $lines) {
+        if ($line -match 'NODE_OPTIONS are not supported in packaged apps') { continue }
+        $line
+    }
+    return (($kept -join [Environment]::NewLine).Trim())
+}
+
+function Get-WtwWmuxProcessEnvSnapshot {
+    [CmdletBinding()]
+    param()
+
+    return [pscustomobject]@{
+        WSLENV          = $env:WSLENV
+        WSL_DISTRO_NAME = $env:WSL_DISTRO_NAME
+        NODE_OPTIONS    = $env:NODE_OPTIONS
+    }
+}
+
+function Reset-WtwWmuxProcessEnv {
+    <#
+    .SYNOPSIS
+        Clear inherited Windows Terminal / Electron env that breaks the wmux CLI.
+    #>
+    [CmdletBinding()]
+    param()
+
+    Remove-Item Env:WSLENV -ErrorAction SilentlyContinue
+    Remove-Item Env:WSL_DISTRO_NAME -ErrorAction SilentlyContinue
+    Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue
+}
+
+function Restore-WtwWmuxProcessEnv {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Snapshot)
+
+    foreach ($name in @('WSLENV', 'WSL_DISTRO_NAME', 'NODE_OPTIONS')) {
+        $value = $Snapshot.$name
+        if ($null -eq $value -or $value -eq '') {
+            Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+        } else {
+            Set-Item -Path "Env:$name" -Value $value
+        }
+    }
+}
+
 function Invoke-WtwWmuxCommand {
     [CmdletBinding()]
     param(
@@ -244,16 +300,19 @@ function Invoke-WtwWmuxCommand {
     Write-Verbose "wmux command: $($invoker.Exe) $($allArgs -join ' ')"
 
     $previousElectron = $env:ELECTRON_RUN_AS_NODE
+    $envSnapshot = Get-WtwWmuxProcessEnvSnapshot
     try {
+        Reset-WtwWmuxProcessEnv
         if ($invoker.ElectronAsNode) {
             $env:ELECTRON_RUN_AS_NODE = '1'
         }
         $output = & $invoker.Exe @allArgs 2>&1
-        $outputText = $output -join [Environment]::NewLine
+        $outputText = ConvertTo-WtwWmuxCliOutput -Raw $output
         $exitCode = $LASTEXITCODE
         if ($null -eq $exitCode) { $exitCode = 0 }
         return [PSCustomObject]@{ ExitCode = $exitCode; Output = $outputText }
     } finally {
+        Restore-WtwWmuxProcessEnv -Snapshot $envSnapshot
         if ($null -eq $previousElectron -or $previousElectron -eq '') {
             Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
         } else {
@@ -267,11 +326,23 @@ function ConvertFrom-WtwWmuxJsonOutput {
     param([string] $Output)
 
     if ([string]::IsNullOrWhiteSpace($Output)) { return $null }
-    try {
-        return $Output | ConvertFrom-Json -Depth 100 -ErrorAction Stop
-    } catch {
-        return $null
+
+    $clean = ConvertTo-WtwWmuxCliOutput -Raw $Output
+    foreach ($candidate in @($clean, $(
+        if ($clean) {
+            $start = $clean.IndexOfAny([char[]]@('{', '['))
+            if ($start -ge 0) { $clean.Substring($start) }
+        }
+    ))) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        try {
+            return $candidate | ConvertFrom-Json -Depth 100 -ErrorAction Stop
+        } catch {
+            continue
+        }
     }
+
+    return $null
 }
 
 function Get-WtwWmuxObjectValue {
@@ -475,6 +546,10 @@ function Open-WtwWmuxProject {
     $existing = Find-WtwWmuxWorkspace -PrettyName $PrettyName -ProjectPath $fullPath
     if ($existing) {
         $wsId = Get-WtwWmuxObjectValue -Object $existing -Names @('id', 'workspaceId', 'ref')
+        $existingTitle = Get-WtwWmuxObjectValue -Object $existing -Names @('title', 'name', 'displayName')
+        if ($wsId -and $PrettyName -and -not [string]::Equals("$existingTitle", $PrettyName, [StringComparison]::Ordinal)) {
+            Invoke-WtwWmuxCommand -ArgumentList @('rename-workspace', "$wsId", $PrettyName) | Out-Null
+        }
         if ($wsId) { Invoke-WtwWmuxCommand -ArgumentList @('select-workspace', "$wsId") | Out-Null }
         return [PSCustomObject]@{
             Success = $true; Created = $false; WorkspaceName = $PrettyName; Path = $fullPath; Id = $wsId; Reason = $null
