@@ -149,7 +149,7 @@ _wtw_list_has() {
 # subcommands to pwsh. Get-WtwCliCommandNames is the source of truth; install
 # refreshes this list via `wtw __shell_state`. `go` stays native (parent cd).
 _wtw_passthrough_commands=(
-    init add create list ls info show open
+    init add create import list ls info show open
     remove rm delete del unregister unreg
     edit rename ren workspace ws copy sync color clean
     host self agent install update reload skill sbx help version run
@@ -161,7 +161,7 @@ _wtw_passthrough_commands=(
     ss superset supersetsh
     cursor cur code co antigravity anti ag windsurf wind codium vscodium
 )
-_wtw_refresh_commands=(init add create remove rm delete del unregister unreg edit rename ren host)
+_wtw_refresh_commands=(init add create import remove rm delete del unregister unreg edit rename ren host)
 _wtw_known_hosts=()
 
 # Native zsh completion. PowerShell's Register-ArgumentCompleter does not apply
@@ -174,6 +174,7 @@ _wtw_completion() {
         'init:Register the current repository'
         'add:Register an existing worktree'
         'create:Create a worktree and workspace'
+        'import:Check out a worktree from another machine'
         'list:List registered repositories and worktrees'
         'info:Show full details for a repo or worktree'
         'show:Alias for info'
@@ -232,6 +233,9 @@ _wtw_completion() {
             create)
                 options=('--name:display name' '--folder:worktree folder' '--branch:existing branch' '--color:workspace color' '--repo:repository' '--open:open after creation' '--no-branch:do not create a branch' '--from:base branch' '--gt-track:Graphite parent')
                 ;;
+            import)
+                options=('--from:machine the worktree is on' '--via:transport' '--dry-run:preview without creating')
+                ;;
             list|ls)
                 options=('-d:detailed view' '--detailed:detailed view' '--wide:untruncated columns' '--repo:repository' '-f:substring filter' '--filter:substring filter')
                 ;;
@@ -261,6 +265,17 @@ _wtw_completion() {
             _describe -t options 'wtw option' options
         fi
         return 0
+    fi
+
+    if [[ "$subcommand" == import ]]; then
+        case "${words[CURRENT-1]}" in
+            --from|--at|--on)
+                if (( ${#_wtw_known_hosts[@]} )); then
+                    _describe -t hosts 'wtw host' _wtw_known_hosts
+                fi
+                return 0
+                ;;
+        esac
     fi
 
     targets=("${_wtw_registered_aliases[@]}")

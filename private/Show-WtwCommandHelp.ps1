@@ -96,6 +96,31 @@ function Show-WtwCommandHelp {
             '  wtw create initiative-016 --from MS-phase-5-swim-polish   # stack on another branch',
             '  wtw create auth --color "forest green"'
         ) }
+        'import'      { @(
+            'wtw import --from <host> <name>',
+            'Check out a worktree that already exists on another machine.',
+            'Both clones must share a git remote. The branch and commit come',
+            'across, along with the color, emoji, pretty name, and aliases.',
+            'If that branch is already checked out here, import stops.',
+            '',
+            'Arguments:',
+            '  name    Same search as wtw go on that machine (task, alias, pretty name)',
+            '',
+            'Options:',
+            '  --from <host>     Machine the worktree is on. Same matching as --on / --at',
+            '                    (name, alias, or a unique prefix).',
+            '  --via <transport> tailscale | zerotier | mdns | lan',
+            '  --dry-run         Show repo, branch, and commit without creating a worktree',
+            '',
+            'wtw --on <host> import <name> is the same command. Uncommitted files',
+            'stay on the other machine. A local branch that is ahead of that commit,',
+            'or has diverged from it, is left alone.',
+            '',
+            'Examples:',
+            '  wtw import --from at auth',
+            '  wtw import --from workstation "PF037 gamification" --dry-run',
+            '  wtw --on at import auth'
+        ) }
         'list'        { @('wtw list [repo] [-f|--filter <text>]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Exact repo name or alias (optional)', '', 'Options:', '  -f, --filter     Substring match on repo / alias / worktree / pretty name', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)', '', 'A matching repo includes all of its worktrees. A matching worktree', 'keeps its parent repo row. `wtw list kul` still needs an exact repo;', 'use `wtw list -f kul` for kulissa-*.') }
         'ls'          { @('wtw list [repo] [-f|--filter <text>]', 'List registered repos and their worktrees.', '', 'Arguments:', '  repo    Exact repo name or alias (optional)', '', 'Options:', '  -f, --filter     Substring match on repo / alias / worktree / pretty name', '  -d, --detailed   Card layout with file links', '  --wide           Full aliases, paths, and branch names (no truncation)', '', 'A matching repo includes all of its worktrees. A matching worktree', 'keeps its parent repo row. `wtw list kul` still needs an exact repo;', 'use `wtw list -f kul` for kulissa-*.') }
         'info'        { @('wtw info <name>', 'Show full details for a repo or all its worktrees.', '', 'Arguments:', '  name    Anything wtw go accepts: repo alias, task name, alias-task combo, prefix, or fuzzy', '', 'Alias: wtw show') }

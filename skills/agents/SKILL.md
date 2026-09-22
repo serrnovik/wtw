@@ -7,7 +7,8 @@ description: |
   Triggers: "create worktree", "new branch workspace", "switch worktree",
   "clean worktrees", "stale worktrees", "worktree disk usage",
   "set workspace color", "change color", "random color",
-  "rename worktree", "edit registry", "change worktree name".
+  "rename worktree", "edit registry", "change worktree name",
+  "import worktree", "sync worktree from another machine".
 metadata:
   version: 0.1.0
 ---
@@ -28,6 +29,9 @@ Run all commands via `pwsh -Command`:
 ```bash
 # Create a worktree + workspace + branch + optional AI-tool project metadata
 pwsh -Command "wtw create <task> [--branch X] [--open] [--emoji X]"
+
+# Check out a worktree that already exists on another machine (same git remote)
+pwsh -Command "wtw import --from <host> <name> [--dry-run] [--via tailscale]"
 
 # Switch to a worktree
 pwsh -Command "wtw go <name>"

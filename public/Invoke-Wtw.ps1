@@ -92,6 +92,7 @@ function Invoke-Wtw {
         Write-WtwHost '    init [aliases]    Initialise current repo as a main repo (--template, --startup-script, --emoji)'
         Write-WtwHost '    add [path]        Adopt an existing on-disk worktree with full registration (workspace + color + cmux/SourceGit/etc.)'
         Write-WtwHost '    create <task>     Create worktree + branch (--emoji for identity glyph; --branch / --adopt to attach an existing branch)'
+        Write-WtwHost '    import --from <host> <name>  Check out a worktree from another machine (same git remote)'
         Write-WtwHost '    list [repo] [-f|--filter <text>] [-d|--detailed] [--wide]  List repos/worktrees'
         Write-WtwHost '    info <name>       Show full details for a repo or worktree  (alias: show)'
         Write-WtwHost '    go <name>         Switch to worktree (cd + session init)'
@@ -198,6 +199,14 @@ function Invoke-Wtw {
             Write-WtwHost "  via $requestedVia → $($hostEntry.Name)" -ForegroundColor DarkGray
             # Consumed locally — the remote CLI has no --via.
             $rawArgs = Remove-WtwFlagWithValue -ArgList $rawArgs -Flag 'via'
+        }
+
+        # import reads the other machine and writes a worktree here. `--on` /
+        # `--at` are the same host selector as `--from` when the command is import.
+        if ($Command -eq 'import') {
+            $importName = if ($remotePos.Count -gt 0) { Join-WtwTargetName $remotePos } else { '' }
+            Import-WtwWorktree -HostEntry $hostEntry -Name $importName -DryRun:([bool]$remoteSplat.Contains('DryRun'))
+            return
         }
 
         # Interactive ssh into the worktree — the remote sibling of `wtw go`.
@@ -340,6 +349,22 @@ function Invoke-Wtw {
                 $splat.Remove('Name')
             }
             New-WtwWorktree @splat
+        }
+        'import'  {
+            if ($splat.Contains('From') -and $splat['From'] -is [System.Management.Automation.SwitchParameter]) {
+                Write-Error 'Usage: wtw import --from <host> <name>'
+                return
+            }
+            $fromHost = if ($splat.Contains('From')) { [string]$splat['From'] } else { $null }
+            if ([string]::IsNullOrWhiteSpace($fromHost)) {
+                Write-Error 'Usage: wtw import --from <host> <name>'
+                return
+            }
+            $importName = if ($pos.Count -gt 0) { Join-WtwTargetName $pos } else { '' }
+            $importSplat = @{ From = $fromHost; Name = $importName }
+            if ($splat.Contains('Via')) { $importSplat['Via'] = [string]$splat['Via'] }
+            if ($splat.Contains('DryRun')) { $importSplat['DryRun'] = $true }
+            Import-WtwWorktree @importSplat
         }
         'list'    {
             if ($splat.Contains('f') -and $splat['f'] -is [System.Management.Automation.SwitchParameter]) {
@@ -501,6 +526,14 @@ function Invoke-Wtw {
                 repoEmoji  = (Get-WtwRepoEmoji -RepoEntry $target.RepoEntry)
                 task       = $target.TaskName
             } | ConvertTo-Json -Compress -Depth 5 | Write-Output
+        }
+        '__export_json' {
+            # Single-line snapshot ``wtw import`` reads over ssh. Same name
+            # resolution as ``wtw go``. Stdout is JSON only.
+            if ($pos.Count -eq 0) { Write-Error "Usage: wtw __export_json <name>"; return }
+            $export = Get-WtwWorktreeExport -Name (Join-WtwTargetName $pos)
+            if (-not $export) { exit 1 }
+            $export | ConvertTo-Json -Compress -Depth 8 | Write-Output
         }
         '__resolve' {
             # Output: path\tcolor\ttitle\tstartup_script\tworktree_id\tworktree_index

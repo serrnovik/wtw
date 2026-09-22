@@ -138,7 +138,7 @@ _wtw_list_has() {
 # subcommands to pwsh. Get-WtwCliCommandNames is the source of truth; install
 # refreshes this list via `wtw __shell_state`. `go` stays native (parent cd).
 _wtw_passthrough_commands=(
-    init add create list ls info show open
+    init add create import list ls info show open
     remove rm delete del unregister unreg
     edit rename ren workspace ws copy sync color clean
     host self agent install update reload skill sbx help version run
@@ -150,7 +150,7 @@ _wtw_passthrough_commands=(
     ss superset supersetsh
     cursor cur code co antigravity anti ag windsurf wind codium vscodium
 )
-_wtw_refresh_commands=(init add create remove rm delete del unregister unreg edit rename ren host)
+_wtw_refresh_commands=(init add create import remove rm delete del unregister unreg edit rename ren host)
 _wtw_known_hosts=()
 
 # Main wtw function
