@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.39'
+    ModuleVersion     = '0.2.40'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -15,6 +15,7 @@
         'Get-WtwList'
         'Get-WtwUpdateStatus'
         'Get-WtwWindowTitle'
+        'Import-WtwWorktree'
         'Initialize-WtwConfig'
         'Install-Wtw'
         'Install-WtwSkill'
@@ -40,7 +41,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'When ssh dies because PowerShell''s startup cache is corrupt, wtw prints the command that clears it (on macOS: rm -rf ~/Library/Caches/powershell ~/.cache/powershell) instead of only the raw exception.'
+            ReleaseNotes = 'wtw import --from <host> <name> checks out a worktree that already exists on another machine when both clones share a git remote, including its branch, commit, color, emoji, and aliases. It stops when that branch is already checked out here. When ssh dies because PowerShell''s startup cache is corrupt, wtw prints the command that clears it (on macOS: rm -rf ~/Library/Caches/powershell ~/.cache/powershell) instead of only the raw exception.'
         }
     }
 }

@@ -12,7 +12,7 @@ function Get-WtwCliCommandNames {
     param()
 
     $core = @(
-        'init', 'add', 'create', 'list', 'ls', 'info', 'show', 'go', 'open',
+        'init', 'add', 'create', 'import', 'list', 'ls', 'info', 'show', 'go', 'open',
         'remove', 'rm', 'delete', 'del', 'unregister', 'unreg',
         'edit', 'rename', 'ren', 'workspace', 'ws', 'copy', 'sync', 'color', 'clean',
         'host', 'self', 'agent', 'install', 'update', 'reload', 'skill', 'sbx', 'help', 'version', 'run',
@@ -54,7 +54,7 @@ function Get-WtwCliMutatingCommandNames {
     param()
 
     return @(
-        'init', 'add', 'create', 'remove', 'rm', 'delete', 'del',
+        'init', 'add', 'create', 'import', 'remove', 'rm', 'delete', 'del',
         'unregister', 'unreg', 'edit', 'rename', 'ren', 'host'
     )
 }

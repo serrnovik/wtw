@@ -107,7 +107,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
 
     $knownSubcommands = @(
         (Get-WtwCliCommandNames)
-        '__resolve', '__resolve_json', '__aliases', '__commands', '__hosts', '__shell_state'
+        '__resolve', '__resolve_json', '__export_json', '__aliases', '__commands', '__hosts', '__shell_state'
     )
 
     $targetSubcommands = @(
@@ -124,7 +124,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     # `--on <host>` value completion (`--at` is the same flag).
     if ($elems.Count -ge 2) {
         $prevToken = $elems[$elems.Count - 2].Extent.Text
-        if ($prevToken -ieq '--on' -or $prevToken -ieq '--at') {
+        $importFrom = ($prevToken -ieq '--from') -and (@($elems | ForEach-Object { $_.Extent.Text }) -contains 'import')
+        if ($prevToken -ieq '--on' -or $prevToken -ieq '--at' -or $importFrom) {
             Get-WtwHostNames | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
                 [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', "remote host $_")
             }
@@ -138,6 +139,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'init';   Tip = 'Register current repo in wtw' }
             @{ Name = 'add';    Tip = 'Add existing repo/worktree to registry' }
             @{ Name = 'create'; Tip = 'Create worktree + workspace' }
+            @{ Name = 'import'; Tip = 'Check out a worktree from another machine' }
             @{ Name = 'list';   Tip = 'List registered worktrees' }
             @{ Name = 'info';   Tip = 'Show full details for a repo or worktree' }
             @{ Name = 'show';   Tip = 'Alias for info' }
@@ -256,6 +258,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'skill'  { @('--agent') }
             'add'    { @('--repo', '--task', '--branch', '--name', '--emoji', '--color', '--alias', '--sourcegit-folder', '--no-sourcegit-folder') }
             'create' { @('--name', '--emoji', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track', '--alias') }
+            'import' { @('--from', '--via', '--dry-run') }
             'clean'  { @('--dry-run', '--force', '--all', '--worktrees', '--linked', '--extra', '--branches') }
             'remove' { @('--repo', '--force') }
             'rm'     { @('--repo', '--force') }
