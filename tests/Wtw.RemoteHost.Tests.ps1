@@ -221,7 +221,8 @@ Describe 'Test-WtwIsSshTransportError' {
             'ssh: Could not resolve hostname foo',
             'ssh: connect to host x port 22: Connection refused',
             'ssh: connect to host x port 22: Connection timed out',
-            'wtw-pwsh-not-found') {
+            'wtw-pwsh-not-found',
+            "Unhandled exception. System.IO.FileLoadException: The given assembly name was invalid.`ncommand 'pwsh' exited abnormally`nmatch exec error") {
             Test-WtwIsSshTransportError -ErrorText $text | Should -BeTrue -Because "'$text' is an ssh problem"
         }
     }
@@ -292,6 +293,44 @@ Describe 'Format-WtwSshError' {
     It 'passes an unrecognised failure through verbatim' {
         Format-WtwSshError -HostEntry $script:entry -ErrorText 'kex_exchange_identification: boom' |
             Should -Match 'kex_exchange_identification: boom'
+    }
+
+    It 'tells you to delete the local startup cache when the ssh hook aborts' {
+        # The Match exec pwsh dies before the connection. ssh prints the crash
+        # and then "exited abnormally". The useful reply is the delete command
+        # for THIS machine, which is where the hook ran.
+        $raw = @'
+Unhandled exception. System.IO.FileLoadException: The given assembly name was invalid.
+File name: 'System.Collections.Specialized, Version=10.0.0.0, Culture=neutral, PublicKey'
+   at System.Reflection.AssemblyNameParser.Parse(ReadOnlySpan`1 name)
+command 'pwsh -NoProfile -File /Users/sno/.ssh/home-lab-renew.ps1' exited abnormally
+/Users/sno/.ssh/config.d/home-lab line 36: match exec error
+'@
+        $msg = Format-WtwSshError -HostEntry $script:entry -ErrorText $raw
+        $msg | Should -Match 'startup cache'
+        $msg | Should -Match 'this machine'
+        $msg | Should -Match ([regex]::Escape((Get-WtwPwshStartupCacheClearCommand -Platform (Get-WtwLocalOsPlatform))))
+        $msg | Should -Not -Match 'kex_exchange'
+    }
+
+    It 'points a remote startup-cache crash at that host''s platform' {
+        $raw = "Unhandled exception. System.IO.FileLoadException: The given assembly name was invalid.`nFile name: 'System.Collections.Specialized, PublicKey'"
+        $mac = @{ Name = 'laptop'; User = 'dev'; HostName = 'laptop.local'; Platform = 'macos' }
+        $msg = Format-WtwSshError -HostEntry $mac -ErrorText $raw
+        $msg | Should -Match 'laptop'
+        $msg | Should -Match 'rm -rf ~/Library/Caches/powershell ~/.cache/powershell'
+        $msg | Should -Not -Match 'this machine'
+    }
+}
+
+Describe 'Get-WtwPwshStartupCacheClearCommand' {
+    It 'prints the command that clears each platform''s startup cache' {
+        Get-WtwPwshStartupCacheClearCommand -Platform macos |
+            Should -Be 'rm -rf ~/Library/Caches/powershell ~/.cache/powershell'
+        Get-WtwPwshStartupCacheClearCommand -Platform linux |
+            Should -Be 'rm -rf ~/.cache/powershell'
+        Get-WtwPwshStartupCacheClearCommand -Platform windows |
+            Should -Match 'StartupProfileData-'
     }
 }
 

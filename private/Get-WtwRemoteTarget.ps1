@@ -1,3 +1,66 @@
+function Get-WtwLocalOsPlatform {
+    <#
+    .SYNOPSIS
+        macos, linux, or windows for the machine running this wtw.
+    #>
+    [CmdletBinding()]
+    param()
+
+    if ($IsMacOS) { return 'macos' }
+    if ($IsLinux) { return 'linux' }
+    return 'windows'
+}
+
+function Get-WtwPwshStartupCacheClearCommand {
+    <#
+    .SYNOPSIS
+        The command that deletes a corrupt PowerShell startup cache.
+    .DESCRIPTION
+        pwsh writes StartupProfileData on startup and reads it back the next
+        time a non-interactive process starts. Parallel pwsh processes race on
+        that file and leave an assembly name truncated mid-token, so the next
+        pwsh aborts with FileLoadException before any script runs. Deleting the
+        cache is the fix; the directory differs per OS.
+    .PARAMETER Platform
+        macos, linux, or windows. Anything else is treated as windows.
+    #>
+    [CmdletBinding()]
+    param(
+        [string] $Platform = 'windows'
+    )
+
+    switch ($Platform) {
+        'macos' { return 'rm -rf ~/Library/Caches/powershell ~/.cache/powershell' }
+        'linux' { return 'rm -rf ~/.cache/powershell' }
+        default {
+            return 'Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Microsoft\Windows\PowerShell\StartupProfileData-*"'
+        }
+    }
+}
+
+function Test-WtwIsPwshStartupCacheError {
+    <#
+    .SYNOPSIS
+        Did pwsh abort because its startup cache is corrupt?
+    .DESCRIPTION
+        The exception names an assembly whose PublicKeyToken was cut off
+        ("PublicKey" plus garbage). ssh's Match exec reports the same crash as
+        "exited abnormally": the process died on a signal, which ssh treats as
+        fatal, so the connection never starts. A normal non-zero exit from the
+        hook does not look like this.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()] [string] $ErrorText)
+
+    if (-not $ErrorText) { return $false }
+    return (
+        $ErrorText -match 'The given assembly name was invalid' -or
+        $ErrorText -match 'AssemblyNameParser' -or
+        ($ErrorText -match 'FileLoadException' -and $ErrorText -match 'PublicKey') -or
+        ($ErrorText -match 'exited abnormally' -and $ErrorText -match 'match exec|home-lab-renew\.ps1')
+    )
+}
+
 function Test-WtwIsSshTransportError {
     <#
     .SYNOPSIS
@@ -22,7 +85,8 @@ function Test-WtwIsSshTransportError {
         $ErrorText -match 'Connection timed out|No route to host' -or
         $ErrorText -match 'wtw-pwsh-not-found' -or
         $ErrorText -match 'command not found: pwsh|pwsh: command not found' -or
-        $ErrorText -match "'pwsh' is not recognized")
+        $ErrorText -match "'pwsh' is not recognized" -or
+        (Test-WtwIsPwshStartupCacheError -ErrorText $ErrorText))
 }
 
 function Format-WtwSshError {
@@ -92,6 +156,34 @@ function Format-WtwSshError {
 
     if ($text -match 'Connection timed out|No route to host') {
         return "No answer from '$($HostEntry.HostName)'. Is the machine awake and on the same network? Re-probe with: wtw host sync"
+    }
+
+    if (Test-WtwIsPwshStartupCacheError -ErrorText $text) {
+        # Match exec runs on the machine that invoked ssh. A FileLoadException
+        # without that hook is the remote pwsh dying the same way.
+        $onClient = $text -match 'match exec|home-lab-renew\.ps1|config\.d/home-lab'
+        $platform = if ($onClient) {
+            Get-WtwLocalOsPlatform
+        } elseif ($HostEntry.Platform) {
+            [string] $HostEntry.Platform
+        } else {
+            Get-WtwLocalOsPlatform
+        }
+        $clear = Get-WtwPwshStartupCacheClearCommand -Platform $platform
+        if ($onClient) {
+            return @(
+                "PowerShell on this machine aborted while starting, so ssh never connected to '$($HostEntry.Name)'."
+                "Its startup cache is corrupt. Several pwsh processes started together and wrote a bad cache,"
+                "and the non-interactive pwsh ssh launches (the certificate hook) dies on it."
+                "Fix: $clear"
+                "Then retry the same wtw command."
+            ) -join "`n"
+        }
+        return @(
+            "PowerShell on '$($HostEntry.Name)' aborted while starting. Its startup cache is corrupt."
+            "Fix: $clear"
+            "Run that on $($HostEntry.Name), then retry."
+        ) -join "`n"
     }
 
     return "ssh to '$($HostEntry.Name)' failed: $text"
