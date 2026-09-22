@@ -205,7 +205,10 @@ function Invoke-Wtw {
         # `--at` are the same host selector as `--from` when the command is import.
         if ($Command -eq 'import') {
             $importName = if ($remotePos.Count -gt 0) { Join-WtwTargetName $remotePos } else { '' }
-            Import-WtwWorktree -HostEntry $hostEntry -Name $importName -DryRun:([bool]$remoteSplat.Contains('DryRun'))
+            $importSplat = @{ HostEntry = $hostEntry; Name = $importName }
+            if ($remoteSplat.Contains('DryRun')) { $importSplat['DryRun'] = $true }
+            if ($remoteSplat.Contains('Repo')) { $importSplat['Repo'] = [string]$remoteSplat['Repo'] }
+            Import-WtwWorktree @importSplat
             return
         }
 
@@ -364,6 +367,7 @@ function Invoke-Wtw {
             $importSplat = @{ From = $fromHost; Name = $importName }
             if ($splat.Contains('Via')) { $importSplat['Via'] = [string]$splat['Via'] }
             if ($splat.Contains('DryRun')) { $importSplat['DryRun'] = $true }
+            if ($splat.Contains('Repo')) { $importSplat['Repo'] = [string]$splat['Repo'] }
             Import-WtwWorktree @importSplat
         }
         'list'    {

@@ -369,6 +369,93 @@ function Find-WtwLocalRepoByGitRemotes {
     return , @($found)
 }
 
+function Select-WtwImportLocalRepo {
+    <#
+    .SYNOPSIS
+        Pick which local clone receives an imported worktree.
+    .DESCRIPTION
+        Several registered repos often share one git remote (snowmain1 and
+        snowmain2). That is not two copies of the worktree. The worktree name
+        stays the search on the other machine. The local clone is the one wtw
+        tracks under that repo name or alias, then the one that already has
+        worktrees, then the current directory.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Matches,
+        [AllowNull()] $Snapshot,
+        [string] $Repo,
+        [string] $Task
+    )
+
+    $list = @($Matches | Where-Object { $_ })
+    if ($Repo) {
+        $picked = @($list | Where-Object {
+            $_.RepoName -eq $Repo -or (Test-WtwAliasMatch -Repo $_.RepoEntry -Name $Repo)
+        })
+        if ($picked.Count -eq 0) {
+            $names = ($list | ForEach-Object { $_.RepoName }) -join ', '
+            Write-Error "'$Repo' is not one of the local clones of that remote ($names)."
+            return $null
+        }
+        if ($picked.Count -eq 1) { return $picked[0] }
+        $list = @($picked)
+    }
+
+    if ($list.Count -le 1) {
+        if ($list.Count -eq 1) { return $list[0] }
+        return $null
+    }
+
+    $wanted = @()
+    $remoteRepo = [string](Get-WtwPropertyValue -Object $Snapshot -Name 'repo')
+    if ($remoteRepo) { $wanted += $remoteRepo }
+    foreach ($alias in @(Get-WtwPropertyValue -Object $Snapshot -Name 'repoAliases')) {
+        if ($alias) { $wanted += [string]$alias }
+    }
+    if ($wanted.Count -gt 0) {
+        $byName = @($list | Where-Object {
+            $repoName = $_.RepoName
+            $entry = $_.RepoEntry
+            foreach ($want in $wanted) {
+                if ($repoName -eq $want -or (Test-WtwAliasMatch -Repo $entry -Name $want)) { return $true }
+            }
+            return $false
+        })
+        if ($byName.Count -eq 1) {
+            $trackedAs = if ($remoteRepo) { $remoteRepo } else { $wanted[0] }
+            $others = (($list | Where-Object { $_.RepoName -ne $byName[0].RepoName } | ForEach-Object { $_.RepoName }) -join ', ')
+            Write-WtwHost "  Using '$($byName[0].RepoName)'. That is the local repo wtw tracks as '$trackedAs'. Also registered: $others." -ForegroundColor DarkGray
+            return $byName[0]
+        }
+    }
+
+    $withWorktrees = @($list | Where-Object {
+        $tasks = Get-WtwPropertyValue -Object $_.RepoEntry -Name 'worktrees'
+        $tasks -and (Get-WtwPropertyNames -Object $tasks).Count -gt 0
+    })
+    if ($withWorktrees.Count -eq 1) {
+        $others = (($list | Where-Object { $_.RepoName -ne $withWorktrees[0].RepoName } | ForEach-Object { $_.RepoName }) -join ', ')
+        Write-WtwHost "  Using '$($withWorktrees[0].RepoName)'. That is the clone wtw is tracking. Also registered: $others." -ForegroundColor DarkGray
+        return $withWorktrees[0]
+    }
+
+    $cwdHit = Get-WtwRepoFromCwd
+    $cwdName = if ($cwdHit) { [string]$cwdHit[0] } else { '' }
+    if ($cwdName) {
+        $inside = @($list | Where-Object { $_.RepoName -eq $cwdName })
+        if ($inside.Count -eq 1) {
+            $others = (($list | Where-Object { $_.RepoName -ne $cwdName } | ForEach-Object { $_.RepoName }) -join ', ')
+            Write-WtwHost "  This directory is in '$cwdName', so import uses that clone. Also registered: $others." -ForegroundColor DarkGray
+            return $inside[0]
+        }
+    }
+
+    $names = ($list | ForEach-Object { $_.RepoName }) -join ', '
+    Write-Error "More than one local clone shares that git remote: $names. '$Task' is one worktree on the other machine. cd into the clone that should receive it, or pass --repo <name>."
+    return $null
+}
+
 function Find-WtwBranchCheckout {
     <#
     .SYNOPSIS
@@ -522,6 +609,7 @@ function Import-WtwWorktreeSnapshot {
     param(
         [Parameter(Mandatory)] $Snapshot,
         [string] $SourceName = 'remote',
+        [string] $Repo,
         [switch] $DryRun
     )
 
@@ -542,17 +630,13 @@ function Import-WtwWorktreeSnapshot {
     # Find returns `, @()`. @() around that would nest the match list.
     $localMatches = Find-WtwLocalRepoByGitRemotes -Remotes $remotes
     if ($null -eq $localMatches) { $localMatches = @() }
-    if ($localMatches.Count -gt 1) {
-        $names = ($localMatches | ForEach-Object { $_.RepoName }) -join ', '
-        Write-Error "More than one local repo shares that git remote: $names. Unregister the extra checkout so import can tell which one you mean."
-        return
-    }
     if ($localMatches.Count -eq 0) {
         $shown = (@($remotes | ForEach-Object { Get-WtwPropertyValue -Object $_ -Name 'url' }) | Select-Object -First 3) -join ', '
         Write-Error "No local repo shares a git remote with '$task' on $SourceName ($shown). Clone it and run 'wtw init' in that checkout first."
         return
     }
-    $local = $localMatches[0]
+    $local = Select-WtwImportLocalRepo -Matches $localMatches -Snapshot $Snapshot -Repo $Repo -Task $task
+    if (-not $local) { return }
 
     $repoName = [string](Get-WtwPropertyValue -Object $local -Name 'RepoName')
     $repoEntry = $local.RepoEntry

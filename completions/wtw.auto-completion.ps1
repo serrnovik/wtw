@@ -258,7 +258,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'skill'  { @('--agent') }
             'add'    { @('--repo', '--task', '--branch', '--name', '--emoji', '--color', '--alias', '--sourcegit-folder', '--no-sourcegit-folder') }
             'create' { @('--name', '--emoji', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track', '--alias') }
-            'import' { @('--from', '--via', '--dry-run') }
+            'import' { @('--from', '--via', '--dry-run', '--repo') }
             'clean'  { @('--dry-run', '--force', '--all', '--worktrees', '--linked', '--extra', '--branches') }
             'remove' { @('--repo', '--force') }
             'rm'     { @('--repo', '--force') }

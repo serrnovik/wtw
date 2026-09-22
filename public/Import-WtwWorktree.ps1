@@ -18,6 +18,9 @@ function Import-WtwWorktree {
         Worktree search text, as you would pass to ``wtw go`` on that machine.
     .PARAMETER Via
         One-off transport: tailscale, zerotier, mdns, or lan.
+    .PARAMETER Repo
+        Local clone that should receive the worktree when more than one
+        registered repo shares that git remote.
     .PARAMETER DryRun
         Print the repo, branch, and commit without creating a worktree.
     .PARAMETER HostEntry
@@ -33,6 +36,7 @@ function Import-WtwWorktree {
         [string] $From,
         [string] $Name,
         [string] $Via,
+        [string] $Repo,
         [switch] $DryRun,
         $HostEntry
     )
@@ -74,5 +78,5 @@ function Import-WtwWorktree {
     $snapshot = Get-WtwRemoteWorktreeExport -HostEntry $HostEntry -Name $Name
     if (-not $snapshot) { return }
 
-    Import-WtwWorktreeSnapshot -Snapshot $snapshot -SourceName $HostEntry.Name -DryRun:$DryRun
+    Import-WtwWorktreeSnapshot -Snapshot $snapshot -SourceName $HostEntry.Name -Repo $Repo -DryRun:$DryRun
 }

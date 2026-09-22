@@ -96,6 +96,40 @@ Describe 'Resolve-WtwTarget worktree aliases and branches' {
         }
     }
 
+    It 'matches a task name in any case when only one worktree fits' {
+        InModuleScope wtw {
+            $reg = Get-WtwRegistry
+            $reg.repos.snowmain1.worktrees | Add-Member -NotePropertyName 'NTB-real-dogfood' -NotePropertyValue ([PSCustomObject]@{
+                    path       = '/tmp/ntb'
+                    branch     = 'NTB-real-dogfood'
+                    prettyName = 'NTB-real-dogfood'
+                }) -Force
+            Save-WtwRegistry $reg
+            (Resolve-WtwTarget 'ntb-real-dogfood').TaskName | Should -Be 'NTB-real-dogfood'
+            (Resolve-WtwTarget 'NTb-real-dogfood').TaskName | Should -Be 'NTB-real-dogfood'
+        }
+    }
+
+    It 'refuses when two task names differ only by case' {
+        InModuleScope wtw {
+            $reg = Get-WtwRegistry
+            $reg.repos.snowmain1.worktrees | Add-Member -NotePropertyName 'NTB-real-dogfood' -NotePropertyValue ([PSCustomObject]@{
+                    path = '/tmp/ntb-upper'; branch = 'NTB-real-dogfood'; prettyName = 'upper'
+                }) -Force
+            $reg.repos | Add-Member -NotePropertyName 'snowmain2' -NotePropertyValue ([PSCustomObject]@{
+                    mainPath  = '/tmp/snowmain2'
+                    aliases   = @('sn2')
+                    worktrees = [PSCustomObject]@{
+                        'ntb-real-dogfood' = [PSCustomObject]@{
+                            path = '/tmp/ntb-lower'; branch = 'ntb-real-dogfood'; prettyName = 'lower'
+                        }
+                    }
+                }) -Force
+            Save-WtwRegistry $reg
+            { Resolve-WtwTarget 'ntb-real-dogfood' -ErrorAction Stop } | Should -Throw -ExpectedMessage '*Ambiguous*'
+        }
+    }
+
     It 'joins leftover go words so unquoted aliases still resolve' {
         InModuleScope wtw {
             Mock Enter-WtwWorktree { }
