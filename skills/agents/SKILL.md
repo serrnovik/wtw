@@ -64,8 +64,8 @@ pwsh -Command "wtw host self --emoji 🍏 --label SP"  # this machine's cmux gro
 pwsh -Command "wtw --version"                      # running module version (aliases: -v, version)
 pwsh -Command "wtw wmux [name]"                    # Windows wmux workspace
 
-# Clean stale AI worktrees and/or leftover merged local branches
-pwsh -Command "wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]"
+# Clean stale AI / unregistered git worktrees, extra linked worktrees, and/or leftover merged local branches
+pwsh -Command "wtw clean [--worktrees] [--linked] [--branches] [--all] [--dry-run] [--force]"
 
 # Sync templates
 pwsh -Command "wtw sync --all [--dry-run]"
@@ -141,6 +141,8 @@ When editing `.code-workspace.template` files, agents can use the following plac
 
 - NEVER run `wtw clean` without `--dry-run` first
 - `wtw clean --branches` only deletes branches already merged into the default branch (`git branch -d`). Branches still checked out in a worktree are skipped.
+- `wtw clean --worktrees` also lists extra git worktrees that are not in the wtw registry (the ones Fork shows that `wtw list` misses).
+- `wtw clean --linked` (alias `--extra`) lists extra git worktrees including wtw-tracked ones. It skips the current checkout and the repo primary tree.
 - NEVER run `wtw remove` without confirmation unless `--force` is explicit
 - Prefer `wtw create` over manual `git worktree add`
 - Do not edit `~/.wtw/registry.json` directly — use wtw commands
@@ -169,5 +171,6 @@ pwsh -Command "wtw color auth random"
 
 ```bash
 pwsh -Command "wtw clean --dry-run"
+pwsh -Command "wtw clean --linked --dry-run"
 pwsh -Command "wtw clean --branches --dry-run"
 ```

@@ -116,7 +116,7 @@ function Invoke-Wtw {
         Write-WtwHost '    copy <name>       Standalone copy of workspace from template'
         Write-WtwHost '    color [name] [hex|random]   Set workspace color (--no-sync to skip sync)'
         Write-WtwHost '    sync [file|--all] Re-apply template to managed workspaces'
-        Write-WtwHost '    clean             Clean stale worktrees and/or merged local branches'
+        Write-WtwHost '    clean             Clean stale / extra git worktrees and/or merged local branches'
         Write-WtwHost '    agent profile ... Configure agentctl profile overlays'
         Write-WtwHost '    install           Install wtw globally from this checkout (~/.wtw/module/)'
         Write-WtwHost '    update [--check]  Update the global install to the latest PowerShell Gallery release'

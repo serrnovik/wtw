@@ -1,22 +1,27 @@
 function Invoke-WtwClean {
     <#
     .SYNOPSIS
-        Find and remove stale AI worktrees and/or local branches already merged.
+        Find and remove stale AI worktrees, extra git worktrees, and/or merged branches.
     .DESCRIPTION
-        Two independent sweeps:
+        Independent sweeps:
 
-          --worktrees   stale AI folders (codex / cursor / conductor) and
-                        detached-HEAD worktrees on registered repos
+          --worktrees   stale AI folders (codex / cursor / conductor),
+                        detached-HEAD worktrees, and extra git worktrees
+                        that are not registered in wtw
+          --linked      extra git worktrees on registered repos, including
+                        ones wtw already tracks (alias: --extra)
           --branches    local branches fully merged into the repo default
                         branch, skipping any branch still checked out
-          --all         both
+          --all         worktrees + branches (not --linked)
 
         With none of those flags, asks which sweep to run. Item pick
         (all / none / 1,3,5) still applies unless ``--force``.
     .PARAMETER All
-        Run both sweeps.
+        Run the worktrees and branches sweeps.
     .PARAMETER Worktrees
-        Only the stale-worktree sweep.
+        Only the stale / unregistered-worktree sweep.
+    .PARAMETER Linked
+        Only extra git worktrees (registered and unregistered).
     .PARAMETER Branches
         Only the merged-branch sweep.
     .PARAMETER DryRun
@@ -25,18 +30,23 @@ function Invoke-WtwClean {
         Remove every listed item without the all/none/1,3,5 picker.
     .EXAMPLE
         wtw clean
-        Ask worktrees / branches / all, then pick items.
+        Ask worktrees / linked / branches / all, then pick items.
+    .EXAMPLE
+        wtw clean --linked --dry-run
+        List extra git worktrees Fork / git worktree add created.
     .EXAMPLE
         wtw clean --branches --dry-run
         List leftover merged local branches.
     .EXAMPLE
         wtw clean --all --force
-        Remove every stale worktree and every leftover merged branch.
+        Remove every stale / unregistered worktree and every leftover merged branch.
     #>
     [CmdletBinding()]
     param(
         [switch] $All,
         [switch] $Worktrees,
+        [Alias('Extra')]
+        [switch] $Linked,
         [switch] $Branches,
         [switch] $DryRun,
         [switch] $Force
@@ -49,7 +59,7 @@ function Invoke-WtwClean {
     }
 
     Write-WtwHost ''
-    $scope = Resolve-WtwCleanScope -All:$All -Worktrees:$Worktrees -Branches:$Branches
+    $scope = Resolve-WtwCleanScope -All:$All -Worktrees:$Worktrees -Branches:$Branches -Linked:$Linked
     if (-not $scope) { return }
 
     $registry = Get-WtwRegistry
@@ -58,6 +68,10 @@ function Invoke-WtwClean {
     if ($scope.Worktrees) {
         $didWork = $true
         Invoke-WtwCleanWorktrees -Config $config -Registry $registry -DryRun:$DryRun -Force:$Force
+    }
+    if ($scope.Linked) {
+        $didWork = $true
+        Invoke-WtwCleanLinkedWorktrees -Registry $registry -DryRun:$DryRun -Force:$Force
     }
     if ($scope.Branches) {
         $didWork = $true
@@ -132,10 +146,14 @@ function Invoke-WtwCleanWorktrees {
                             Source   = $toolName
                             Path     = $repoDir.FullName
                             Repo     = $repoDir.Name
+                            Branch   = '-'
                             Size     = $size
                             SizeStr  = Format-Size $size
                             Modified = $repoDir.LastWriteTime.ToString('yyyy-MM-dd')
                             Type     = 'ai-worktree'
+                            MainPath = $null
+                            Status   = 'unregistered'
+                            Task     = $null
                         }
                     }
                 }
@@ -148,50 +166,25 @@ function Invoke-WtwCleanWorktrees {
                         Source   = $toolName
                         Path     = $dir.FullName
                         Repo     = $dir.Name
+                        Branch   = '-'
                         Size     = $size
                         SizeStr  = Format-Size $size
                         Modified = $dir.LastWriteTime.ToString('yyyy-MM-dd')
                         Type     = 'ai-worktree'
+                        MainPath = $null
+                        Status   = 'unregistered'
+                        Task     = $null
                     }
                 }
             }
         }
     }
 
-    foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
-        $repo = $Registry.repos.$repoName
-        if (-not (Test-Path $repo.mainPath)) { continue }
-
-        $wtList = git -C $repo.mainPath worktree list --porcelain 2>$null
-        if (-not $wtList) { continue }
-
-        $currentWt = $null
-        foreach ($line in $wtList) {
-            if ($line -match '^worktree (.+)$') {
-                $currentWt = @{ path = $Matches[1] }
-            } elseif ($line -match '^HEAD (.+)$' -and $currentWt) {
-                $currentWt.head = $Matches[1]
-            } elseif ($line -eq 'detached' -and $currentWt) {
-                if ($currentWt.path -ne $repo.mainPath) {
-                    $alreadyListed = $staleItems | Where-Object { $_.Path -eq $currentWt.path }
-                    if (-not $alreadyListed -and (Test-Path $currentWt.path)) {
-                        $dir = Get-Item $currentWt.path
-                        $size = Get-DirectorySize $currentWt.path
-                        $staleItems += [PSCustomObject]@{
-                            Source   = 'git'
-                            Path     = $currentWt.path
-                            Repo     = $repoName
-                            Size     = $size
-                            SizeStr  = Format-Size $size
-                            Modified = $dir.LastWriteTime.ToString('yyyy-MM-dd')
-                            Type     = 'detached'
-                        }
-                    }
-                }
-            } elseif ($line -eq '' -and $currentWt) {
-                $currentWt = $null
-            }
-        }
+    $gitExtras = @(Get-WtwLinkedWorktreeItems -Registry $Registry -IncludeUnregistered -IncludeDetached)
+    foreach ($extra in $gitExtras) {
+        $alreadyListed = $staleItems | Where-Object { $_.Path -eq $extra.Path }
+        if ($alreadyListed) { continue }
+        $staleItems += $extra
     }
 
     if ($staleItems.Count -eq 0) {
@@ -205,7 +198,7 @@ function Invoke-WtwCleanWorktrees {
     Write-WtwHost ''
     Write-WtwHost "  Found $($staleItems.Count) stale worktrees ($(Format-Size $totalSize) total)" -ForegroundColor Yellow
     Write-WtwHost ''
-    Format-WtwTable $staleItems @('Source', 'Repo', 'SizeStr', 'Modified', 'Path')
+    Format-WtwTable $staleItems @('Source', 'Repo', 'Type', 'Branch', 'SizeStr', 'Modified', 'Path')
     Write-WtwHost ''
 
     if ($DryRun) {
@@ -223,23 +216,7 @@ function Invoke-WtwCleanWorktrees {
         Write-WtwHost "  Removing: $($item.Path)..." -ForegroundColor Cyan -NoNewline
 
         try {
-            $parentRepo = $null
-            foreach ($rn in (Get-WtwPropertyNames -Object $Registry.repos)) {
-                $r = $Registry.repos.$rn
-                if ($item.Path.StartsWith($r.mainPath) -or $item.Repo -eq (Split-Path $r.mainPath -Leaf)) {
-                    $parentRepo = $r.mainPath
-                    break
-                }
-            }
-
-            if ($parentRepo -and (Test-Path $parentRepo)) {
-                git -C $parentRepo worktree remove $item.Path --force 2>$null
-            }
-
-            if (Test-Path $item.Path) {
-                Remove-Item -Path $item.Path -Recurse -Force
-            }
-
+            Remove-WtwCleanWorktreeItem -Item $item -Registry $Registry
             $removedSize += $item.Size
             $removedCount++
             Write-WtwHost ' done' -ForegroundColor Green
@@ -257,6 +234,100 @@ function Invoke-WtwCleanWorktrees {
 
     Write-WtwHost ''
     Write-WtwHost "  Removed $removedCount worktrees, freed $(Format-Size $removedSize)" -ForegroundColor Green
+}
+
+function Invoke-WtwCleanLinkedWorktrees {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Registry,
+        [switch] $DryRun,
+        [switch] $Force
+    )
+
+    Write-WtwHost '  Scanning for extra git worktrees...' -ForegroundColor Cyan
+
+    $items = @(Get-WtwLinkedWorktreeItems -Registry $Registry -IncludeRegistered -IncludeUnregistered -IncludeDetached)
+    if ($items.Count -eq 0) {
+        Write-WtwHost '  No extra git worktrees found.' -ForegroundColor Green
+        return
+    }
+
+    $items = @($items | Sort-Object -Property Size -Descending)
+    $totalSize = ($items | Measure-Object -Property Size -Sum).Sum
+
+    Write-WtwHost ''
+    Write-WtwHost "  Found $($items.Count) extra git worktree(s) ($(Format-Size $totalSize) total)" -ForegroundColor Yellow
+    Write-WtwHost ''
+    Format-WtwTable $items @('Repo', 'Branch', 'Status', 'Merged', 'Dirty', 'SizeStr', 'Path')
+    Write-WtwHost ''
+
+    if ($DryRun) {
+        Write-WtwHost '  (dry-run: no changes made)' -ForegroundColor DarkGray
+        return
+    }
+
+    $items = Select-WtwCleanItems -Items $items -Force:$Force -Noun 'extra git worktrees'
+    if ($null -eq $items) { return }
+
+    $removedSize = 0
+    $removedCount = 0
+    foreach ($item in $items) {
+        Write-WtwHost "  Removing: $($item.Path)..." -ForegroundColor Cyan -NoNewline
+        try {
+            Remove-WtwCleanWorktreeItem -Item $item -Registry $Registry
+            $removedSize += $item.Size
+            $removedCount++
+            Write-WtwHost ' done' -ForegroundColor Green
+        } catch {
+            Write-WtwHost " FAILED: $_" -ForegroundColor Red
+        }
+    }
+
+    foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
+        $repo = $Registry.repos.$repoName
+        if (Test-Path $repo.mainPath) {
+            git -C $repo.mainPath worktree prune 2>$null
+        }
+    }
+
+    Write-WtwHost ''
+    Write-WtwHost "  Removed $removedCount worktrees, freed $(Format-Size $removedSize)" -ForegroundColor Green
+}
+
+function Remove-WtwCleanWorktreeItem {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Item,
+        [Parameter(Mandatory)] $Registry
+    )
+
+    $isRegistered = (Get-WtwPropertyValue -Object $Item -Name 'Status') -eq 'registered'
+    $taskName = Get-WtwPropertyValue -Object $Item -Name 'Task'
+    if ($isRegistered -and $taskName) {
+        Remove-WtwWorktree -Name $taskName -Force
+        if (-not (Test-Path $Item.Path)) { return }
+    }
+
+    $parentRepo = Get-WtwPropertyValue -Object $Item -Name 'MainPath'
+    if (-not $parentRepo) {
+        foreach ($rn in (Get-WtwPropertyNames -Object $Registry.repos)) {
+            $r = $Registry.repos.$rn
+            $sameRepoName = $Item.Repo -eq (Split-Path $r.mainPath -Leaf)
+            $pathUnderMain = $Item.Path.StartsWith($r.mainPath)
+            if ($pathUnderMain -or $sameRepoName) {
+                $parentRepo = $r.mainPath
+                break
+            }
+        }
+    }
+
+    if ($parentRepo -and (Test-Path $parentRepo)) {
+        git -C $parentRepo worktree remove $Item.Path --force 2>$null
+    }
+
+    if (Test-Path $Item.Path) {
+        Remove-Item -Path $Item.Path -Recurse -Force
+    }
 }
 
 function Invoke-WtwCleanMergedBranches {

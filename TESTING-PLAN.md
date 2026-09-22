@@ -73,6 +73,8 @@ Plan for integration tests and GitHub Actions CI. Not yet implemented.
 
 #### 8. `Wtw.Clean.Tests.ps1` — Stale worktree cleanup
 - Detects directories in configured stale paths
+- `--worktrees` also lists unregistered extra git worktrees
+- `--linked` lists extra git worktrees including registered ones
 - `--dry-run` lists but doesn't delete
 - Respects interactive selection (mock `Read-Host`)
 

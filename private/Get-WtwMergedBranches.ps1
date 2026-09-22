@@ -105,34 +105,52 @@ function Get-WtwMergedLocalBranches {
     return $result
 }
 
+function New-WtwCleanScope {
+    param(
+        [bool] $Worktrees,
+        [bool] $Branches,
+        [bool] $Linked
+    )
+
+    return [PSCustomObject]@{
+        Worktrees = $Worktrees
+        Branches  = $Branches
+        Linked    = $Linked
+    }
+}
+
 function Resolve-WtwCleanScope {
     <#
     .SYNOPSIS
-        Decide whether clean runs worktrees, merged branches, or both.
+        Decide whether clean runs stale worktrees, linked extras, merged branches, or a mix.
     #>
     [CmdletBinding()]
     param(
         [switch] $All,
         [switch] $Worktrees,
         [switch] $Branches,
+        [Alias('Extra')]
+        [switch] $Linked,
         [string] $Choice
     )
 
-    if ($All -or ($Worktrees -and $Branches)) {
-        return [PSCustomObject]@{ Worktrees = $true; Branches = $true }
-    }
-    if ($Worktrees) {
-        return [PSCustomObject]@{ Worktrees = $true; Branches = $false }
-    }
-    if ($Branches) {
-        return [PSCustomObject]@{ Worktrees = $false; Branches = $true }
+    $hasExplicit = $All -or $Worktrees -or $Branches -or $Linked
+    if ($hasExplicit) {
+        $includeWorktrees = [bool]($All -or $Worktrees)
+        $includeBranches = [bool]($All -or $Branches)
+        if ($Worktrees -and $Branches) {
+            $includeWorktrees = $true
+            $includeBranches = $true
+        }
+        return (New-WtwCleanScope -Worktrees $includeWorktrees -Branches $includeBranches -Linked ([bool]$Linked))
     }
 
     if (-not $PSBoundParameters.ContainsKey('Choice')) {
         Write-WtwHost '  Clean what?' -ForegroundColor Yellow
-        Write-WtwHost '    worktrees  stale AI / detached worktrees'
+        Write-WtwHost '    worktrees  stale AI / detached / unregistered git worktrees'
+        Write-WtwHost '    linked     extra git worktrees (including wtw-tracked)'
         Write-WtwHost '    branches   local branches already merged into the default branch'
-        Write-WtwHost '    all        both'
+        Write-WtwHost '    all        worktrees + branches'
         Write-WtwHost ''
         Write-WtwHost '  Select: ' -ForegroundColor Yellow -NoNewline
         $Choice = Read-Host
@@ -140,9 +158,10 @@ function Resolve-WtwCleanScope {
 
     $token = if ($null -eq $Choice) { '' } else { $Choice.Trim().ToLowerInvariant() }
     switch -Regex ($token) {
-        '^(all|a|3)$' { return [PSCustomObject]@{ Worktrees = $true; Branches = $true } }
-        '^(worktrees?|wt|w|1)$' { return [PSCustomObject]@{ Worktrees = $true; Branches = $false } }
-        '^(branches?|br|b|2)$' { return [PSCustomObject]@{ Worktrees = $false; Branches = $true } }
+        '^(all|a|3)$' { return (New-WtwCleanScope -Worktrees $true -Branches $true -Linked $false) }
+        '^(worktrees?|wt|w|1)$' { return (New-WtwCleanScope -Worktrees $true -Branches $false -Linked $false) }
+        '^(branches?|br|b|2)$' { return (New-WtwCleanScope -Worktrees $false -Branches $true -Linked $false) }
+        '^(linked|link|extra|extras|l|4)$' { return (New-WtwCleanScope -Worktrees $false -Branches $false -Linked $true) }
     }
 
     Write-WtwHost '  Cancelled.' -ForegroundColor DarkGray

@@ -149,7 +149,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'edit'; Tip = 'Edit a registry record (name, task, aliases)' }
             @{ Name = 'rename'; Tip = 'Alias for edit' }
             @{ Name = 'ren';    Tip = 'Alias for edit' }
-            @{ Name = 'clean';       Tip = 'Clean stale AI worktrees' }
+            @{ Name = 'clean';       Tip = 'Clean stale / extra git worktrees and merged branches' }
             @{ Name = 'agent';       Tip = 'Configure agentctl profile overlays' }
             @{ Name = 'skill';       Tip = 'Install AI skill into current repo' }
             @{ Name = 'sbx';         Tip = 'Launch AI sandbox with workspace folders mounted' }
@@ -256,7 +256,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'skill'  { @('--agent') }
             'add'    { @('--repo', '--task', '--branch', '--name', '--emoji', '--color', '--alias', '--sourcegit-folder', '--no-sourcegit-folder') }
             'create' { @('--name', '--emoji', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track', '--alias') }
-            'clean'  { @('--dry-run', '--force', '--all', '--worktrees', '--branches') }
+            'clean'  { @('--dry-run', '--force', '--all', '--worktrees', '--linked', '--extra', '--branches') }
             'remove' { @('--repo', '--force') }
             'rm'     { @('--repo', '--force') }
             'unregister' { @('--repo', '--force') }

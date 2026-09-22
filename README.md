@@ -205,15 +205,23 @@ wtw remove auth           # removes worktree + workspace + branch
 ### 5. Clean up stale worktrees and merged branches
 
 ```powershell
-wtw clean                      # ask: worktrees / branches / all, then pick items
+wtw clean                      # ask: worktrees / linked / branches / all, then pick items
 wtw clean --worktrees --dry-run
+wtw clean --linked --dry-run   # extra git worktrees (Fork / git worktree add), including tracked
 wtw clean --branches --dry-run # leftover local branches already merged into main
 wtw clean --all --force
 ```
 
+`--worktrees` now also lists extra git worktrees that git/Fork created but wtw
+never registered. `--linked` (alias `--extra`) lists those plus wtw-tracked
+extras so you can clean the full set Fork shows. The current checkout and the
+repo primary tree are skipped. `--all` stays worktrees + branches; pass
+`--linked` as well when you want tracked extras included.
+
 `--branches` uses `git branch --merged` against the repo default branch and
-skips any branch still checked out in a worktree (`wtw remove` those first).
-Delete is `git branch -d` only — unmerged branches are never force-deleted.
+skips any branch still checked out in a worktree (`wtw remove` or
+`wtw clean --linked` those first). Delete is `git branch -d` only — unmerged
+branches are never force-deleted.
 
 ## Commands
 
@@ -245,7 +253,7 @@ Delete is `git branch -d` only — unmerged branches are never force-deleted.
 | `wtw copy <name> [--code-folder X]` | Standalone workspace copy from template |
 | `wtw color [name] [hex\|random]` | Set workspace color |
 | `wtw sync --all [--dry-run] [--repo X]` | Re-apply template to all managed workspaces |
-| `wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]` | Clean stale AI / detached worktrees and leftover merged local branches |
+| `wtw clean [--worktrees] [--linked] [--branches] [--all] [--dry-run] [--force]` | Clean stale AI / unregistered / extra git worktrees and leftover merged local branches |
 | `wtw install [--skip-profile]` | Install this checkout globally to `~/.wtw/module/` |
 | `wtw update [--check] [--yes] [--force]` | Update the global install to the latest PowerShell Gallery release |
 | `wtw reload [--check]` | Re-import the installed (or current) module in this session |

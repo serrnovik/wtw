@@ -155,22 +155,27 @@ function Show-WtwCommandHelp {
         'sync'        { @('wtw sync [name] [--all]', 'Re-apply template settings to managed workspaces.', '', 'Arguments:', '  name    Target workspace (alias, task, or file path; default: detected from cwd)', '', 'Options:', '  --all               Sync all managed workspaces', '  --repo <name>       Limit --all to a specific repo', '  --template <path>   Override template source', '  --dry-run           Show what would be synced without writing', '  --color-source      json | workspace (single-file sync; skips interactive prompt)', '                      Default when omitted: prompt if interactive, else json-first', '', 'Examples:', '  wtw sync                  Sync current workspace', '  wtw sync proj-fix         Sync a specific workspace by name', '  wtw sync --all            Sync all registered workspaces', '  wtw sync --all --repo proj Sync all workspaces for one repo') }
         'color'       { @('wtw color [name] [hex|random]', 'Set or show the Peacock color for a workspace.', '', 'Arguments:', '  name     Target workspace (default: detected from cwd)', '  color    A hex color (rrggbb) or "random" for max contrast', '', 'Options:', '  --no-sync   Skip syncing the workspace file after color change', '', 'Examples:', '  wtw color                  Show color for current workspace', '  wtw color proj random      Pick a maximally contrasting color', '  wtw color my-task e05d44   Set a specific color', '', 'Note: # starts a comment in PowerShell. Either omit it', '  or quote it: ''#e05d44''') }
         'clean'       { @(
-            'wtw clean [--worktrees] [--branches] [--all] [--dry-run] [--force]',
-            'Remove stale AI / detached worktrees and leftover local branches',
+            'wtw clean [--worktrees] [--linked] [--branches] [--all] [--dry-run] [--force]',
+            'Remove stale AI / detached / unregistered git worktrees, extra linked',
+            'git worktrees (Fork / git worktree add), and leftover local branches',
             'that are already merged into the repo default branch (main/master).',
             '',
             'Options:',
-            '  --worktrees   Stale AI folders (codex / cursor / conductor) and detached HEADs',
+            '  --worktrees   Stale AI folders, detached HEADs, and extra git worktrees',
+            '                that are not registered in wtw',
+            '  --linked      Extra git worktrees on registered repos, including',
+            '                wtw-tracked ones (alias: --extra)',
             '  --branches    Local branches fully merged into the default branch',
             '                (skips any branch still checked out in a worktree)',
-            '  --all         Both sweeps',
+            '  --all         worktrees + branches (does not include --linked)',
             '  --dry-run     List only',
             '  --force       Skip the all/none/1,3,5 picker',
             '',
-            'With none of --worktrees / --branches / --all, asks which sweep to run.',
+            'With none of --worktrees / --linked / --branches / --all, asks which sweep to run.',
             '',
             'Examples:',
             '  wtw clean',
+            '  wtw clean --linked --dry-run',
             '  wtw clean --branches --dry-run',
             '  wtw clean --all --force'
         ) }

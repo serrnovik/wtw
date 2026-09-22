@@ -251,7 +251,7 @@ _wtw_completion() {
                 options=('--no-sync:skip workspace synchronization')
                 ;;
             clean)
-                options=('--dry-run:preview cleanup' '--force:skip confirmation')
+                options=('--dry-run:preview cleanup' '--force:skip confirmation' '--all:stale worktrees and merged branches' '--worktrees:stale AI / unregistered git worktrees' '--linked:extra git worktrees including tracked' '--extra:alias of --linked' '--branches:merged local branches')
                 ;;
             skill)
                 options=('--agent:agent format')
