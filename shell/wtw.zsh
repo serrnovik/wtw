@@ -234,7 +234,7 @@ _wtw_completion() {
                 options=('--name:display name' '--folder:worktree folder' '--branch:existing branch' '--color:workspace color' '--repo:repository' '--open:open after creation' '--no-branch:do not create a branch' '--from:base branch' '--gt-track:Graphite parent')
                 ;;
             import)
-                options=('--from:machine the worktree is on' '--via:transport' '--dry-run:preview without creating')
+                options=('--from:machine the worktree is on' '--repo:local clone to receive it' '--via:transport' '--dry-run:preview without creating')
                 ;;
             list|ls)
                 options=('-d:detailed view' '--detailed:detailed view' '--wide:untruncated columns' '--repo:repository' '-f:substring filter' '--filter:substring filter')

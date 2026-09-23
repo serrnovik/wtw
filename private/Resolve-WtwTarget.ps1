@@ -17,6 +17,31 @@ function Get-WtwNumericNameHint {
     return ''
 }
 
+function Resolve-WtwWorktreeKey {
+    <#
+    .SYNOPSIS
+        Registry task key that matches a query, ignoring case.
+    .DESCRIPTION
+        One match returns that key's real spelling. Two keys that differ only
+        by case return $null so the caller can treat it as a conflict.
+    #>
+    param(
+        $Worktrees,
+        [AllowNull()] [string] $Name
+    )
+
+    if (-not $Worktrees -or [string]::IsNullOrWhiteSpace($Name)) { return $null }
+    # Get-WtwPropertyNames returns one array. A pipeline would treat that array
+    # as a single item, so walk it in foreach.
+    $keys = @(
+        foreach ($key in (Get-WtwPropertyNames -Object $Worktrees)) {
+            if ($key -eq $Name) { $key }
+        }
+    )
+    if ($keys.Count -eq 1) { return [string]$keys[0] }
+    return $null
+}
+
 function Resolve-WtwTarget {
     <#
     .SYNOPSIS
@@ -163,17 +188,18 @@ function Resolve-WtwTarget {
     # 2. "alias-task" exact match
     if ($Name -match '^(.+?)-(.+)$') {
         $aliasOrName = $Matches[1]
-        $taskName    = $Matches[2]
+        $taskQuery   = $Matches[2]
         foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
             if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
             $repo = $registry.repos.$repoName
-            if (((Test-WtwAliasMatch $repo $aliasOrName) -or $repoName -eq $aliasOrName) -and
-                $repo.worktrees -and (Get-WtwPropertyNames -Object $repo.worktrees) -contains $taskName) {
+            if (-not ((Test-WtwAliasMatch $repo $aliasOrName) -or $repoName -eq $aliasOrName)) { continue }
+            $taskKey = Resolve-WtwWorktreeKey -Worktrees $repo.worktrees -Name $taskQuery
+            if ($taskKey) {
                 return [PSCustomObject]@{
                     RepoName       = $repoName
                     RepoEntry      = $repo
-                    TaskName       = $taskName
-                    WorktreeEntry  = $repo.worktrees.$taskName
+                    TaskName       = $taskKey
+                    WorktreeEntry  = $repo.worktrees.$taskKey
                 }
             }
         }
@@ -184,12 +210,13 @@ function Resolve-WtwTarget {
     foreach ($repoName in (Get-WtwPropertyNames -Object $registry.repos)) {
         if ($restrictRepo -and $repoName -ne $restrictRepo) { continue }
         $repo = $registry.repos.$repoName
-        if ($repo.worktrees -and (Get-WtwPropertyNames -Object $repo.worktrees) -contains $Name) {
+        $taskKey = Resolve-WtwWorktreeKey -Worktrees $repo.worktrees -Name $Name
+        if ($taskKey) {
             $found += [PSCustomObject]@{
                 RepoName       = $repoName
                 RepoEntry      = $repo
-                TaskName       = $Name
-                WorktreeEntry  = $repo.worktrees.$Name
+                TaskName       = $taskKey
+                WorktreeEntry  = $repo.worktrees.$taskKey
             }
         }
     }

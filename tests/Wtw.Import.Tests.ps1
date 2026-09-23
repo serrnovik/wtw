@@ -249,6 +249,121 @@ Describe 'wtw import snapshot' {
         Test-Path -LiteralPath $imported | Should -BeFalse
     }
 
+    It 'does not treat two local clones as two copies of the worktree' {
+        $registryPath = Join-Path $script:fx.Temp 'registry.json'
+        [PSCustomObject]@{
+            repos = [PSCustomObject]@{
+                left = [PSCustomObject]@{
+                    mainPath       = $script:fx.RepoB
+                    worktreeParent = $script:fx.DirB
+                    aliases        = @('aa')
+                    worktrees      = [PSCustomObject]@{}
+                }
+                right = [PSCustomObject]@{
+                    mainPath       = $script:fx.RepoA
+                    worktreeParent = $script:fx.DirA
+                    aliases        = @('bb')
+                    worktrees      = [PSCustomObject]@{}
+                }
+            }
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path $registryPath -Encoding utf8
+
+        InModuleScope wtw -Parameters @{ Export = $script:export } {
+            { Import-WtwWorktreeSnapshot -Snapshot $Export -SourceName 'other' -ErrorAction Stop } |
+                Should -Throw -ExpectedMessage '*More than one local clone*'
+        }
+    }
+
+    It 'uses the local repo wtw tracks under the remote repo name' {
+        $registryPath = Join-Path $script:fx.Temp 'registry.json'
+        [PSCustomObject]@{
+            repos = [PSCustomObject]@{
+                left = [PSCustomObject]@{
+                    mainPath       = $script:fx.RepoB
+                    worktreeParent = $script:fx.DirB
+                    aliases        = @('demo')
+                    worktrees      = [PSCustomObject]@{}
+                }
+                right = [PSCustomObject]@{
+                    mainPath       = $script:fx.RepoA
+                    worktreeParent = $script:fx.DirA
+                    aliases        = @('bb')
+                    worktrees      = [PSCustomObject]@{}
+                }
+            }
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path $registryPath -Encoding utf8
+
+        $imported = Join-Path $script:fx.DirB 'left_feature'
+        InModuleScope wtw -Parameters @{ Export = $script:export } {
+            Mock Initialize-WtwWorktreeMetadata { @{ Success = $true } }
+            Import-WtwWorktreeSnapshot -Snapshot $Export -SourceName 'other' -ErrorAction Stop
+            Should -Invoke Initialize-WtwWorktreeMetadata -Times 1 -ParameterFilter { $RepoName -eq 'left' }
+        }
+        Test-Path -LiteralPath $imported | Should -BeTrue
+    }
+
+    It 'imports into the clone that contains the current directory' {
+        $registryPath = Join-Path $script:fx.Temp 'registry.json'
+        [PSCustomObject]@{
+            repos = [PSCustomObject]@{
+                left = [PSCustomObject]@{
+                    mainPath       = $script:fx.RepoB
+                    worktreeParent = $script:fx.DirB
+                    aliases        = @('aa')
+                    worktrees      = [PSCustomObject]@{}
+                }
+                right = [PSCustomObject]@{
+                    mainPath       = $script:fx.RepoA
+                    worktreeParent = $script:fx.DirA
+                    aliases        = @('bb')
+                    worktrees      = [PSCustomObject]@{}
+                }
+            }
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path $registryPath -Encoding utf8
+
+        $imported = Join-Path $script:fx.DirB 'left_feature'
+        $previous = Get-Location
+        try {
+            Set-Location -LiteralPath $script:fx.RepoB
+            InModuleScope wtw -Parameters @{ Export = $script:export } {
+                Mock Initialize-WtwWorktreeMetadata { @{ Success = $true } }
+                Import-WtwWorktreeSnapshot -Snapshot $Export -SourceName 'other' -ErrorAction Stop
+                Should -Invoke Initialize-WtwWorktreeMetadata -Times 1 -ParameterFilter { $RepoName -eq 'left' }
+            }
+        } finally {
+            Set-Location -LiteralPath $previous.Path
+        }
+        Test-Path -LiteralPath $imported | Should -BeTrue
+    }
+
+    It 'imports into the clone named by --repo' {
+        $registryPath = Join-Path $script:fx.Temp 'registry.json'
+        [PSCustomObject]@{
+            repos = [PSCustomObject]@{
+                left = [PSCustomObject]@{
+                    mainPath       = $script:fx.RepoB
+                    worktreeParent = $script:fx.DirB
+                    aliases        = @('aa')
+                    worktrees      = [PSCustomObject]@{}
+                }
+                right = [PSCustomObject]@{
+                    mainPath       = $script:fx.RepoA
+                    worktreeParent = $script:fx.DirA
+                    aliases        = @('bb')
+                    worktrees      = [PSCustomObject]@{}
+                }
+            }
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path $registryPath -Encoding utf8
+
+        $imported = Join-Path $script:fx.DirB 'left_feature'
+        InModuleScope wtw -Parameters @{ Export = $script:export } {
+            Mock Initialize-WtwWorktreeMetadata { @{ Success = $true } }
+            Import-WtwWorktreeSnapshot -Snapshot $Export -SourceName 'other' -Repo 'aa' -ErrorAction Stop
+            Should -Invoke Initialize-WtwWorktreeMetadata -Times 1 -ParameterFilter { $RepoName -eq 'left' }
+        }
+        Test-Path -LiteralPath $imported | Should -BeTrue
+    }
+
     It 'plans a fast-forward, an adopt, and a missing commit without writing' {
         InModuleScope wtw -Parameters @{ RepoB = $script:fx.RepoB; Commit = $script:fx.Commit } {
             (Get-WtwImportBranchPlan -RepoPath $RepoB -Branch 'feature' -Commit $Commit).Action | Should -Be 'create'
