@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.41'
+    ModuleVersion     = '0.2.42'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -41,7 +41,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'wtw import uses the local repo wtw already tracks for that remote when several clones share it, such as snowmain1 (alias snowmain) instead of a second clone. --repo still names a clone explicitly. Search matches NTB-real-dogfood in any case when only one worktree fits.'
+            ReleaseNotes = 'wtw go runs the configured session script even when the shell is already in that directory. wtw list prints worktree aliases that were stored as a list, instead of System.Object[].'
         }
     }
 }

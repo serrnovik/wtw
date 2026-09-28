@@ -15,6 +15,28 @@ function Get-WtwWorktreeAliases {
     return , @($result | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
 }
 
+function Format-WtwWorktreeAliasLines {
+    <#
+    .SYNOPSIS
+        Custom worktree aliases, then derived repo-alias-task names, one per line.
+    .DESCRIPTION
+        Get-WtwWorktreeAliases returns one array object (the comma operator keeps
+        a single alias from unwrapping to a string). @(Get-WtwWorktreeAliases $wt)
+        does not enumerate that object, so -join prints System.Object[].
+        Assign first, then wrap, so each alias is a string.
+    #>
+    param(
+        $RepoAliases,
+        $Worktree,
+        [string] $TaskName
+    )
+
+    $customAliasList = Get-WtwWorktreeAliases $Worktree
+    $customAliases = @($customAliasList)
+    $derivedAliases = @(@($RepoAliases) | ForEach-Object { "$_-$TaskName" })
+    return ((@($customAliases + $derivedAliases) | Where-Object { $_ }) -join "`n")
+}
+
 function ConvertTo-WtwLookupKey {
     <#
     .SYNOPSIS
@@ -117,7 +139,10 @@ function Get-WtwMatchingWorktrees {
             $wt = $repo.worktrees.$taskName
             $candidates = switch ($Field) {
                 'Task' { @($taskName) }
-                'Alias' { @(Get-WtwWorktreeAliases $wt) }
+                'Alias' {
+                    $listedAliases = Get-WtwWorktreeAliases $wt
+                    @($listedAliases)
+                }
                 'Branch' { @(Get-WtwPropertyValue -Object $wt -Name 'branch') }
                 'Pretty' { @(Get-WtwPropertyValue -Object $wt -Name 'prettyName') }
             }

@@ -31,19 +31,9 @@ function Register-WtwProfile {
 
         $goMainBlock = {
             param($p, $s, $color, $title)
-            if (Get-Command 'Set-GitRepo' -ErrorAction SilentlyContinue) {
-                $tool = if ($s) { $s } else { 'start-repository-session.ps1' }
-                Set-GitRepo -gitRoot $p -toolName $tool
-            } else {
-                Set-Location $p
-                $scriptRan = $false
-                if ($s) {
-                    $script = Join-Path $p $s
-                    if (Test-Path $script) { & $script; $scriptRan = $true }
-                }
-                if (-not $scriptRan -and (Get-Command 'Set-WtwTerminalColor' -ErrorAction SilentlyContinue)) {
-                    Set-WtwTerminalColor -Color $color -Title $title
-                }
+            Invoke-WtwDirectorySwitch -Path $p -SessionScript $s
+            if (-not $script:WtwSessionScriptRan -and (Get-Command 'Set-WtwTerminalColor' -ErrorAction SilentlyContinue)) {
+                Set-WtwTerminalColor -Color $color -Title $title
             }
         }.GetNewClosure()
 

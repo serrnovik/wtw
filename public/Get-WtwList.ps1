@@ -181,9 +181,7 @@ function Get-WtwList {
                 $wt = $repoEntry.worktrees.$taskName
                 $exists = Test-Path $wt.path
                 $wtWsDisplay = if ($wt.workspace -and (Test-Path $wt.workspace)) { Split-Path $wt.workspace -Leaf } else { '-' }
-                $customAliases = @(Get-WtwWorktreeAliases $wt)
-                $derivedAliases = @($aliases | ForEach-Object { "$_-$taskName" })
-                $wtAliases = (@($customAliases + $derivedAliases) | Where-Object { $_ }) -join "`n"
+                $wtAliases = Format-WtwWorktreeAliasLines -RepoAliases $aliases -Worktree $wt -TaskName $taskName
                 $pathDisplay = if ($exists) { $wt.path } else { "$($wt.path) (MISSING)" }
 
                 # Created date: from registry, then git fallback

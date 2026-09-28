@@ -131,18 +131,9 @@ function Enter-WtwWorktree {
     Set-WtwTerminalColor -Color $targetColor -Title $titleWithPr
 
     try {
-        # Use Set-GitRepo if available (from user profile), otherwise direct approach
-        if (Get-Command 'Set-GitRepo' -ErrorAction SilentlyContinue) {
-            $toolName = if ($sessionScript) { $sessionScript } else { 'start-repository-session.ps1' }
-            Set-GitRepo -gitRoot $targetPath -toolName $toolName
-        } else {
-            Set-Location $targetPath
-            if ($sessionScript) {
-                $scriptPath = Join-Path $targetPath $sessionScript
-                if (Test-Path $scriptPath) { & $scriptPath }
-            }
-            Write-WtwHost "  Switched to: $targetPath" -ForegroundColor Green
-        }
+        # Set-GitRepo skips the session script when the shell is already in
+        # the target directory. Invoke-WtwDirectorySwitch runs that script anyway.
+        Invoke-WtwDirectorySwitch -Path $targetPath -SessionScript $sessionScript
 
         # Inside a cmux surface, also push the workspace/tab metadata (icon'd tab label,
         # color, status). Set-WtwTerminalColor above only sets the OSC window title, which
