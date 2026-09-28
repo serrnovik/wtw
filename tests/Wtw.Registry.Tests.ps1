@@ -19,6 +19,13 @@ Describe 'Get-WtwRepoAliases' {
         $result.Count | Should -Be 1
     }
 
+    It 'lists each custom worktree alias instead of System.Object[]' {
+        $worktree = [PSCustomObject]@{ aliases = @('phoenix', 'real-judge') }
+        $lines = Format-WtwWorktreeAliasLines -RepoAliases @('kulissa', 'kl') -Worktree $worktree -TaskName 't3code-7e87d9d7'
+        $lines | Should -Be "phoenix`nreal-judge`nkulissa-t3code-7e87d9d7`nkl-t3code-7e87d9d7"
+        $lines | Should -Not -Match 'System\.Object\[\]'
+    }
+
     It 'returns empty array when no aliases' {
         $repo = [PSCustomObject]@{ mainPath = '/some/path' }
         $result = Get-WtwRepoAliases $repo

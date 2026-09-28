@@ -180,9 +180,7 @@ function Show-WtwEditableRecord {
         $glyph = Get-WtwWorktreeEmoji -WorktreeEntry $wt -TaskName $Target.TaskName -Name $pretty
         $color = Get-WtwPropertyValue -Object $wt -Name 'color'
         $ws = Get-WtwPropertyValue -Object $wt -Name 'workspace'
-        $derived = ($aliases | ForEach-Object { "$_-$($Target.TaskName)" }) -join ', '
-        $custom = @(Get-WtwWorktreeAliases $wt)
-        $shownAliases = @($custom + @($derived | Where-Object { $_ })) -join ', '
+        $shownAliases = (Format-WtwWorktreeAliasLines -RepoAliases $aliases -Worktree $wt -TaskName $Target.TaskName) -replace "`n", ', '
         Write-WtwHost "  Worktree  $repoName / $($Target.TaskName)" -ForegroundColor Cyan
         if ($pretty) { Write-WtwHost "    Name      : $pretty" }
         Write-WtwHost "    Task      : $($Target.TaskName)"
