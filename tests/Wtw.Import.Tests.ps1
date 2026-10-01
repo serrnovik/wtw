@@ -133,6 +133,37 @@ Describe 'New-WtwRemoteExportScript' {
             $script | Should -Match 'Get-WtwWorktreeExport'
             $script | Should -Match 'wtw-export'
             $script.Contains('(?:\s+\[[^\]]+\])?') | Should -BeTrue
+            $script.IndexOf('.remotes') | Should -BeGreaterThan $script.IndexOf('Get-WtwWorktreeExport')
+        }
+    }
+}
+
+Describe 'Get-WtwRemoteWorktreeExport' {
+    It 're-reads fetch URLs when the remote module returns none' {
+        InModuleScope wtw {
+            $empty = '{"kind":"wtw-export","version":1,"error":null,"repo":"snowmain1","task":"swed","branch":"swed","commit":"abc","detached":false,"folderSuffix":"swed","remotes":[],"aliases":[]}'
+            $filled = '{"kind":"wtw-export","version":1,"error":null,"repo":"snowmain1","task":"swed","branch":"swed","commit":"abc","detached":false,"folderSuffix":"swed","remotes":[{"name":"origin","url":"git@github.com:serrnovik/snowmain.git"}],"aliases":[]}'
+            $script:exportCalls = 0
+            Mock Invoke-WtwRemoteCommand {
+                $script:exportCalls++
+                $payload = if ($script:exportCalls -eq 1) { $empty } else { $filled }
+                return @{ Success = $true; Error = $null; Output = @($payload) }
+            }
+            $export = Get-WtwRemoteWorktreeExport -HostEntry @{ Name = 'snowpomme' } -Name 'swed'
+            @($export.remotes)[0].url | Should -Be 'git@github.com:serrnovik/snowmain.git'
+            Should -Invoke Invoke-WtwRemoteCommand -Times 2 -Exactly
+        }
+    }
+
+    It 'keeps a snapshot that already has a fetch URL' {
+        InModuleScope wtw {
+            $filled = '{"kind":"wtw-export","version":1,"error":null,"repo":"snowmain1","task":"swed","branch":"swed","commit":"abc","detached":false,"folderSuffix":"swed","remotes":[{"name":"origin","url":"git@github.com:serrnovik/snowmain.git"}],"aliases":[]}'
+            Mock Invoke-WtwRemoteCommand {
+                return @{ Success = $true; Error = $null; Output = @($filled) }
+            }
+            $export = Get-WtwRemoteWorktreeExport -HostEntry @{ Name = 'snowpomme' } -Name 'swed'
+            @($export.remotes)[0].url | Should -Be 'git@github.com:serrnovik/snowmain.git'
+            Should -Invoke Invoke-WtwRemoteCommand -Times 1 -Exactly
         }
     }
 }

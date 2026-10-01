@@ -366,18 +366,25 @@ function Invoke-WtwRemoteCommand {
     .OUTPUTS
         @{ Success; Output; Error } — Output is the raw stdout lines.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Arguments')]
     param(
         [Parameter(Mandatory)] $HostEntry,
-        [Parameter(Mandatory)] [string[]] $Arguments,
-        [string] $WorkingDirectory
+        [Parameter(Mandatory, ParameterSetName = 'Arguments')] [string[]] $Arguments,
+        [Parameter(Mandatory, ParameterSetName = 'Script')] [string] $Script,
+        [Parameter(ParameterSetName = 'Arguments')] [string] $WorkingDirectory
     )
 
     if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
         return @{ Success = $false; Output = @(); Error = 'ssh is not on PATH.' }
     }
 
-    $remoteScript = New-WtwRemoteScript -Arguments $Arguments -WtwCommand $HostEntry.Wtw -WorkingDirectory $WorkingDirectory
+    # -Script is a complete remote pwsh program. Import uses it to re-read
+    # `git remote -v` with this machine's parser when the remote module is older.
+    $remoteScript = if ($PSCmdlet.ParameterSetName -eq 'Script') {
+        $Script
+    } else {
+        New-WtwRemoteScript -Arguments $Arguments -WtwCommand $HostEntry.Wtw -WorkingDirectory $WorkingDirectory
+    }
     # -EncodedCommand wants UTF-16LE, which is what [Text.Encoding]::Unicode is.
     $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($remoteScript))
 

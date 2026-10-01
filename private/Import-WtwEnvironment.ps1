@@ -223,6 +223,20 @@ function ConvertFrom-WtwWorktreeExportText {
     return $obj
 }
 
+function Test-WtwExportHasFetchUrl {
+    <#
+    .SYNOPSIS
+        Does this snapshot carry at least one fetch URL?
+    #>
+    [CmdletBinding()]
+    param($Snapshot)
+
+    foreach ($remote in @(Get-WtwPropertyValue -Object $Snapshot -Name 'remotes')) {
+        if (Get-WtwPropertyValue -Object $remote -Name 'url') { return $true }
+    }
+    return $false
+}
+
 function New-WtwRemoteExportScript {
     <#
     .SYNOPSIS
@@ -231,6 +245,12 @@ function New-WtwRemoteExportScript {
         Prefers Get-WtwWorktreeExport when that function exists in the remote
         module. Otherwise collects the same fields with Resolve-WtwTarget and git,
         which gallery builds already have.
+
+        Fetch URLs are always read from ``git remote -v`` by the script this
+        machine sends. A remote module that still requires the line to end at
+        ``(fetch)`` drops partial-clone lines such as ``[blob:none]`` and returns
+        an empty remote list. The regex below is the same one as
+        ConvertFrom-WtwGitRemoteVerboseLine.
     #>
     [CmdletBinding()]
     param([Parameter(Mandatory)] [string] $Name)
@@ -250,14 +270,17 @@ $module = Get-Module wtw
 if (-not $module) { Write-Error 'wtw is not installed on this machine.'; exit 1 }
 $json = & $module {
     param($ExportName)
+    $target = Resolve-WtwTarget -Name $ExportName
+    if (-not $target) { return $null }
     $exporter = Get-Command -Name Get-WtwWorktreeExport -ErrorAction SilentlyContinue
+    $export = $null
     if ($exporter) {
         $export = Get-WtwWorktreeExport -Name $ExportName
         if (-not $export) { return $null }
-        return ($export | ConvertTo-Json -Compress -Depth 8)
+        $exportError = $null
+        if ($export.PSObject.Properties['error']) { $exportError = [string]$export.error }
+        if ($exportError -eq 'main') { return ($export | ConvertTo-Json -Compress -Depth 8) }
     }
-    $target = Resolve-WtwTarget -Name $ExportName
-    if (-not $target) { return $null }
     if (-not $target.TaskName -or -not $target.WorktreeEntry) {
         return ([PSCustomObject]@{ kind = 'wtw-export'; error = 'main'; repo = $target.RepoName } | ConvertTo-Json -Compress)
     }
@@ -276,6 +299,14 @@ $json = & $module {
         if ("$line" -match '^(?<name>\S+)\s+(?<url>\S+)\s+\(fetch\)(?:\s+\[[^\]]+\])?\s*$') {
             $remotes += [PSCustomObject]@{ name = $Matches.name; url = $Matches.url }
         }
+    }
+    if ($export) {
+        if ($export.PSObject.Properties['remotes']) {
+            $export.remotes = @($remotes)
+        } else {
+            $export | Add-Member -NotePropertyName 'remotes' -NotePropertyValue @($remotes) -Force
+        }
+        return ($export | ConvertTo-Json -Compress -Depth 8)
     }
     $leaf = Split-Path -Path $path -Leaf
     $prefix = "$($target.RepoName)_"
@@ -322,7 +353,14 @@ function Get-WtwRemoteWorktreeExport {
     }
 
     $parsed = ConvertFrom-WtwWorktreeExportText -Text (($primary.Output -join "`n"))
-    if (-not $parsed) {
+    # An older remote module parses `git remote -v` itself and drops
+    # `[blob:none]`, so a real origin comes back as an empty list. Re-read the
+    # lines with the script from this module. A repo that truly has no remotes
+    # stays empty after that second pass.
+    $rereadRemotes = $parsed -and
+        ((Get-WtwPropertyValue -Object $parsed -Name 'error') -ne 'main') -and
+        -not (Test-WtwExportHasFetchUrl -Snapshot $parsed)
+    if (-not $parsed -or $rereadRemotes) {
         # Gallery wtw without __export_json treats that token as ``wtw go``.
         $script = New-WtwRemoteExportScript -Name $Name
         $fallback = Invoke-WtwRemoteCommand -HostEntry $HostEntry -Script $script
@@ -330,8 +368,10 @@ function Get-WtwRemoteWorktreeExport {
             Write-WtwSshFailure -HostEntry $HostEntry -ErrorText $fallback.Error
             return $null
         }
-        $parsed = ConvertFrom-WtwWorktreeExportText -Text (($fallback.Output -join "`n"))
-        if (-not $parsed) {
+        $reparsed = ConvertFrom-WtwWorktreeExportText -Text (($fallback.Output -join "`n"))
+        if ($reparsed) {
+            $parsed = $reparsed
+        } elseif (-not $parsed) {
             Show-WtwRemoteTargetSuggestions -HostEntry $HostEntry -Name $Name
             Write-Error "'$Name' did not resolve to a worktree on $($HostEntry.Name)."
             return $null
