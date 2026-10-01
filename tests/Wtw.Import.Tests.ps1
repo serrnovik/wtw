@@ -74,6 +74,49 @@ Describe 'ConvertTo-WtwCanonicalGitUrl' {
     }
 }
 
+Describe 'ConvertFrom-WtwGitRemoteVerboseLine' {
+    It 'reads a fetch URL and ignores the partial-clone filter suffix' {
+        InModuleScope wtw {
+            $plain = ConvertFrom-WtwGitRemoteVerboseLine -Line "origin`tgit@github.com:serrnovik/snowmain.git (fetch)"
+            $plain.name | Should -Be 'origin'
+            $plain.url | Should -Be 'git@github.com:serrnovik/snowmain.git'
+
+            $partial = ConvertFrom-WtwGitRemoteVerboseLine -Line "origin`tgit@github.com:serrnovik/snowmain.git (fetch) [blob:none]"
+            $partial.name | Should -Be 'origin'
+            $partial.url | Should -Be 'git@github.com:serrnovik/snowmain.git'
+
+            $limited = ConvertFrom-WtwGitRemoteVerboseLine -Line "upstream`thttps://github.com/serrnovik/snowmain.git (fetch) [blob:limit=1m]"
+            $limited.name | Should -Be 'upstream'
+            $limited.url | Should -Be 'https://github.com/serrnovik/snowmain.git'
+
+            ConvertFrom-WtwGitRemoteVerboseLine -Line "origin`tgit@github.com:serrnovik/snowmain.git (push)" |
+                Should -BeNullOrEmpty
+        }
+    }
+
+    It 'reads fetch URLs from a checkout whose remote -v advertises a promisor filter' {
+        $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-remote-v-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+        New-Item -Path $temp -ItemType Directory -Force | Out-Null
+        try {
+            git init -b main $temp --quiet
+            git -C $temp remote add origin 'git@github.com:serrnovik/snowmain.git'
+            git -C $temp config remote.origin.promisor true
+            git -C $temp config remote.origin.partialclonefilter blob:none
+            $verbose = @(git -C $temp remote -v)
+            ($verbose -join "`n") | Should -Match '\[blob:none\]'
+
+            $remotes = InModuleScope wtw -Parameters @{ RepoPath = $temp } {
+                Get-WtwGitFetchRemotes -RepoPath $RepoPath
+            }
+            @($remotes).Count | Should -Be 1
+            $remotes[0].name | Should -Be 'origin'
+            $remotes[0].url | Should -Be 'git@github.com:serrnovik/snowmain.git'
+        } finally {
+            Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe 'import command help' {
     It 'documents --from as the host selector' {
         $out = & { Invoke-Wtw import --help } 6>&1 | Out-String
@@ -89,6 +132,7 @@ Describe 'New-WtwRemoteExportScript' {
             $script | Should -Match "o''brien"
             $script | Should -Match 'Get-WtwWorktreeExport'
             $script | Should -Match 'wtw-export'
+            $script.Contains('(?:\s+\[[^\]]+\])?') | Should -BeTrue
         }
     }
 }

@@ -64,6 +64,27 @@ function ConvertTo-WtwCanonicalLocalGitPath {
     return $candidate.TrimEnd('/', '\')
 }
 
+function ConvertFrom-WtwGitRemoteVerboseLine {
+    <#
+    .SYNOPSIS
+        Parse one `git remote -v` line into a fetch remote, or $null.
+    .DESCRIPTION
+        A partial clone appends its promisor filter after `(fetch)`, for example
+        `[blob:none]` or `[blob:limit=1m]`. That suffix is not part of the URL.
+        Push lines are ignored.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()] [string] $Line)
+
+    if ([string]::IsNullOrWhiteSpace($Line)) { return $null }
+    # Same pattern as the inline match in New-WtwRemoteExportScript. That script
+    # runs on a remote whose module may not have this function yet.
+    if ("$Line" -match '^(?<name>\S+)\s+(?<url>\S+)\s+\(fetch\)(?:\s+\[[^\]]+\])?\s*$') {
+        return [PSCustomObject]@{ name = $Matches.name; url = $Matches.url }
+    }
+    return $null
+}
+
 function Get-WtwGitFetchRemotes {
     <#
     .SYNOPSIS
@@ -75,12 +96,8 @@ function Get-WtwGitFetchRemotes {
     $found = @()
     if (-not (Test-Path -LiteralPath $RepoPath)) { return , @() }
     foreach ($line in @(git -C $RepoPath remote -v 2>$null)) {
-        $text = "$line"
-        if ($text -match '^(?<name>\S+)\s+(?<url>\S+)\s+\(fetch\)$') {
-            $remoteName = $Matches.name
-            $remoteUrl = $Matches.url
-            $found += [PSCustomObject]@{ name = $remoteName; url = $remoteUrl }
-        }
+        $remote = ConvertFrom-WtwGitRemoteVerboseLine -Line "$line"
+        if ($remote) { $found += $remote }
     }
     return , @($found)
 }
@@ -255,7 +272,8 @@ $json = & $module {
     $dirty = @(git -C $path status --porcelain 2>$null | Where-Object { "$_".Trim() }).Count -gt 0
     $remotes = @()
     foreach ($line in @(git -C $main remote -v 2>$null)) {
-        if ("$line" -match '^(?<name>\S+)\s+(?<url>\S+)\s+\(fetch\)$') {
+        # Partial clones print `(fetch) [blob:none]`. The bracket is not the URL.
+        if ("$line" -match '^(?<name>\S+)\s+(?<url>\S+)\s+\(fetch\)(?:\s+\[[^\]]+\])?\s*$') {
             $remotes += [PSCustomObject]@{ name = $Matches.name; url = $Matches.url }
         }
     }
