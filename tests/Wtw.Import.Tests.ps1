@@ -102,6 +102,7 @@ Describe 'ConvertFrom-WtwGitRemoteVerboseLine' {
             git -C $temp remote add origin 'git@github.com:serrnovik/snowmain.git'
             git -C $temp config remote.origin.promisor true
             git -C $temp config remote.origin.partialclonefilter blob:none
+            git -C $temp config extensions.partialclone blob:none
             $verbose = @(git -C $temp remote -v)
             ($verbose -join "`n") | Should -Match '\[blob:none\]'
 
