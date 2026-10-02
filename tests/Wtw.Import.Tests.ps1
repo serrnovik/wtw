@@ -94,7 +94,7 @@ Describe 'ConvertFrom-WtwGitRemoteVerboseLine' {
         }
     }
 
-    It 'reads fetch URLs from a checkout whose remote -v advertises a promisor filter' {
+    It 'reads fetch URLs from a promisor checkout without relying on Git display format' {
         $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-remote-v-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
         New-Item -Path $temp -ItemType Directory -Force | Out-Null
         try {
@@ -103,8 +103,6 @@ Describe 'ConvertFrom-WtwGitRemoteVerboseLine' {
             git -C $temp config remote.origin.promisor true
             git -C $temp config remote.origin.partialclonefilter blob:none
             git -C $temp config extensions.partialclone blob:none
-            $verbose = @(git -C $temp remote -v)
-            ($verbose -join "`n") | Should -Match '\[blob:none\]'
 
             $remotes = InModuleScope wtw -Parameters @{ RepoPath = $temp } {
                 Get-WtwGitFetchRemotes -RepoPath $RepoPath
