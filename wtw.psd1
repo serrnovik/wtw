@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.44'
+    ModuleVersion     = '0.2.45'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -41,7 +41,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'wtw go runs the configured session script even when the shell is already in that directory. wtw list prints worktree aliases that were stored as a list, instead of System.Object[].'
+            ReleaseNotes = 'wtw create still parses its arguments after this session reloads the module. A reload used to drop the private argument parser, so create ran with an empty task name.'
         }
     }
 }

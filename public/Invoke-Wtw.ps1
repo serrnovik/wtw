@@ -180,6 +180,10 @@ function Invoke-Wtw {
         }
 
         $remoteParsed = Convert-WtwArgsToSplat $rawArgs
+        if ($null -eq $remoteParsed -or $null -eq $remoteParsed.Splat -or $null -eq $remoteParsed.Positional) {
+            Write-Error "wtw could not parse arguments for '$Command'."
+            return
+        }
         $remoteSplat = $remoteParsed.Splat
         $remotePos = $remoteParsed.Positional
 
@@ -307,6 +311,10 @@ function Invoke-Wtw {
     }
 
     $parsed = Convert-WtwArgsToSplat $rawArgs
+    if ($null -eq $parsed -or $null -eq $parsed.Splat -or $null -eq $parsed.Positional) {
+        Write-Error "wtw could not parse arguments for '$Command'."
+        return
+    }
     $splat = $parsed.Splat
     $pos = $parsed.Positional
 

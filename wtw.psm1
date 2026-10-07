@@ -192,3 +192,32 @@ Set-Item -Path Function:Global:Sync-WtwCmuxRemoteProjects -Value {
     & $mod { param($s) & ${function:Sync-WtwCmuxRemoteProjects} @s } $splat
 } -Force
 
+# Same tear-down as Write-WtwHost. `wtw create` parses in Invoke-Wtw via this
+# private helper. After Import-Module -Force the in-flight frame cannot see
+# module-private commands, $parsed stays null, and New-WtwWorktree is called
+# with an empty Task. The global proxy re-enters the loaded module.
+Set-Item -Path Function:Global:Convert-WtwArgsToSplat -Value {
+    param(
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [object[]] $ArgList
+    )
+
+    if ($null -eq $ArgList) { $ArgList = @() }
+    $mod = Get-Module wtw | Select-Object -First 1
+    if (-not $mod) {
+        throw 'wtw is not loaded.'
+    }
+
+    # A bare array is enumerated by the call operator, which turned
+    # `--from main` into one positional string. A hashtable is one value.
+    & $mod {
+        param($s)
+        if (-not (Get-Command -Name Convert-WtwArgsToSplat -ErrorAction SilentlyContinue)) {
+            $helper = Join-Path $script:WtwModuleRoot 'private' 'Convert-WtwArgsToSplat.ps1'
+            if (Test-Path -LiteralPath $helper) { . $helper }
+        }
+        & ${function:Convert-WtwArgsToSplat} -ArgList $s.ArgList
+    } @{ ArgList = $ArgList }
+} -Force
+

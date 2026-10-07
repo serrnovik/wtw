@@ -1,6 +1,6 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../wtw.psm1" -Force -DisableNameChecking
-    # Dot-source the public file containing Convert-WtwArgsToSplat (it's not exported but defined in public/)
+    # Private helper. Tests call the dot-sourced copy; the module keeps its own.
     . "$PSScriptRoot/../private/Convert-WtwArgsToSplat.ps1"
 }
 
@@ -55,5 +55,21 @@ Describe 'Convert-WtwArgsToSplat' {
         $result = Convert-WtwArgsToSplat @()
         $result.Positional.Count | Should -Be 0
         $result.Splat.Count | Should -Be 0
+    }
+}
+
+Describe 'Convert-WtwArgsToSplat after module reimport' {
+    It 'parses from a stack frame whose private commands were torn down' {
+        # Import-Module -Force drops by-name lookup of module-private functions
+        # for the frame that is already running. `wtw create` then saw a null
+        # splat and called New-WtwWorktree with an empty Task.
+        $mod = Get-Module wtw | Select-Object -First 1
+        $result = & $mod {
+            Import-Module (Join-Path $script:WtwModuleRoot 'wtw.psm1') -Global -Force -DisableNameChecking
+            Convert-WtwArgsToSplat @('astra-kulissa-practice-meet', '--from', 'main')
+        }
+
+        $result.Positional | Should -Contain 'astra-kulissa-practice-meet'
+        $result.Splat['From'] | Should -Be 'main'
     }
 }
