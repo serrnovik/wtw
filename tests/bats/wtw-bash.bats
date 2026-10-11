@@ -120,6 +120,7 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.bash"
         | grep -v '/pwsh' \
         | grep -v 'echo.*pwsh' \
         | grep -v '\$_wtw_pwsh' \
+        | grep -v -- '--pwsh' \
         || true)
     [ -z "$bad_lines" ]
 }
