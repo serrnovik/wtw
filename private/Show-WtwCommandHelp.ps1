@@ -26,7 +26,7 @@ function Show-WtwCommandHelp {
             '  .zsh  -> sourced in zsh      .sh/.bash -> sourced in bash/zsh'
         ) }
         'add'         { @(
-            'wtw add [path]',
+            'wtw add [path|task]',
             'Adopt an *existing-on-disk* git worktree with full wtw registration.',
             'For worktrees created by `git worktree add` outside wtw. Runs the same',
             'post-setup as `wtw create`: workspace file from template, color, pretty',
@@ -35,7 +35,7 @@ function Show-WtwCommandHelp {
             'For the parent repo itself use `wtw init`.',
             '',
             'Arguments:',
-            '  path    Path to the worktree directory (default: current directory)',
+            '  path    Worktree directory (default: current directory). A bare name from inside a worktree is the task.',
             '',
             'Options:',
             '  --repo <name>     Parent repo alias (auto-detected from the worktree .git pointer)',
@@ -50,6 +50,7 @@ function Show-WtwCommandHelp {
             '                    Create or skip a SourceGit group for the parent repo',
             '',
             'Examples:',
+            '  wtw add update-routine --emoji ...',
             '  wtw add ../snowmain1_foo --task foo',
             '  cd ../snowmain1_foo ; wtw add --task foo --color "forest green"',
             '  wtw add ~/.t3/worktrees/snowmain1/t3code-ad4f13f1 --alias "onboarding video"',

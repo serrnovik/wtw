@@ -288,3 +288,67 @@ _wtw_register_aliases() {
 
 _wtw_register_aliases 2>/dev/null
 _wtw_cmux_apply_current
+
+# Flag completion mirrors completions/wtw.auto-completion.ps1 and shell/wtw.zsh.
+_wtw_complete() {
+    local cur prev cmd i
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    cmd=""
+    i=1
+    while [ "$i" -lt "$COMP_CWORD" ]; do
+        case "${COMP_WORDS[$i]}" in
+            --on|--at|--via|--from)
+                i=$((i + 2))
+                ;;
+            -*)
+                i=$((i + 1))
+                ;;
+            *)
+                cmd="${COMP_WORDS[$i]}"
+                break
+                ;;
+        esac
+    done
+    local flags=""
+    case "$cmd" in
+        init) flags="--template --startup-script --startup-script-zsh --startup-script-bash --workspaces-dir --name --emoji --sourcegit-folder --no-sourcegit-folder" ;;
+        add) flags="--repo --task --branch --name --emoji --color --alias --sourcegit-folder --no-sourcegit-folder" ;;
+        create) flags="--name --emoji --folder --branch --adopt --no-branch --from --gt-track --color --repo --open --alias" ;;
+        import) flags="--from --repo --via --dry-run" ;;
+        list|ls) flags="-f --filter -d --detailed --wide --repo" ;;
+        remove|rm|delete|del|unregister|unreg) flags="--repo --force" ;;
+        edit|rename|ren) flags="--name --task --alias --key --emoji --sourcegit-folder --no-sourcegit-folder --repo --no-sync" ;;
+        open|cursor|cur|code|co|antigravity|anti|windsurf|wind|codium|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|claude|t3|ss) flags="--repo --editor --skip-restart" ;;
+        claudecode|ccode) flags="--repo --prompt" ;;
+        sync) flags="--all --repo --template --dry-run --color-source" ;;
+        color) flags="--no-sync" ;;
+        clean) flags="--dry-run --force --all --worktrees --linked --extra --branches" ;;
+        skill) flags="--agent" ;;
+        sbx) flags="--name --agent --template --writable --dry-run" ;;
+        install) flags="--skip-profile" ;;
+        update) flags="--check --yes --force" ;;
+        host|self) flags="--alias --user --address --identity --port --wtw --pwsh --yes --exclude --emoji --label --separator" ;;
+        *) flags="" ;;
+    esac
+    flags="$flags --help -h --on --at"
+    if [[ "$cur" == -* ]]; then
+        # shellcheck disable=SC2207
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+        return 0
+    fi
+    if [ -z "$cmd" ]; then
+        local commands="init add create import list ls info show go open remove rm delete del unregister unreg edit rename ren workspace copy sync color clean host self agent install update skill sbx run connect chatgpt cursor code antigravity windsurf codium droid cmux wmux ss claude claudecode t3 help version"
+        # shellcheck disable=SC2207
+        COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
+        return 0
+    fi
+    if [ "$cmd" = "add" ]; then
+        # shellcheck disable=SC2207
+        COMPREPLY=( $(compgen -d -- "$cur") )
+        return 0
+    fi
+    return 0
+}
+complete -F _wtw_complete wtw

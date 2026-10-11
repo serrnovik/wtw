@@ -90,7 +90,7 @@ function Invoke-Wtw {
         Write-WtwHost ''
         Write-WtwHost '  Commands:' -ForegroundColor Yellow
         Write-WtwHost '    init [aliases]    Initialise current repo as a main repo (--template, --startup-script, --emoji)'
-        Write-WtwHost '    add [path]        Adopt an existing on-disk worktree with full registration (workspace + color + cmux/SourceGit/etc.)'
+        Write-WtwHost '    add [path|task]   Adopt an existing on-disk worktree (bare name inside it is the task)'
         Write-WtwHost '    create <task>     Create worktree + branch (--emoji for identity glyph; --branch / --adopt to attach an existing branch)'
         Write-WtwHost '    import --from <host> <name>  Check out a worktree from another machine (same git remote)'
         Write-WtwHost '    list [repo] [-f|--filter <text>] [-d|--detailed] [--wide]  List repos/worktrees'

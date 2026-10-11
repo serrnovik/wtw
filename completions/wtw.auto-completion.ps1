@@ -257,23 +257,38 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'init'   { @('--template', '--startup-script', '--startup-script-zsh', '--startup-script-bash', '--workspaces-dir', '--name', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder') }
             'skill'  { @('--agent') }
             'add'    { @('--repo', '--task', '--branch', '--name', '--emoji', '--color', '--alias', '--sourcegit-folder', '--no-sourcegit-folder') }
-            'create' { @('--name', '--emoji', '--folder', '--branch', '--color', '--repo', '--open', '--no-branch', '--from', '--gt-track', '--alias') }
+            'create' { @('--name', '--emoji', '--folder', '--branch', '--adopt', '--no-branch', '--color', '--repo', '--open', '--from', '--gt-track', '--alias') }
             'import' { @('--from', '--via', '--dry-run', '--repo') }
             'clean'  { @('--dry-run', '--force', '--all', '--worktrees', '--linked', '--extra', '--branches') }
             'remove' { @('--repo', '--force') }
             'rm'     { @('--repo', '--force') }
+            'delete' { @('--repo', '--force') }
+            'del'    { @('--repo', '--force') }
             'unregister' { @('--repo', '--force') }
             'unreg'      { @('--repo', '--force') }
             'edit'       { @('--name', '--task', '--alias', '--key', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder', '--repo', '--no-sync') }
             'rename'     { @('--name', '--task', '--alias', '--key', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder', '--repo', '--no-sync') }
             'ren'        { @('--name', '--task', '--alias', '--key', '--emoji', '--sourcegit-folder', '--no-sourcegit-folder', '--repo', '--no-sync') }
-            'open'   { @('--repo', '--editor') }
-            'list'   { @('--repo', '--detailed', '-d') }
-            'ls'     { @('--repo', '--detailed', '-d') }
+            'open'   { @('--repo', '--editor', '--prompt', '--skip-restart') }
+            'cursor' { @('--repo', '--skip-restart') }
+            'code'   { @('--repo', '--skip-restart') }
+            'chatgpt' { @('--repo', '--skip-restart') }
+            'cgpt'   { @('--repo', '--skip-restart') }
+            'codex'  { @('--repo', '--skip-restart') }
+            'claudecode' { @('--repo', '--prompt') }
+            'ccode'  { @('--repo', '--prompt') }
+            'list'   { @('--repo', '--detailed', '-d', '--wide', '-f', '--filter') }
+            'ls'     { @('--repo', '--detailed', '-d', '--wide', '-f', '--filter') }
             'sync'   { @('--all', '--repo', '--template', '--dry-run', '--color-source') }
             'color'  { @('--no-sync') }
+            'sbx'    { @('--name', '--agent', '--template', '--writable', '--dry-run') }
+            'install' { @('--skip-profile') }
+            'update' { @('--check', '--yes', '--force') }
+            'host'   { @('--alias', '--user', '--address', '--identity', '--port', '--wtw', '--pwsh', '--yes', '--exclude', '--emoji', '--label', '--separator') }
+            'self'   { @('--emoji', '--label') }
             default  { @() }
         }
+        $flags = @($flags) + @('--help', '-h', '--on', '--at')
         $flags | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
             [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterName', $_)
         }

@@ -225,42 +225,146 @@ _wtw_completion() {
     if [[ "$PREFIX" == -* ]]; then
         case "$subcommand" in
             init)
-                options=('--template:workspace template' '--startup-script:session script' '--startup-script-zsh:zsh session script' '--startup-script-bash:bash session script' '--workspaces-dir:workspace directory' '--name:display name')
+                options=(
+                    '--template:workspace template'
+                    '--startup-script:session script'
+                    '--startup-script-zsh:zsh session script'
+                    '--startup-script-bash:bash session script'
+                    '--workspaces-dir:workspace directory'
+                    '--name:registry key'
+                    '--emoji:prefix glyph'
+                    '--sourcegit-folder:create a SourceGit group'
+                    '--no-sourcegit-folder:do not create a SourceGit group'
+                )
                 ;;
             add)
-                options=('--repo:repository' '--task:task name' '--branch:branch name')
+                options=(
+                    '--repo:parent repository'
+                    '--task:registry task name'
+                    '--branch:branch name override'
+                    '--name:display name'
+                    '--emoji:identity glyph'
+                    '--color:workspace color'
+                    '--alias:extra go names'
+                    '--sourcegit-folder:create a SourceGit group'
+                    '--no-sourcegit-folder:do not create a SourceGit group'
+                )
                 ;;
             create)
-                options=('--name:display name' '--folder:worktree folder' '--branch:existing branch' '--color:workspace color' '--repo:repository' '--open:open after creation' '--no-branch:do not create a branch' '--from:base branch' '--gt-track:Graphite parent')
+                options=(
+                    '--name:display name'
+                    '--emoji:identity glyph'
+                    '--folder:worktree folder suffix'
+                    '--branch:branch to create or adopt'
+                    '--adopt:adopt the branch named by the task'
+                    '--no-branch:adopt the branch named by the task'
+                    '--from:start point for a new branch'
+                    '--gt-track:register with Graphite'
+                    '--color:workspace color'
+                    '--repo:repository'
+                    '--open:open after creation'
+                    '--alias:extra go names'
+                )
                 ;;
             import)
-                options=('--from:machine the worktree is on' '--repo:local clone to receive it' '--via:transport' '--dry-run:preview without creating')
+                options=(
+                    '--from:machine the worktree is on'
+                    '--repo:local clone to receive it'
+                    '--via:transport'
+                    '--dry-run:preview without creating'
+                )
                 ;;
             list|ls)
-                options=('-d:detailed view' '--detailed:detailed view' '--wide:untruncated columns' '--repo:repository' '-f:substring filter' '--filter:substring filter')
+                options=(
+                    '-f:substring filter'
+                    '--filter:substring filter'
+                    '-d:detailed view'
+                    '--detailed:detailed view'
+                    '--wide:untruncated columns'
+                    '--repo:repository'
+                )
                 ;;
             remove|rm|delete|del|unregister|unreg)
                 options=('--repo:repository' '--force:skip confirmation')
                 ;;
             edit|rename|ren)
-                options=('--name:display name or aliases' '--task:worktree registry key' '--alias:repo aliases' '--key:repo registry key' '--repo:repository' '--no-sync:skip workspace synchronization')
+                options=(
+                    '--name:display name or aliases'
+                    '--task:worktree registry key'
+                    '--alias:extra names or repo aliases'
+                    '--key:repo registry key'
+                    '--emoji:identity glyph or repo prefix'
+                    '--sourcegit-folder:create a SourceGit group'
+                    '--no-sourcegit-folder:do not create a SourceGit group'
+                    '--repo:repository'
+                    '--no-sync:skip workspace synchronization'
+                )
                 ;;
-            open)
-                options=('--repo:repository' '--editor:editor name')
+            open|cursor|cur|code|co|antigravity|anti|windsurf|wind|codium|vscodium|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|t3|t3code|ss|superset|supersetsh)
+                options=('--repo:repository' '--editor:editor name' '--skip-restart:do not restart the app')
+                ;;
+            claudecode|ccode)
+                options=('--repo:repository' '--prompt:pre-fill the new chat')
                 ;;
             sync)
-                options=('--all:all workspaces' '--repo:repository' '--template:workspace template' '--dry-run:preview changes' '--color-source:color source')
+                options=(
+                    '--all:all workspaces'
+                    '--repo:repository'
+                    '--template:workspace template'
+                    '--dry-run:preview changes'
+                    '--color-source:json or workspace'
+                )
                 ;;
             color)
                 options=('--no-sync:skip workspace synchronization')
                 ;;
             clean)
-                options=('--dry-run:preview cleanup' '--force:skip confirmation' '--all:stale worktrees and merged branches' '--worktrees:stale AI / unregistered git worktrees' '--linked:extra git worktrees including tracked' '--extra:alias of --linked' '--branches:merged local branches')
+                options=(
+                    '--dry-run:preview cleanup'
+                    '--force:skip confirmation'
+                    '--all:stale worktrees and merged branches'
+                    '--worktrees:stale AI / unregistered git worktrees'
+                    '--linked:extra git worktrees including tracked'
+                    '--extra:alias of --linked'
+                    '--branches:merged local branches'
+                )
                 ;;
             skill)
-                options=('--agent:agent format')
+                options=('--agent:claude, agents, or all')
+                ;;
+            sbx)
+                options=(
+                    '--name:sandbox name'
+                    '--agent:agent to launch'
+                    '--template:sandbox template'
+                    '--writable:mount the workspace writable'
+                    '--dry-run:preview the launch'
+                )
+                ;;
+            install)
+                options=('--skip-profile:do not edit the shell profile')
+                ;;
+            update)
+                options=('--check:report only' '--yes:skip the prompt' '--force:reinstall')
+                ;;
+            host|self)
+                options=(
+                    '--alias:host aliases'
+                    '--user:ssh user'
+                    '--address:ssh address'
+                    '--identity:ssh identity file'
+                    '--port:ssh port'
+                    '--wtw:remote wtw path'
+                    '--pwsh:remote pwsh path'
+                    '--yes:skip the prompt'
+                    '--exclude:paths to skip'
+                    '--emoji:machine badge glyph'
+                    '--label:short machine label'
+                    '--separator:badge separator'
+                )
                 ;;
         esac
+        options+=('--help:show help' '-h:show help' '--on:remote host' '--at:remote host')
         if (( ${#options[@]} )); then
             _describe -t options 'wtw option' options
         fi
@@ -276,6 +380,11 @@ _wtw_completion() {
                 return 0
                 ;;
         esac
+    fi
+
+    if [[ "$subcommand" == add ]]; then
+        _files -/
+        return 0
     fi
 
     targets=("${_wtw_registered_aliases[@]}")

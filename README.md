@@ -228,7 +228,7 @@ branches are never force-deleted.
 | Command | Description |
 |---------|-------------|
 | `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X] [--emoji X] [--sourcegit-folder]` | Register current repo with aliases, template, per-shell session scripts, optional SourceGit / list / cmux / wmux / T3 prefix, and optional SourceGit group folder |
-| `wtw add [path] [--repo X --task X] [--alias a,b] [--emoji X] [--sourcegit-folder]` | Import an existing worktree into the registry |
+| `wtw add [path|task] [--repo X --task X] [--branch X] [--name X] [--alias a,b] [--emoji X] [--color X] [--sourcegit-folder]` | Adopt an existing worktree. A bare name inside it is the task. |
 | `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b] [--emoji X]` | Create worktree + workspace + branch |
 | `wtw list [-f\|--filter text] [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`-f kul` = substring; `--wide` = full aliases and paths) |
 | `wtw --version` / `-v` / `version` | Print the running module version and where it was loaded from |

@@ -40,7 +40,8 @@ function Add-WtwEntry {
     .PARAMETER NoSourceGitFolder
         Do not create a SourceGit group. An existing folder still collects this worktree.
     .EXAMPLE
-        wtw add /path/to/snowmain1_foo --task foo
+        wtw add update-routine --emoji 🎉
+        From inside the worktree, a bare name is the task (same as --task).
         Adopt an existing worktree as task 'foo' under its auto-detected parent.
         Generates the workspace file, picks a color, registers with cmux/SourceGit/etc.
     .EXAMPLE
@@ -68,13 +69,10 @@ function Add-WtwEntry {
         return
     }
 
-    if (-not $Path) { $Path = (Get-Location).Path }
-    $Path = [System.IO.Path]::GetFullPath($Path)
-
-    if (-not (Test-Path $Path)) {
-        Write-Error "Path does not exist: $Path"
-        return
-    }
+    $resolved = Resolve-WtwAddTarget -Path $Path -Task $Task
+    if (-not $resolved) { return }
+    $Path = $resolved.Path
+    $Task = $resolved.Task
 
     $gitDir = Join-Path $Path '.git'
     if (-not (Test-Path $gitDir)) {
