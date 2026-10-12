@@ -194,16 +194,50 @@ SHELL_FILE="${BATS_TEST_DIRNAME}/../../shell/wtw.zsh"
     [[ "$output" != *"Invoke-Wtw 'go'"* ]]
 }
 
-@test "no bare pwsh calls in wtw.zsh (uses \$_wtw_pwsh)" {
-    local bad_lines
-    bad_lines=$(grep -n 'pwsh' "$SHELL_FILE" \
+_wtw_bare_pwsh_lines() {
+    # Remove only quoted completion descriptions, not whole lines: a bare call
+    # on the same line must still fail. Token boundaries exclude the --pwsh flag.
+    sed -E "s/'--pwsh:[^']*'//g" "$@" \
+        | grep -nE '(^|[^[:alnum:]_-])pwsh([^[:alnum:]_-]|$)' \
         | grep -Ev '^[0-9]+:[[:space:]]*#' \
         | grep -v '_wtw_pwsh=' \
         | grep -v 'command -v pwsh' \
         | grep -v '/pwsh' \
         | grep -v 'echo.*pwsh' \
         | grep -v '\$_wtw_pwsh' \
-        | grep -v -- '--pwsh' \
-        || true)
+        || true
+}
+
+@test "no bare pwsh calls in wtw.zsh (uses \$_wtw_pwsh)" {
+    local bad_lines
+    bad_lines=$(_wtw_bare_pwsh_lines "$SHELL_FILE")
     [ -z "$bad_lines" ]
+}
+
+@test "zsh bare-pwsh detection ignores comments and completion text" {
+    local bad_lines
+    bad_lines=$(printf '%s\n' \
+        '    # Pass the current shell PATH so pwsh subprocess can find tools' \
+        $'\t# must reach pwsh. Implicit go would treat them as worktree names.' \
+        'host|self) flags="--wtw --pwsh --yes" ;;' \
+        "    '--pwsh:remote pwsh path'" \
+        | _wtw_bare_pwsh_lines)
+    [ -z "$bad_lines" ]
+}
+
+@test "zsh bare-pwsh detection still rejects executable calls" {
+    local sample bad_lines
+    for sample in \
+        'pwsh' \
+        '    pwsh -NoProfile -Command true' \
+        'result=$(pwsh -NoProfile -Command true)' \
+        'PATH="$PATH" pwsh -NoProfile' \
+        'true && pwsh -NoProfile' \
+        'pwsh --pwsh' \
+        'flags="--pwsh"; pwsh -NoProfile' \
+        "options=('--pwsh:remote pwsh path'); pwsh -NoProfile"
+    do
+        bad_lines=$(_wtw_bare_pwsh_lines <<< "$sample")
+        [ -n "$bad_lines" ]
+    done
 }
