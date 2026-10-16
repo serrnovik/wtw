@@ -226,3 +226,22 @@ Describe 'SourceGit repo folders' {
         }
     }
 }
+
+Describe 'Get-WtwSourceGitPreferencePath on Linux' {
+    It 'finds preference.json under the XDG config dir' -Skip:(-not $IsLinux) {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-sgcfg-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+        $pref = Join-Path $root 'SourceGit/preference.json'
+        New-Item -ItemType Directory -Path (Split-Path $pref) -Force | Out-Null
+        Set-Content -LiteralPath $pref -Value '{}'
+        $saved = @{ Xdg = $env:XDG_CONFIG_HOME; Override = $env:WTW_SOURCEGIT_PREF }
+        try {
+            $env:XDG_CONFIG_HOME = $root
+            Remove-Item Env:WTW_SOURCEGIT_PREF -ErrorAction SilentlyContinue
+            InModuleScope wtw { Get-WtwSourceGitPreferencePath } | Should -Be $pref
+        } finally {
+            $env:XDG_CONFIG_HOME = $saved.Xdg
+            $env:WTW_SOURCEGIT_PREF = $saved.Override
+            Remove-Item $root -Recurse -Force
+        }
+    }
+}

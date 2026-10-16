@@ -7,7 +7,8 @@ function Get-WtwSourceGitPreferencePath {
         <DataDir>/preference.json under the RepositoryNodes array. DataDir per
         platform (mirrors src/Native/{MacOS,Linux,Windows}.cs GetDataDir):
           - macOS:   ~/Library/Application Support/SourceGit
-          - Linux:   ~/.sourcegit
+          - Linux:   $XDG_CONFIG_HOME/SourceGit (~/.config/SourceGit), or the
+                     legacy ~/.sourcegit when that is the one present
           - Windows: %APPDATA%\SourceGit
         Portable installs (Windows exe-dir\data, AppImage-dir\data) aren't
         auto-detected — set WTW_SOURCEGIT_PREF to override. Returns $null when
@@ -22,7 +23,13 @@ function Get-WtwSourceGitPreferencePath {
     if ($IsMacOS) {
         $path = Join-Path $HOME 'Library/Application Support/SourceGit/preference.json'
     } elseif ($IsLinux) {
-        $path = Join-Path $HOME '.sourcegit/preference.json'
+        # .NET maps ApplicationData to $XDG_CONFIG_HOME or ~/.config, the same
+        # base SourceGit uses. Older builds wrote ~/.sourcegit instead.
+        $configDir = [Environment]::GetFolderPath('ApplicationData')
+        $candidates = @()
+        if ($configDir) { $candidates += Join-Path $configDir 'SourceGit/preference.json' }
+        $candidates += Join-Path $HOME '.sourcegit/preference.json'
+        $path = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     } elseif ($IsWindows -or $env:OS -eq 'Windows_NT') {
         $appData = [Environment]::GetFolderPath('ApplicationData')
         $scoopUser = [Environment]::GetEnvironmentVariable('SCOOP')
