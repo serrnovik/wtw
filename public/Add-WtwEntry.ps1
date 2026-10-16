@@ -74,11 +74,19 @@ function Add-WtwEntry {
     $Path = $resolved.Path
     $Task = $resolved.Task
 
-    $gitDir = Join-Path $Path '.git'
-    if (-not (Test-Path $gitDir)) {
-        Write-Error "Not a git repository: $Path"
+    # Run from a subfolder of the worktree, adopt the worktree itself.
+    $worktreeRoot = Resolve-WtwRepoRoot -Path $Path
+    if (-not $worktreeRoot) {
+        Write-Error @"
+Not a git repository: $Path
+wtw manages git checkouts and their worktrees, so a plain folder cannot be added.
+  To track it with wtw:  git init; git add -A; git commit -m init; wtw init
+  To adopt a worktree:   run wtw add from inside a 'git worktree add' directory
+"@
         return
     }
+    $Path = $worktreeRoot
+    $gitDir = Join-Path $Path '.git'
 
     $dirName = Split-Path $Path -Leaf
     Write-WtwHost "  Path: $Path" -ForegroundColor Cyan

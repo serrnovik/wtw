@@ -4,7 +4,8 @@ function Resolve-WtwRepoRoot {
         [string] $Path
     )
 
-    $target = if ($Path) { $Path } else { (Get-Location).Path }
+    $start = if ($Path) { $Path } else { (Get-Location).Path }
+    $target = $start
     $prev = $null
     while ($target -and $target -ne $prev) {
         if (Test-Path (Join-Path $target '.git')) {
@@ -15,7 +16,7 @@ function Resolve-WtwRepoRoot {
     }
     # Fallback to git command
     try {
-        $root = git -C (Get-Location).Path rev-parse --show-toplevel 2>$null
+        $root = git -C $start rev-parse --show-toplevel 2>$null
         if ($LASTEXITCODE -eq 0 -and $root) { return $root }
     } catch {}
     return $null
