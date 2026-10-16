@@ -106,6 +106,7 @@ function Invoke-Wtw {
         Write-WtwHost '    droid [name]     Open in Factory desktop app (alias: factory)'
         Write-WtwHost '    cmux [name]       Open in cmux terminal workspace (alias: cm)'
         Write-WtwHost '    wmux [name]       Open in wmux terminal workspace (alias: wm)'
+        Write-WtwHost '    wave [name]       Open in a Wave Terminal block via wsh (alias: wv)'
         Write-WtwHost '    claude [name]     Open Claude.ai app  (alias: cowork)'
         Write-WtwHost '    claudecode [name] [--prompt <text>]  New Claude Code chat in the worktree (alias: ccode)'
         Write-WtwHost '    t3 [name]         Add + open T3 Code project  (alias: t3code)'

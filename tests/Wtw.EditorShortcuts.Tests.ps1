@@ -86,6 +86,16 @@ Describe 'Resolve-WtwEditorCommand' {
         $alias.type | Should -Be 'wmux'
     }
 
+    It 'resolves "wave" and "wv" to Wave launcher metadata' {
+        $command = Resolve-WtwEditorCommand 'wave'
+        $alias = Resolve-WtwEditorCommand 'wv'
+
+        $command.type | Should -Be 'wave'
+        $command.appName | Should -Be 'Wave'
+        $command.cmd | Should -Be 'wsh'
+        $alias.type | Should -Be 'wave'
+    }
+
     It 'resolves "claude" and "cowork" to a plain Claude app launch' {
         foreach ($name in 'claude', 'cowork') {
             $command = Resolve-WtwEditorCommand $name

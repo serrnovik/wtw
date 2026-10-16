@@ -116,7 +116,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
     ) + $familyNames + @(
         'sourcegit', 'sgit', 'sg',
         'codex', 'droid', 'factory', 'claude', 'cowork', 'claudecode', 'ccode', 't3', 't3code',
-        'cmux', 'cm', 'wmux', 'wm',
+        'cmux', 'cm', 'wmux', 'wm', 'wave', 'wv',
         'ss', 'superset', 'supersetsh',
         'workspace', 'ws'
     )
@@ -166,6 +166,7 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             @{ Name = 'claudecode';  Tip = 'New Claude Code chat in the worktree (alias: ccode)' }
             @{ Name = 'cmux';        Tip = 'Open as a cmux workspace (also: wtw --on <host> cmux)' }
             @{ Name = 'wmux';        Tip = 'Open as a wmux workspace on Windows' }
+            @{ Name = 'wave';        Tip = 'Open in a Wave Terminal block (wsh)' }
             @{ Name = 't3';          Tip = 'Register + open a T3 Code project' }
             @{ Name = 'ss';          Tip = 'Find & open matching Superset workspace' }
             @{ Name = 'host';        Tip = 'Manage remote machines for --on' }

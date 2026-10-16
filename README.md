@@ -194,6 +194,7 @@ wtw chatgpt auth --skip-restart  # open without closing ChatGPT if the label nee
 wtw claudecode auth       # new Claude Code chat rooted at the worktree (or: wtw ccode auth)
 wtw cmux auth             # open the worktree as a cmux workspace (or: wtw cm auth)
 wtw wmux auth             # Windows: open the worktree as a wmux workspace (or: wtw wm auth)
+wtw wave auth             # from a Wave terminal: open the worktree in a Wave block (or: wtw wv auth)
 ```
 
 ### 4. Done with it
@@ -246,6 +247,7 @@ branches are never force-deleted.
 | `wtw claudecode [name] [--prompt X]` | Start a new Claude Code chat rooted at the worktree (aliases: `ccode`) |
 | `wtw cmux [name]` | Open the worktree as a cmux workspace (aliases: `cm`). With `--on` / `--at`, opens a local cmux whose terminal SSHs to that host |
 | `wtw wmux [name]` | Open the worktree as a wmux workspace on Windows (aliases: `wm`) |
+| `wtw wave [name]` | Open the worktree as a Wave Terminal block, from inside Wave (aliases: `wv`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
 | `wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X] [--emoji X] [--sourcegit-folder]` | Edit a registry record (aliases: `rename`, `ren`). `--emoji` on a repo is the SourceGit / list prefix; on a worktree it overrides the derived identity glyph. `--sourcegit-folder` is repo-only |
@@ -957,6 +959,17 @@ them and `wtw remove` cleans that registration up:
   dirs — set `$env:WMUX_EXE` to override. The CLI is run with `node` when present,
   otherwise with `wmux.exe` and `ELECTRON_RUN_AS_NODE` (same as wmux's own shims).
   All of this is a no-op when wmux is not found.
+- **Wave Terminal** — `wtw wave <name>` (alias `wtw wv <name>`) drives
+  [Wave](https://waveterm.dev) through its `wsh` CLI on Linux, macOS and Windows.
+  `wsh` only reaches the app from a shell Wave spawned (it needs the injected
+  `WAVETERM_JWT` / `WAVETERM_TABID`), so run it from a Wave terminal. `wsh` cannot
+  create Wave workspaces or tabs, so the target becomes a terminal block in the
+  current tab: a block already rooted at the path (`cmd:cwd`, then
+  `frame:title`) is focused, otherwise `wsh term <path>` opens one. The block
+  gets the composed pretty title (`frame:title`) and the worktree color as its
+  frame border. wtw finds `wsh` via `$env:WTW_WSH`, PATH, `$env:WAVETERM_WSHBINDIR`,
+  then Wave's data dirs (including the snap install). `wtw create` / `wtw add` /
+  `wtw remove` do not touch Wave, since that would split the tab you ran them from.
 - **agentctl** — when installed, attaches ignored local AI-agent overlay files
   to the new worktree using the configured profile. Defaults to `team` for
   safety unless a repo/global override selects another profile.

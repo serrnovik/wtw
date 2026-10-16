@@ -20,7 +20,7 @@ function Get-WtwCliCommandNames {
         'sourcegit', 'sgit', 'sg',
         'chatgpt', 'cgpt', 'codex', 'droid', 'factory',
         'claude', 'cowork', 'claudecode', 'ccode',
-        't3', 't3code', 'cmux', 'cm', 'wmux', 'wm',
+        't3', 't3code', 'cmux', 'cm', 'wmux', 'wm', 'wave', 'wv',
         'ss', 'superset', 'supersetsh'
     )
     $family = foreach ($member in @(Get-WtwEditorFamily)) {

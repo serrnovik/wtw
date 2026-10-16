@@ -67,6 +67,7 @@ pwsh -Command "wtw cmux [name]"                    # cmux workspace in a machine
 pwsh -Command "wtw host self --emoji 🍏 --label SP"  # this machine's cmux group badge (alias: wtw self)
 pwsh -Command "wtw --version"                      # running module version (aliases: -v, version)
 pwsh -Command "wtw wmux [name]"                    # Windows wmux workspace
+pwsh -Command "wtw wave [name]"                    # Wave Terminal block (run from a Wave terminal)
 
 # Clean stale AI / unregistered git worktrees, extra linked worktrees, and/or leftover merged local branches
 pwsh -Command "wtw clean [--worktrees] [--linked] [--branches] [--all] [--dry-run] [--force]"

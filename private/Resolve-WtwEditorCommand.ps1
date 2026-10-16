@@ -24,6 +24,7 @@ function Resolve-WtwEditorCommand {
         @{ prefixes = @('droid', 'factory'); type = 'macapp'; appName = 'Factory'; appNameCandidates = @('Factory') }
         @{ prefixes = @('cmux', 'cm');          type = 'cmux';   appName = 'cmux';        cmd = 'cmux' }
         @{ prefixes = @('wmux', 'wm');          type = 'wmux';   appName = 'wmux';        cmd = 'wmux' }
+        @{ prefixes = @('wave', 'wv');          type = 'wave';   appName = 'Wave';        cmd = 'wsh' }
         @{ prefixes = @('claude', 'cowork');    type = 'macapp'; appName = 'Claude';      appNameCandidates = @('Claude') }
         # Claude Code ships inside the Claude desktop app, not as its own bundle —
         # `claude://code/new?folder=<dir>` starts a chat rooted at the worktree.

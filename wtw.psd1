@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.46'
+    ModuleVersion     = '0.2.47'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -38,10 +38,10 @@
     VariablesToExport = @()
     PrivateData       = @{
         PSData = @{
-            Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote')
+            Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote', 'waveterm')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'wtw create still parses its arguments after this session reloads the module. A reload used to drop the private argument parser, so create ran with an empty task name.'
+            ReleaseNotes = 'wtw wave <name> (alias wv) opens a worktree in Wave Terminal. Run it from a Wave terminal: it focuses the block already in that directory, or opens a new one with wsh term, titled with the worktree name and framed in its color.'
         }
     }
 }

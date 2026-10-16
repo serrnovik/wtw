@@ -357,6 +357,23 @@ function Show-WtwCommandHelp {
                 'workspace is visible.'
             )
         }
+        { $_ -in 'wave', 'wv' } {
+            @(
+                'wtw wave [name]',
+                'Open a target as a Wave Terminal block (alias: wv).',
+                '',
+                'Arguments:',
+                '  name    Target to open (default: detected from cwd)',
+                '',
+                'Run it from a Wave terminal: wsh only reaches the app through the',
+                'token Wave injects into its own shells. wsh cannot create Wave',
+                'workspaces or tabs, so the target opens as a terminal block in the',
+                'current tab via `wsh term <path>`. A block already rooted at the',
+                'target is focused instead. The block is titled with the wtw name',
+                '(e.g. 🎸🐕 NTB real dogfood) and its frame tinted with the',
+                'worktree color.'
+            )
+        }
         { $_ -in 't3', 't3code' } {
             @('wtw t3 [name]', 'Register a target as a T3 Code project, then launch T3 Code.', '', 'Arguments:', '  name    Target to register (default: detected from cwd)', '', 'T3 Code ships no CLI and no folder-open deep link, so wtw cannot tell a', 'running app to open a directory. Instead it appends the project to T3''s', 'event store under the wtw pretty name, so the worktree is already in the', 'sidebar when the app comes up.', '', 'Registration only runs while T3 Code is stopped — its server owns the', 'store while running. When it is up, wtw points T3''s "Add project starts', 'in" setting at the worktree instead.', '', 'T3 Code has no project color, so `wtw color` does not reach it.')
         }

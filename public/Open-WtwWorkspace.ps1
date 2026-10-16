@@ -76,6 +76,13 @@ function Open-WtwWorkspace {
         return
     }
 
+    # Wave Terminal — wsh has no workspace/tab creation, so the target opens as
+    # a terminal block in the current Wave tab (reused when already there).
+    if ($editorType -eq 'wave') {
+        Open-WtwWaveWorkspace -Target $target
+        return
+    }
+
     # T3 Code — no CLI and no folder-open deep link, so wtw registers the
     # worktree as a T3 project (pretty name included) and launches the app.
     if ($editorType -eq 't3') {

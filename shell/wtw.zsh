@@ -157,7 +157,7 @@ _wtw_passthrough_commands=(
     sourcegit sgit sg
     chatgpt cgpt codex droid factory
     claude cowork claudecode ccode
-    t3 t3code cmux cm wmux wm
+    t3 t3code cmux cm wmux wm wave wv
     ss superset supersetsh
     cursor cur code co antigravity anti ag windsurf wind codium vscodium
 )
@@ -210,6 +210,7 @@ _wtw_completion() {
         'factory:Open a target in Factory desktop app'
         'cmux:Open a target in cmux'
         'wmux:Open a target in wmux'
+        'wave:Open a target in a Wave Terminal block'
         'ss:Find and open a matching Superset workspace'
         'claude:Open a target in Claude'
         'claudecode:Start a new Claude Code chat in a target'
@@ -300,7 +301,7 @@ _wtw_completion() {
                     '--no-sync:skip workspace synchronization'
                 )
                 ;;
-            open|cursor|cur|code|co|antigravity|anti|windsurf|wind|codium|vscodium|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|claude|cowork|t3|t3code|ss|superset|supersetsh)
+            open|cursor|cur|code|co|antigravity|anti|windsurf|wind|codium|vscodium|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|wave|wv|claude|cowork|t3|t3code|ss|superset|supersetsh)
                 options=('--repo:repository' '--editor:editor name' '--skip-restart:do not restart the app')
                 ;;
             claudecode|ccode)
@@ -389,7 +390,7 @@ _wtw_completion() {
 
     targets=("${_wtw_registered_aliases[@]}")
     case "$subcommand" in
-        list|ls|info|show|go|open|remove|rm|delete|del|unregister|unreg|edit|rename|ren|workspace|ws|copy|sync|color|sbx|run|connect|conn|ssh|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|ss|superset|supersetsh|claude|cowork|claudecode|ccode|t3|t3code)
+        list|ls|info|show|go|open|remove|rm|delete|del|unregister|unreg|edit|rename|ren|workspace|ws|copy|sync|color|sbx|run|connect|conn|ssh|cursor|cur|code|co|antigravity|anti|ag|windsurf|wind|codium|vscodium|sourcegit|sgit|sg|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|wave|wv|ss|superset|supersetsh|claude|cowork|claudecode|ccode|t3|t3code)
             if (( ${#targets[@]} )); then
                 _describe -t targets 'wtw target' targets
             fi
