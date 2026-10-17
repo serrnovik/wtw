@@ -83,6 +83,19 @@ function Open-WtwWorkspace {
         return
     }
 
+    # Herdr — agent multiplexer with a workspace sidebar. Its CLI works from any
+    # shell; with no server up, herdr is started in Ghostty at the target.
+    if ($editorType -eq 'herdr') {
+        Open-WtwHerdrWorkspace -Target $target
+        return
+    }
+
+    # workmux — tmux windows over git worktrees, with an agent status sidebar.
+    if ($editorType -eq 'workmux') {
+        Open-WtwWorkmuxWorkspace -Target $target
+        return
+    }
+
     # T3 Code — no CLI and no folder-open deep link, so wtw registers the
     # worktree as a T3 project (pretty name included) and launches the app.
     if ($editorType -eq 't3') {

@@ -195,6 +195,8 @@ wtw claudecode auth       # new Claude Code chat rooted at the worktree (or: wtw
 wtw cmux auth             # open the worktree as a cmux workspace (or: wtw cm auth)
 wtw wmux auth             # Windows: open the worktree as a wmux workspace (or: wtw wm auth)
 wtw wave auth             # from a Wave terminal: open the worktree in a Wave block (or: wtw wv auth)
+wtw herdr auth            # open the worktree as a Herdr workspace (or: wtw hd auth)
+wtw workmux auth          # open the worktree as a workmux tmux window (or: wtw wmx auth)
 ```
 
 ### 4. Done with it
@@ -248,6 +250,8 @@ branches are never force-deleted.
 | `wtw cmux [name]` | Open the worktree as a cmux workspace (aliases: `cm`). With `--on` / `--at`, opens a local cmux whose terminal SSHs to that host |
 | `wtw wmux [name]` | Open the worktree as a wmux workspace on Windows (aliases: `wm`) |
 | `wtw wave [name]` | Open the worktree as a Wave Terminal block, from inside Wave (aliases: `wv`) |
+| `wtw herdr [name]` | Open the worktree as a Herdr workspace, starting Herdr in Ghostty if needed (aliases: `hd`) |
+| `wtw workmux [name]` | Open the worktree as a workmux tmux window, starting tmux in Ghostty if needed (aliases: `wmx`) |
 | `wtw sourcegit [name]` | Open in SourceGit (aliases: `sgit`, `sg`) |
 | `wtw remove <task> [--force]` | Remove worktree + workspace + branch |
 | `wtw edit [name] [--name X] [--task X] [--alias a,b] [--key X] [--emoji X] [--sourcegit-folder]` | Edit a registry record (aliases: `rename`, `ren`). `--emoji` on a repo is the SourceGit / list prefix; on a worktree it overrides the derived identity glyph. `--sourcegit-folder` is repo-only |
@@ -970,6 +974,24 @@ them and `wtw remove` cleans that registration up:
   frame border. wtw finds `wsh` via `$env:WTW_WSH`, PATH, `$env:WAVETERM_WSHBINDIR`,
   then Wave's data dirs (including the snap install). `wtw create` / `wtw add` /
   `wtw remove` do not touch Wave, since that would split the tab you ran them from.
+- **Herdr** — `wtw herdr <name>` (alias `wtw hd <name>`) drives
+  [Herdr](https://herdr.dev), the agent multiplexer whose sidebar shows which
+  agent is working, blocked or done. Its CLI reaches the running server from any
+  shell. A workspace with a pane already rooted at the path (`pane list` cwd,
+  then the label) is relabelled with the composed pretty title and focused;
+  otherwise `herdr workspace create --cwd <path> --label <title>` opens one. With
+  no server running, wtw starts `herdr` in a new Ghostty window at the path.
+  Herdr has no workspace color, so the color emoji in the title carries it. wtw
+  finds `herdr` via `$env:WTW_HERDR`, PATH, `~/.local/bin`, then `~/.cargo/bin`.
+- **workmux** — `wtw workmux <name>` (alias `wtw wmx <name>`) drives
+  [workmux](https://workmux.raine.dev), which pairs git worktrees with tmux windows
+  and adds an agent status sidebar (`workmux sidebar`) and dashboard. workmux reads
+  `git worktree list`, so wtw runs `workmux open <dir-name>` from the target: it
+  switches to the existing `wm-<dir>` window or creates one. workmux needs a tmux
+  server (not a client); with none running, wtw starts `tmux new-session -s wtw`
+  in a new Ghostty window first. workmux slugs window names (emoji become words),
+  so the windows keep workmux's `wm-<dir>` names. wtw finds `workmux` via
+  `$env:WTW_WORKMUX`, PATH, `~/.cargo/bin`, then `~/.local/bin`.
 - **agentctl** — when installed, attaches ignored local AI-agent overlay files
   to the new worktree using the configured profile. Defaults to `team` for
   safety unless a repo/global override selects another profile.

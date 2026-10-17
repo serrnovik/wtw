@@ -8,6 +8,7 @@
 #   wsh blocks list --tab <id> --json      -> [{blockid,tabid,view,meta:{cmd:cwd,...}}]
 #   wsh setmeta -b <block> key=value ...   -> frame:title / frame:bordercolor
 #   wsh focusblock -b <block>
+#   wsh setconfig app:tabbar=left          -> vertical tab bar
 #
 # wsh has no "new workspace" or "new tab" command, and it only works from a
 # shell Wave itself spawned. So unlike cmux/wmux, a wtw target maps to a
@@ -147,6 +148,53 @@ function Set-WtwWaveBlockFrame {
     Invoke-WtwWshCommand -ArgumentList (@('setmeta', '-b', $BlockId) + $meta) | Out-Null
 }
 
+function Get-WtwWaveSettingsPath {
+    <#
+    .SYNOPSIS
+        Path to Wave's settings.json, or $null when no config dir is found.
+    #>
+    [CmdletBinding()]
+    param()
+
+    $dirs = [System.Collections.Generic.List[string]]::new()
+    if ($env:WAVETERM_CONFIG_HOME) { $dirs.Add($env:WAVETERM_CONFIG_HOME) }
+    $homeDir = if ($HOME) { $HOME } else { $env:USERPROFILE }
+    if ($homeDir) {
+        # Snap (classic) keeps its config under ~/snap/waveterm/<rev>.
+        $dirs.Add((Join-Path $homeDir 'snap/waveterm/current/.config/waveterm'))
+        $dirs.Add((Join-Path $homeDir '.config/waveterm'))
+    }
+
+    foreach ($dir in $dirs) {
+        $candidate = Join-Path $dir 'settings.json'
+        if (Test-Path $candidate) { return $candidate }
+    }
+    return $null
+}
+
+function Initialize-WtwWaveTabBar {
+    <#
+    .SYNOPSIS
+        Move Wave's tab bar to the left, wtw's project-list layout, unless the
+        user already chose a position (app:tabbar = top or left).
+    #>
+    [CmdletBinding()]
+    param()
+
+    $settingsPath = Get-WtwWaveSettingsPath
+    if ($settingsPath) {
+        try {
+            $settings = Get-Content -Raw $settingsPath | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            if ($settings -and $settings.ContainsKey('app:tabbar')) { return }
+        } catch {
+            # Unreadable settings: don't guess, leave Wave's layout alone.
+            return
+        }
+    }
+
+    Invoke-WtwWshCommand -ArgumentList @('setconfig', 'app:tabbar=left') | Out-Null
+}
+
 function Open-WtwWaveProject {
     <#
     .SYNOPSIS
@@ -169,6 +217,8 @@ function Open-WtwWaveProject {
             Reason  = 'not running inside a Wave terminal (WAVETERM_JWT / WAVETERM_TABID not set). Run wtw from a Wave terminal block.'
         }
     }
+
+    Initialize-WtwWaveTabBar
 
     $fullPath = [System.IO.Path]::GetFullPath($ProjectPath)
 

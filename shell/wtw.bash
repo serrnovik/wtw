@@ -146,7 +146,7 @@ _wtw_passthrough_commands=(
     sourcegit sgit sg
     chatgpt cgpt codex droid factory
     claude cowork claudecode ccode
-    t3 t3code cmux cm wmux wm wave wv
+    t3 t3code cmux cm wmux wm wave wv herdr hd workmux wmx
     ss superset supersetsh
     cursor cur code co antigravity anti ag windsurf wind codium vscodium
 )
@@ -320,7 +320,7 @@ _wtw_complete() {
         list|ls) flags="-f --filter -d --detailed --wide --repo" ;;
         remove|rm|delete|del|unregister|unreg) flags="--repo --force" ;;
         edit|rename|ren) flags="--name --task --alias --key --emoji --sourcegit-folder --no-sourcegit-folder --repo --no-sync" ;;
-        open|cursor|cur|code|co|antigravity|anti|windsurf|wind|codium|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|wave|wv|claude|t3|ss) flags="--repo --editor --skip-restart" ;;
+        open|cursor|cur|code|co|antigravity|anti|windsurf|wind|codium|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|wave|wv|herdr|hd|workmux|wmx|claude|t3|ss) flags="--repo --editor --skip-restart" ;;
         claudecode|ccode) flags="--repo --prompt" ;;
         sync) flags="--all --repo --template --dry-run --color-source" ;;
         color) flags="--no-sync" ;;
@@ -339,7 +339,7 @@ _wtw_complete() {
         return 0
     fi
     if [ -z "$cmd" ]; then
-        local commands="init add create import list ls info show go open remove rm delete del unregister unreg edit rename ren workspace copy sync color clean host self agent install update skill sbx run connect chatgpt cursor code antigravity windsurf codium droid cmux wmux wave ss claude claudecode t3 help version"
+        local commands="init add create import list ls info show go open remove rm delete del unregister unreg edit rename ren workspace copy sync color clean host self agent install update skill sbx run connect chatgpt cursor code antigravity windsurf codium droid cmux wmux wave herdr workmux ss claude claudecode t3 help version"
         # shellcheck disable=SC2207
         COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
         return 0

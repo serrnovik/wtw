@@ -68,6 +68,8 @@ pwsh -Command "wtw host self --emoji 🍏 --label SP"  # this machine's cmux gro
 pwsh -Command "wtw --version"                      # running module version (aliases: -v, version)
 pwsh -Command "wtw wmux [name]"                    # Windows wmux workspace
 pwsh -Command "wtw wave [name]"                    # Wave Terminal block (run from a Wave terminal)
+pwsh -Command "wtw herdr [name]"                   # Herdr workspace (starts Herdr in Ghostty if needed)
+pwsh -Command "wtw workmux [name]"                 # workmux tmux window (starts tmux in Ghostty if needed)
 
 # Clean stale AI / unregistered git worktrees, extra linked worktrees, and/or leftover merged local branches
 pwsh -Command "wtw clean [--worktrees] [--linked] [--branches] [--all] [--dry-run] [--force]"

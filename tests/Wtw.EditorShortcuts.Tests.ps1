@@ -96,6 +96,25 @@ Describe 'Resolve-WtwEditorCommand' {
         $alias.type | Should -Be 'wave'
     }
 
+    It 'resolves "herdr" and "hd" to Herdr launcher metadata' {
+        $command = Resolve-WtwEditorCommand 'herdr'
+        $alias = Resolve-WtwEditorCommand 'hd'
+
+        $command.type | Should -Be 'herdr'
+        $command.appName | Should -Be 'Herdr'
+        $command.cmd | Should -Be 'herdr'
+        $alias.type | Should -Be 'herdr'
+    }
+
+    It 'resolves "workmux" and "wmx" to workmux launcher metadata' {
+        $command = Resolve-WtwEditorCommand 'workmux'
+        $alias = Resolve-WtwEditorCommand 'wmx'
+
+        $command.type | Should -Be 'workmux'
+        $command.cmd | Should -Be 'workmux'
+        $alias.type | Should -Be 'workmux'
+    }
+
     It 'resolves "claude" and "cowork" to a plain Claude app launch' {
         foreach ($name in 'claude', 'cowork') {
             $command = Resolve-WtwEditorCommand $name

@@ -107,6 +107,8 @@ function Invoke-Wtw {
         Write-WtwHost '    cmux [name]       Open in cmux terminal workspace (alias: cm)'
         Write-WtwHost '    wmux [name]       Open in wmux terminal workspace (alias: wm)'
         Write-WtwHost '    wave [name]       Open in a Wave Terminal block via wsh (alias: wv)'
+        Write-WtwHost '    herdr [name]      Open as a Herdr workspace, starting Herdr in Ghostty if needed (alias: hd)'
+        Write-WtwHost '    workmux [name]    Open as a workmux tmux window, starting tmux in Ghostty if needed (alias: wmx)'
         Write-WtwHost '    claude [name]     Open Claude.ai app  (alias: cowork)'
         Write-WtwHost '    claudecode [name] [--prompt <text>]  New Claude Code chat in the worktree (alias: ccode)'
         Write-WtwHost '    t3 [name]         Add + open T3 Code project  (alias: t3code)'

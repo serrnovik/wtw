@@ -15,6 +15,7 @@ Describe 'Open-WtwWaveProject' {
 
         Mock Get-WtwWshExe { '/usr/bin/wsh' }
         Mock Test-WtwWaveSession { $true }
+        Mock Get-WtwWaveSettingsPath { $null }
         Mock Invoke-WtwWshCommand {
             $script:wshCalls.Add(($ArgumentList -join ' '))
             switch ($ArgumentList[0]) {
@@ -71,6 +72,46 @@ Describe 'Open-WtwWaveProject' {
         $result.Success | Should -BeFalse
         $result.Reason | Should -Match 'Wave terminal'
         $script:wshCalls.Count | Should -Be 0
+    }
+}
+
+Describe 'Initialize-WtwWaveTabBar' {
+    BeforeEach {
+        $script:settingsPath = Join-Path ([System.IO.Path]::GetTempPath()) ("wtw-wave-settings-" + [guid]::NewGuid() + '.json')
+        $script:wshCalls = [System.Collections.Generic.List[string]]::new()
+        Mock Get-WtwWaveSettingsPath { $script:settingsPath }
+        Mock Invoke-WtwWshCommand {
+            $script:wshCalls.Add(($ArgumentList -join ' '))
+            [PSCustomObject]@{ ExitCode = 0; Output = '' }
+        }
+    }
+
+    AfterEach {
+        Remove-Item -Force $script:settingsPath -ErrorAction SilentlyContinue
+    }
+
+    It 'moves the tab bar left when the user has not chosen a position' {
+        Set-Content -Path $script:settingsPath -Value '{ "autoupdate:channel": "latest" }'
+
+        Initialize-WtwWaveTabBar
+
+        $script:wshCalls | Should -Contain 'setconfig app:tabbar=left'
+    }
+
+    It 'keeps an explicit top tab bar' {
+        Set-Content -Path $script:settingsPath -Value '{ "app:tabbar": "top" }'
+
+        Initialize-WtwWaveTabBar
+
+        $script:wshCalls.Count | Should -Be 0
+    }
+
+    It 'sets it when Wave has no settings file yet' {
+        Mock Get-WtwWaveSettingsPath { $null }
+
+        Initialize-WtwWaveTabBar
+
+        $script:wshCalls | Should -Contain 'setconfig app:tabbar=left'
     }
 }
 

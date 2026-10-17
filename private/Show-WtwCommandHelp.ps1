@@ -374,6 +374,39 @@ function Show-WtwCommandHelp {
                 'worktree color.'
             )
         }
+        { $_ -in 'herdr', 'hd' } {
+            @(
+                'wtw herdr [name]',
+                'Open a target as a Herdr workspace (alias: hd).',
+                '',
+                'Arguments:',
+                '  name    Target to open (default: detected from cwd)',
+                '',
+                'Herdr is an agent multiplexer whose sidebar shows which agent is',
+                'working, blocked or done. A workspace with a pane already rooted at',
+                'the target is relabelled with the wtw name and focused; otherwise',
+                '`herdr workspace create --cwd <path> --label <name>` opens one.',
+                'With no Herdr server running, wtw starts `herdr` in a new Ghostty',
+                'window at the target. Herdr has no workspace color, so the color',
+                'emoji in the name stands in for it.'
+            )
+        }
+        { $_ -in 'workmux', 'wmx' } {
+            @(
+                'wtw workmux [name]',
+                'Open a target as a workmux tmux window (alias: wmx).',
+                '',
+                'Arguments:',
+                '  name    Target to open (default: detected from cwd)',
+                '',
+                'workmux pairs git worktrees with tmux windows and adds an agent',
+                'status sidebar (`workmux sidebar`) and dashboard. It reads `git',
+                'worktree list`, so wtw runs `workmux open <dir-name>` from the',
+                'target: it switches to the existing `wm-<dir>` window or creates',
+                'one. With no tmux server running, wtw starts a tmux session in a',
+                'new Ghostty window first.'
+            )
+        }
         { $_ -in 't3', 't3code' } {
             @('wtw t3 [name]', 'Register a target as a T3 Code project, then launch T3 Code.', '', 'Arguments:', '  name    Target to register (default: detected from cwd)', '', 'T3 Code ships no CLI and no folder-open deep link, so wtw cannot tell a', 'running app to open a directory. Instead it appends the project to T3''s', 'event store under the wtw pretty name, so the worktree is already in the', 'sidebar when the app comes up.', '', 'Registration only runs while T3 Code is stopped — its server owns the', 'store while running. When it is up, wtw points T3''s "Add project starts', 'in" setting at the worktree instead.', '', 'T3 Code has no project color, so `wtw color` does not reach it.')
         }
