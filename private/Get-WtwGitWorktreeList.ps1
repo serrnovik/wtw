@@ -126,11 +126,15 @@ function Test-WtwWorktreeDirty {
     )
 
     if (-not (Test-Path $Path)) { return $false }
-    $untracked = git -C $Path ls-files --others --exclude-standard 2>$null
-    if ($untracked) { return $true }
+    $status = @(git -C $Path status --porcelain=v1 --ignore-submodules=none 2>$null)
+    if ($LASTEXITCODE -ne 0) { return $true }
+    if (-not $status) { return $false }
     # Line-ending-only changes (files committed with CRLF under eol=lf) are not
     # work: they appear in every old checkout and made every worktree look dirty.
-    git -C $Path diff --ignore-cr-at-eol --quiet HEAD -- 2>$null
+    # Only unstaged edits to tracked files can be that; anything staged,
+    # untracked or conflicted stays dirty.
+    if (@($status | Where-Object { -not "$_".StartsWith(' M ') }).Count) { return $true }
+    git -C $Path diff --ignore-cr-at-eol --ignore-submodules=none --quiet 2>$null
     return $LASTEXITCODE -ne 0
 }
 

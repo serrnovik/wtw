@@ -112,4 +112,31 @@ Describe 'Test-WtwWorktreeDirty' {
             git -C $Repo checkout -q -- plain.txt
         }
     }
+
+    It 'reports staged work even when the working file matches HEAD' {
+        InModuleScope wtw -Parameters @{ Repo = $script:repo } {
+            [IO.File]::WriteAllText((Join-Path $Repo 'plain.txt'), "staged`n")
+            git -C $Repo add plain.txt
+            [IO.File]::WriteAllText((Join-Path $Repo 'plain.txt'), "one`n")
+            Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
+            git -C $Repo reset -q -- plain.txt
+            git -C $Repo checkout -q -- plain.txt
+        }
+    }
+
+    It 'reports untracked files inside a submodule as dirty' {
+        $sub = Join-Path ([System.IO.Path]::GetTempPath()) "wtw-dirty-sub-$([guid]::NewGuid())"
+        try {
+            git init -q $sub
+            git -C $sub -c user.email=t@e -c user.name=t commit -q --allow-empty -m init
+            git -C $script:repo -c protocol.file.allow=always submodule add -q $sub sub 2>$null
+            git -C $script:repo commit -qm sub
+            [IO.File]::WriteAllText((Join-Path $script:repo 'sub/scratch.txt'), 'x')
+            InModuleScope wtw -Parameters @{ Repo = $script:repo } {
+                Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
+            }
+        } finally {
+            Remove-Item -Path $sub -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
