@@ -126,8 +126,12 @@ function Test-WtwWorktreeDirty {
     )
 
     if (-not (Test-Path $Path)) { return $false }
-    $status = git -C $Path status --porcelain 2>$null
-    return [bool]$status
+    $untracked = git -C $Path ls-files --others --exclude-standard 2>$null
+    if ($untracked) { return $true }
+    # Line-ending-only changes (files committed with CRLF under eol=lf) are not
+    # work: they appear in every old checkout and made every worktree look dirty.
+    git -C $Path diff --ignore-cr-at-eol --quiet HEAD -- 2>$null
+    return $LASTEXITCODE -ne 0
 }
 
 function Test-WtwBranchMergedInto {

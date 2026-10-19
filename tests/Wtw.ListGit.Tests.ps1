@@ -71,3 +71,45 @@ Describe 'wtw list git fallback' {
         }
     }
 }
+
+Describe 'Test-WtwWorktreeDirty' {
+    BeforeAll {
+        $script:repo = Join-Path ([System.IO.Path]::GetTempPath()) "wtw-dirty-$([guid]::NewGuid())"
+        New-Item -Path $script:repo -ItemType Directory -Force | Out-Null
+        git -C $script:repo init -q
+        git -C $script:repo config user.email 'test@example.com'
+        git -C $script:repo config user.name 'test'
+        git -C $script:repo config core.autocrlf false
+        # Committed before the eol rule, like the repo's legacy CRLF files.
+        [IO.File]::WriteAllText((Join-Path $script:repo 'legacy.yml'), "a: 1`r`nb: 2`r`n")
+        [IO.File]::WriteAllText((Join-Path $script:repo 'plain.txt'), "one`n")
+        git -C $script:repo add -A
+        git -C $script:repo commit -qm init
+        [IO.File]::WriteAllText((Join-Path $script:repo '.gitattributes'), "*.yml text eol=lf`n")
+        git -C $script:repo add .gitattributes
+        git -C $script:repo commit -qm eol
+    }
+    AfterAll {
+        Remove-Item -Path $script:repo -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'treats line-ending-only differences as clean' {
+        # Touching the file makes git re-check it and report it as modified.
+        (Get-Item (Join-Path $script:repo 'legacy.yml')).LastWriteTime = (Get-Date).AddMinutes(1)
+        git -C $script:repo status --porcelain | Should -Not -BeNullOrEmpty
+        InModuleScope wtw -Parameters @{ Repo = $script:repo } {
+            Test-WtwWorktreeDirty -Path $Repo | Should -BeFalse
+        }
+    }
+
+    It 'reports content changes and untracked files as dirty' {
+        InModuleScope wtw -Parameters @{ Repo = $script:repo } {
+            [IO.File]::WriteAllText((Join-Path $Repo 'new.txt'), 'x')
+            Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
+            Remove-Item (Join-Path $Repo 'new.txt')
+            [IO.File]::WriteAllText((Join-Path $Repo 'plain.txt'), "two`n")
+            Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
+            git -C $Repo checkout -q -- plain.txt
+        }
+    }
+}
