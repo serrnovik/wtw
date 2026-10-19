@@ -13,7 +13,7 @@ function Get-WtwGitWorktreeList {
     )
 
     $items = [System.Collections.Generic.List[object]]::new()
-    if (-not (Test-Path $RepoPath)) { return @() }
+    if (-not (Test-Path -LiteralPath $RepoPath)) { return @() }
 
     $porcelain = git -C $RepoPath worktree list --porcelain 2>$null
     if (-not $porcelain) { return @() }
@@ -125,7 +125,7 @@ function Test-WtwWorktreeDirty {
         [string] $Path
     )
 
-    if (-not (Test-Path $Path)) { return $false }
+    if (-not (Test-Path -LiteralPath $Path)) { return $false }
     $status = @(git -C $Path status --porcelain=v1 --untracked-files=all --ignore-submodules=none 2>$null)
     if ($LASTEXITCODE -ne 0) { return $true }
     # status cannot see edits to assume-unchanged (lowercase tag) or
@@ -214,7 +214,7 @@ function Get-WtwLinkedWorktreeItems {
     foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
         $repo = $Registry.repos.$repoName
         $mainPath = Get-WtwPropertyValue -Object $repo -Name 'mainPath'
-        if (-not $mainPath -or -not (Test-Path $mainPath)) { continue }
+        if (-not $mainPath -or -not (Test-Path -LiteralPath $mainPath)) { continue }
 
         $defaultBranch = Get-WtwDefaultBranch -RepoPath $mainPath
         $registeredMap = Get-WtwRegisteredWorktreePathMap -RepoEntry $repo
@@ -248,7 +248,7 @@ function Get-WtwLinkedWorktreeItems {
             }
             if (-not $includeThis) { continue }
 
-            $exists = Test-Path $wt.Path
+            $exists = Test-Path -LiteralPath $wt.Path
             $size = if ($exists) { Get-DirectorySize $wt.Path } else { [long]0 }
             $modified = '-'
             if ($exists) {
