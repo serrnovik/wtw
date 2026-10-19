@@ -166,6 +166,11 @@ Describe 'Test-WtwWorktreeDirty' {
                 Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
                 Remove-Item (Join-Path $Repo 'sub/scratch.txt')
                 Test-WtwWorktreeDirty -Path $Repo | Should -BeFalse
+                # Uninitialized: empty is clean, files inside are work.
+                git -C $Repo submodule deinit -q -f sub
+                Test-WtwWorktreeDirty -Path $Repo | Should -BeFalse
+                [IO.File]::WriteAllText((Join-Path $Repo 'sub/valuable.txt'), 'x')
+                Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
             }
         } finally {
             Remove-Item -Path $sub -Recurse -Force -ErrorAction SilentlyContinue

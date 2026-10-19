@@ -146,12 +146,19 @@ function Test-WtwWorktreeDirty {
         git -C $Path diff --ignore-cr-at-eol --ignore-submodules=none --quiet 2>$null
         if ($LASTEXITCODE -ne 0) { return $true }
     }
-    # The parent index cannot see hidden work inside initialized submodules;
-    # each one gets the same check (and recurses into its own submodules).
-    $submodules = @(git -C $Path submodule foreach --quiet 'pwd' 2>$null)
+    # The parent index cannot see hidden work inside submodules: initialized
+    # ones get the same check (recursively); an uninitialized one is only
+    # clean while its directory is empty.
+    $raw = (git -C $Path ls-files -s -z 2>$null) -join "`n"
     if ($LASTEXITCODE -ne 0) { return $true }
-    foreach ($submodule in $submodules) {
-        if (Test-WtwWorktreeDirty -Path "$submodule") { return $true }
+    foreach ($entry in @($raw -split "`0" | Where-Object { "$_".StartsWith('160000 ') })) {
+        $submodule = Join-Path $Path ($entry -split "`t", 2)[1]
+        if (-not (Test-Path -LiteralPath $submodule -PathType Container)) { continue }
+        if (Test-Path -LiteralPath (Join-Path $submodule '.git')) {
+            if (Test-WtwWorktreeDirty -Path $submodule) { return $true }
+        } elseif (Get-ChildItem -LiteralPath $submodule -Force | Select-Object -First 1) {
+            return $true
+        }
     }
     return $false
 }
