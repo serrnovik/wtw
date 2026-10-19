@@ -126,8 +126,17 @@ function Test-WtwWorktreeDirty {
     )
 
     if (-not (Test-Path $Path)) { return $false }
-    $status = @(git -C $Path status --porcelain=v1 --ignore-submodules=none 2>$null)
+    $status = @(git -C $Path status --porcelain=v1 --untracked-files=all --ignore-submodules=none 2>$null)
     if ($LASTEXITCODE -ne 0) { return $true }
+    # status cannot see edits to assume-unchanged (lowercase tag) or
+    # skip-worktree (S) files; a flagged file on disk may hold work.
+    # Quoted (unusual) paths cannot be checked on disk, so they count as present.
+    $flagged = @(git -C $Path -c core.quotepath=false ls-files -v 2>$null | Where-Object {
+            "$_" -cmatch '^[a-z] ' -or ("$_".StartsWith('S ') -and
+                ("$_".Substring(2).StartsWith('"') -or
+                    (Test-Path -LiteralPath (Join-Path $Path "$_".Substring(2)))))
+        })
+    if ($LASTEXITCODE -ne 0 -or $flagged.Count) { return $true }
     if (-not $status) { return $false }
     # Line-ending-only changes (files committed with CRLF under eol=lf) are not
     # work: they appear in every old checkout and made every worktree look dirty.

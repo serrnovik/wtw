@@ -124,6 +124,32 @@ Describe 'Test-WtwWorktreeDirty' {
         }
     }
 
+    It 'reports untracked files even when status hides them' {
+        InModuleScope wtw -Parameters @{ Repo = $script:repo } {
+            git -C $Repo config status.showUntrackedFiles no
+            try {
+                [IO.File]::WriteAllText((Join-Path $Repo 'hidden.txt'), 'x')
+                Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
+            } finally {
+                Remove-Item (Join-Path $Repo 'hidden.txt') -ErrorAction SilentlyContinue
+                git -C $Repo config --unset status.showUntrackedFiles
+            }
+        }
+    }
+
+    It 'reports edits hidden by assume-unchanged or skip-worktree as dirty' {
+        InModuleScope wtw -Parameters @{ Repo = $script:repo } {
+            foreach ($flag in '--assume-unchanged', '--skip-worktree') {
+                git -C $Repo update-index $flag plain.txt
+                [IO.File]::WriteAllText((Join-Path $Repo 'plain.txt'), "hidden`n")
+                git -C $Repo status --porcelain -- plain.txt | Should -BeNullOrEmpty
+                Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
+                git -C $Repo update-index ($flag -replace '^--', '--no-') plain.txt
+                git -C $Repo checkout -q -- plain.txt
+            }
+        }
+    }
+
     It 'reports untracked files inside a submodule as dirty' {
         $sub = Join-Path ([System.IO.Path]::GetTempPath()) "wtw-dirty-sub-$([guid]::NewGuid())"
         try {
