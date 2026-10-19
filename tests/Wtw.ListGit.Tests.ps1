@@ -160,6 +160,12 @@ Describe 'Test-WtwWorktreeDirty' {
             [IO.File]::WriteAllText((Join-Path $script:repo 'sub/scratch.txt'), 'x')
             InModuleScope wtw -Parameters @{ Repo = $script:repo } {
                 Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
+                # Hidden by the submodule's own config: the parent status cannot see it.
+                git -C (Join-Path $Repo 'sub') config status.showUntrackedFiles no
+                git -C $Repo status --porcelain --ignore-submodules=none -- sub | Should -BeNullOrEmpty
+                Test-WtwWorktreeDirty -Path $Repo | Should -BeTrue
+                Remove-Item (Join-Path $Repo 'sub/scratch.txt')
+                Test-WtwWorktreeDirty -Path $Repo | Should -BeFalse
             }
         } finally {
             Remove-Item -Path $sub -Recurse -Force -ErrorAction SilentlyContinue

@@ -137,14 +137,23 @@ function Test-WtwWorktreeDirty {
                     (Test-Path -LiteralPath (Join-Path $Path "$_".Substring(2)))))
         })
     if ($LASTEXITCODE -ne 0 -or $flagged.Count) { return $true }
-    if (-not $status) { return $false }
-    # Line-ending-only changes (files committed with CRLF under eol=lf) are not
-    # work: they appear in every old checkout and made every worktree look dirty.
-    # Only unstaged edits to tracked files can be that; anything staged,
-    # untracked or conflicted stays dirty.
-    if (@($status | Where-Object { -not "$_".StartsWith(' M ') }).Count) { return $true }
-    git -C $Path diff --ignore-cr-at-eol --ignore-submodules=none --quiet 2>$null
-    return $LASTEXITCODE -ne 0
+    if ($status) {
+        # Line-ending-only changes (files committed with CRLF under eol=lf) are not
+        # work: they appear in every old checkout and made every worktree look dirty.
+        # Only unstaged edits to tracked files can be that; anything staged,
+        # untracked or conflicted stays dirty.
+        if (@($status | Where-Object { -not "$_".StartsWith(' M ') }).Count) { return $true }
+        git -C $Path diff --ignore-cr-at-eol --ignore-submodules=none --quiet 2>$null
+        if ($LASTEXITCODE -ne 0) { return $true }
+    }
+    # The parent index cannot see hidden work inside initialized submodules;
+    # each one gets the same check (and recurses into its own submodules).
+    $submodules = @(git -C $Path submodule foreach --quiet 'pwd' 2>$null)
+    if ($LASTEXITCODE -ne 0) { return $true }
+    foreach ($submodule in $submodules) {
+        if (Test-WtwWorktreeDirty -Path "$submodule") { return $true }
+    }
+    return $false
 }
 
 function Test-WtwBranchMergedInto {
