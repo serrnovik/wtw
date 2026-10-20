@@ -25,7 +25,7 @@ function Enter-WtwWorktree {
         [switch] $NewTab
     )
 
-    $target = Resolve-WtwTarget $Name
+    $target = Resolve-WtwTarget $Name -AdoptUntracked
     if (-not $target) { return }
 
     $repo = $target.RepoEntry

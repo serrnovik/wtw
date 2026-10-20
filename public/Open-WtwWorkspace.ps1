@@ -45,7 +45,7 @@ function Open-WtwWorkspace {
     $editorCmd = Resolve-WtwEditorPreference -Editor $editorPreference
     if (-not $editorCmd) { $editorCmd = $editorPreference }
 
-    $target = Resolve-WtwTarget $Name
+    $target = Resolve-WtwTarget $Name -AdoptUntracked
     if (-not $target) { return }
 
     $editorType = if ($editorCmd -is [System.Collections.IDictionary]) {

@@ -82,6 +82,10 @@ function Get-WtwList {
         matching worktree includes its parent repo row. Aliases: ``-f``, ``--filter``.
     .PARAMETER Detailed
         Show card-style output with clickable file links and settings paths.
+    .PARAMETER NoUntracked
+        Hide git worktrees of registered repos that wtw does not track yet.
+        They are listed by default with Kind ``untracked``; ``wtw go <task>`` or
+        ``wtw open <task>`` on one adds it to wtw.
     .PARAMETER Wide
         Table mode: show every alias variant, full paths, and untruncated branches.
         Default table uses abbreviated aliases (one fuzzy target per worktree),
@@ -109,13 +113,22 @@ function Get-WtwList {
         [Alias('d')]
         [switch] $Detailed,
 
-        [switch] $Wide
+        [switch] $Wide,
+
+        [switch] $NoUntracked
     )
 
     $registry = Get-WtwRegistry
     $config = Get-WtwConfig
     $gitCommand = Get-WtwGitCommand
     $repoNames = (Get-WtwPropertyNames -Object $registry.repos)
+
+    # Worktrees git already removed (by another tool, or `git worktree remove`)
+    # leave wtw too, instead of lingering as MISSING rows.
+    $goneWorktrees = @()
+    if ($gitCommand) {
+        $goneWorktrees = @(Remove-WtwGoneWorktree -Registry $registry)
+    }
 
     if (-not $repoNames -or $repoNames.Count -eq 0) {
         Write-WtwHost '  No repos registered. Run "wtw init" inside a repo.' -ForegroundColor Yellow
@@ -222,6 +235,30 @@ function Get-WtwList {
                 }
             }
         }
+
+        # Git worktrees other tools made next to this repo. Shown until git
+        # removes them; `wtw go` / `wtw open` on one adds it to wtw.
+        if ($gitCommand -and -not $Task -and -not $NoUntracked) {
+            foreach ($untracked in @(Get-WtwUntrackedWorktree -Registry $registry -RepoName $name)) {
+                $untrackedBranch = if ($untracked.Branch) { $untracked.Branch } elseif ($untracked.Detached) { '(detached)' } else { '-' }
+                $items += [PSCustomObject]@{
+                    Kind      = 'untracked'
+                    Repo      = $repoDisplay
+                    RepoName  = $name
+                    Emoji     = '(none)'
+                    Task      = $untracked.TaskName
+                    TaskName  = $untracked.TaskName
+                    Aliases   = ''
+                    Branch    = $untrackedBranch
+                    Color     = '-'
+                    Path      = $untracked.Path
+                    Workspace = '-'
+                    Created   = '-'
+                    AgentProfile = $agentProfile
+                    PrettyName = 'untracked: wtw go adds it'
+                }
+            }
+        }
     }
 
     if (-not [string]::IsNullOrWhiteSpace($Filter)) {
@@ -247,9 +284,16 @@ function Get-WtwList {
         $tableRows = Get-WtwListRowsForTable -FullItems $items -Wide:$Wide
         Write-WtwHost ''
         Format-WtwTable -Items $tableRows -Columns $tableColumns
+        if (@($items | Where-Object { $_.Kind -eq 'untracked' }).Count -gt 0) {
+            Write-WtwHost "  Kind 'untracked' = git worktree wtw does not track yet. wtw go <task> adds it; --no-untracked hides them." -ForegroundColor DarkGray
+        }
         if (-not $Wide) {
             Write-WtwHost '  Tip: wtw list --wide  for full aliases, paths, workspace, and branch names.' -ForegroundColor DarkGray
         }
+        Write-WtwHost ''
+    }
+    if ($goneWorktrees.Count -gt 0) {
+        Write-WtwHost "  Removed from wtw (git no longer has them): $($goneWorktrees -join ', ')" -ForegroundColor DarkGray
         Write-WtwHost ''
     }
 }

@@ -284,6 +284,7 @@ _wtw_completion() {
                     '-d:detailed view'
                     '--detailed:detailed view'
                     '--wide:untruncated columns'
+                    '--no-untracked:hide worktrees wtw does not track'
                     '--repo:repository'
                 )
                 ;;

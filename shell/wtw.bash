@@ -317,7 +317,7 @@ _wtw_complete() {
         add) flags="--repo --task --branch --name --emoji --color --alias --sourcegit-folder --no-sourcegit-folder" ;;
         create) flags="--name --emoji --folder --branch --adopt --no-branch --from --gt-track --color --repo --open --alias" ;;
         import) flags="--from --repo --via --dry-run" ;;
-        list|ls) flags="-f --filter -d --detailed --wide --repo" ;;
+        list|ls) flags="-f --filter -d --detailed --wide --no-untracked --repo" ;;
         remove|rm|delete|del|unregister|unreg) flags="--repo --force" ;;
         edit|rename|ren) flags="--name --task --alias --key --emoji --sourcegit-folder --no-sourcegit-folder --repo --no-sync" ;;
         open|cursor|cur|code|co|antigravity|anti|windsurf|wind|codium|chatgpt|cgpt|codex|droid|factory|cmux|cm|wmux|wm|wave|wv|herdr|hd|workmux|wmx|claude|t3|ss) flags="--repo --editor --skip-restart" ;;

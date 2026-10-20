@@ -233,7 +233,7 @@ branches are never force-deleted.
 | `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X] [--emoji X] [--sourcegit-folder]` | Register current repo with aliases, template, per-shell session scripts, optional SourceGit / list / cmux / wmux / T3 prefix, and optional SourceGit group folder |
 | `wtw add [path|task] [--repo X --task X] [--branch X] [--name X] [--alias a,b] [--emoji X] [--color X] [--sourcegit-folder]` | Adopt an existing worktree. A bare name inside it is the task. |
 | `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b] [--emoji X]` | Create worktree + workspace + branch |
-| `wtw list [-f\|--filter text] [-d\|--detailed] [--wide] [--repo alias]` | List repos/worktrees: default **compact** table (`-f kul` = substring; `--wide` = full aliases and paths) |
+| `wtw list [-f\|--filter text] [-d\|--detailed] [--wide] [--no-untracked] [--repo alias]` | List repos/worktrees: default **compact** table (`-f kul` = substring; `--wide` = full aliases and paths). Also lists untracked git worktrees and drops entries git removed |
 | `wtw --version` / `-v` / `version` | Print the running module version and where it was loaded from |
 | `wtw <name>` | Switch to repo/worktree — implicit `go` (cd + session init) |
 | `wtw go <name>` | Same as above, explicit |
@@ -589,6 +589,26 @@ wtw go onboarding          # or: wtw go onboarding video
 
 Spaces and hyphens are equivalent. `--alias none` clears the extra names. Derived `alias-task` names (`sn1-t3code-ad4f13f1`) stay.
 
+### Untracked worktrees (adopted on first use)
+
+Agents and other tools (T3 Code, Codex, Cursor, `git worktree add`) keep creating
+worktrees of repos wtw already tracks. You do not have to `wtw add` each one:
+
+- `wtw list` shows them with Kind `untracked` (folder name as task, git branch).
+  `--no-untracked` hides them; `-f` filters them like any worktree.
+- `wtw go <name>`, `wtw open <name>` and the editor shortcuts look at them after
+  every registered name has missed (before fuzzy matching). The name matches the
+  folder, the task, or the branch (exact, then prefix, then substring). One hit
+  is adopted with `wtw add` (color, workspace file, editor registrations) and
+  then opened. Several hits are reported as ambiguous.
+- A worktree git has removed (its folder is gone and git no longer lists it, or
+  lists it as prunable) is dropped from the registry, colors, and its workspace
+  file the next time `wtw list` runs. A folder git still lists as live (an
+  unmounted drive, say) is kept.
+
+Only commands that act on a target adopt. Listing, terminal titles and cmux
+metadata never register anything.
+
 ## Name Resolution
 
 All commands that accept a target name (`go`, `open`, `remove`, editor shortcuts, and the implicit go) share the same resolution logic via `Resolve-WtwTarget`:
@@ -600,7 +620,8 @@ All commands that accept a target name (`go`, `open`, `remove`, editor shortcuts
 5. **Task prefix / substring** — `au` → `auth`, `content` → `my-content-engine`
 6. **Worktree alias prefix / substring**
 7. **Pretty name, then branch** — lower priority so a task or alias always wins. `wtw go onboarding` can land on `t3code/pronouncefit-…-onboarding-video` with no rename
-8. **Fuzzy match** (Levenshtein) on task / alias names
+8. **Untracked git worktree** — a worktree of a registered repo that wtw does not track yet (folder, task, or branch). `go` / `open` / editor shortcuts adopt it with `wtw add`
+9. **Fuzzy match** (Levenshtein) on task / alias names
 
 Unquoted leftovers are joined for `go` / `open` / `info` / editor shortcuts: `wtw go onboarding video` is the same as `wtw go "onboarding video"`.
 
@@ -715,7 +736,7 @@ Example (values abbreviated; alias cells may span several screen lines):
   wt    my-app  auth   app-auth      auth-branch  (swatch)  ~/projects/...    my-app_auth.code-workspace
 ```
 
-- **Kind**: `repo` = main repo, `wt` = worktree
+- **Kind**: `repo` = main repo, `wt` = worktree, `untracked` = git worktree wtw does not track yet (`--no-untracked` hides these)
 - **Aliases** (compact): primary match target; use `--wide` for the full cross-product list
 - **Color**: colored swatch with contrasting text
 

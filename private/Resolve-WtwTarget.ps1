@@ -60,6 +60,7 @@ function Resolve-WtwTarget {
           5b. Substring match on task     -> "content" matches "my-content-engine"
           5c. Worktree alias prefix / substring
           5d. Pretty-name then branch match (lower priority than task / alias)
+          5e. Untracked git worktree (-AdoptUntracked) -> adopted with ``wtw add``
           6. Fuzzy match (Levenshtein)    -> auto-resolve if unique close match, suggest if tied
     .OUTPUTS
         PSCustomObject with: RepoName, RepoEntry, TaskName, WorktreeEntry
@@ -78,7 +79,14 @@ function Resolve-WtwTarget {
         # fuzzy-match again — Get-WtwAllTargetNames can contain a string that
         # earlier stages do not resolve (shell-hyphenated alias, stale name),
         # and `return (Resolve-WtwTarget $fuzzy.Match)` then stack-overflows.
-        [switch] $SkipFuzzy
+        [switch] $SkipFuzzy,
+
+        # Look at git worktrees of registered repos that wtw does not track
+        # (made by T3 Code, Codex, `git worktree add`, ...) and adopt the one
+        # the name points to. Only for commands that act on the target (go,
+        # open, editors); listing, titles and cmux metadata must not register
+        # anything as a side effect.
+        [switch] $AdoptUntracked
     )
 
     $registry = Get-WtwRegistry
@@ -137,6 +145,12 @@ function Resolve-WtwTarget {
             $names = ($pathMatches | ForEach-Object { $_.WorktreeEntry.path }) -join ', '
             Write-Error "Ambiguous path '$Name'. Matches: $names"
             return $null
+        }
+
+        # 0c. Untracked git worktree of a registered repo -> adopt it
+        if ($AdoptUntracked) {
+            $untracked = @(Find-WtwUntrackedWorktree -Registry $registry -Name $Name -RepoName $restrictRepo)
+            if ($untracked.Count -eq 1) { return (Add-WtwUntrackedTarget -Item $untracked[0] -Name $Name) }
         }
 
         Write-Error "No worktree found at path '$Name'. Run 'wtw list' to see available targets."
@@ -362,6 +376,19 @@ function Resolve-WtwTarget {
         }
     }
 
+    # 5e. Untracked git worktree of a registered repo (created by another
+    # tool) -> adopt it, so `wtw go` / `wtw open` work on it straight away.
+    # Before fuzzy: a real folder/branch match beats an edit-distance guess.
+    if ($AdoptUntracked) {
+        $untracked = @(Find-WtwUntrackedWorktree -Registry $registry -Name $Name -RepoName $restrictRepo)
+        if ($untracked.Count -eq 1) { return (Add-WtwUntrackedTarget -Item $untracked[0] -Name $Name) }
+        if ($untracked.Count -gt 1) {
+            $names = ($untracked | ForEach-Object { "$($_.RepoName)/$($_.TaskName) (untracked)" }) -join ', '
+            Write-Error "Ambiguous name '$Name'. Matches: $names"
+            return $null
+        }
+    }
+
     # 6. Fuzzy match - find closest target by edit distance
     if ($restrictRepo) {
         $hint = Get-WtwNumericNameHint -Name $Name
@@ -378,7 +405,7 @@ function Resolve-WtwTarget {
         $allTargets = @(Get-WtwAllTargetNames $registry)
         $fuzzy = Resolve-WtwFuzzyMatch $Name $allTargets
         if ($fuzzy -and $fuzzy.Match -and (ConvertTo-WtwLookupKey $fuzzy.Match) -ne (ConvertTo-WtwLookupKey $Name)) {
-            return (Resolve-WtwTarget -Name $fuzzy.Match -RepoAlias $RepoAlias -SkipFuzzy)
+            return (Resolve-WtwTarget -Name $fuzzy.Match -RepoAlias $RepoAlias -SkipFuzzy -AdoptUntracked:$AdoptUntracked)
         }
     }
     # An all-digit name almost always means PowerShell ate a leading zero:

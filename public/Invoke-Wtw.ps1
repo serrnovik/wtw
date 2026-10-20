@@ -93,7 +93,7 @@ function Invoke-Wtw {
         Write-WtwHost '    add [path|task]   Adopt an existing on-disk worktree (bare name inside it is the task)'
         Write-WtwHost '    create <task>     Create worktree + branch (--emoji for identity glyph; --branch / --adopt to attach an existing branch)'
         Write-WtwHost '    import --from <host> <name>  Check out a worktree from another machine (same git remote)'
-        Write-WtwHost '    list [repo] [-f|--filter <text>] [-d|--detailed] [--wide]  List repos/worktrees'
+        Write-WtwHost '    list [repo] [-f|--filter <text>] [-d|--detailed] [--wide] [--no-untracked]  List repos/worktrees'
         Write-WtwHost '    info <name>       Show full details for a repo or worktree  (alias: show)'
         Write-WtwHost '    go <name>         Switch to worktree (cd + session init)'
         Write-WtwHost '    open [name]       Open workspace in editor (default: current)'
@@ -501,7 +501,7 @@ function Invoke-Wtw {
             # tabs). Used by wtw.cmd so cmd.exe can `cd /d` to it cleanly
             # without parsing tab-delimited fields.
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve_path <name>"; return }
-            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) } 6>$null
+            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) -AdoptUntracked } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             Write-Output $p
@@ -513,7 +513,7 @@ function Invoke-Wtw {
             # Deliberately not an extra field on __resolve: the zsh/bash wrappers
             # read that one with fixed positional fields.
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve_json <name>"; return }
-            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) } 6>$null
+            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) -AdoptUntracked } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             $ws = if ($target.WorktreeEntry) {
@@ -556,7 +556,7 @@ function Invoke-Wtw {
             # Optional: --shell zsh|bash to resolve per-shell session script
             if ($pos.Count -eq 0) { Write-Error "Usage: wtw __resolve <name> [--shell zsh|bash]"; return }
             $shellType = $splat['Shell'] ?? ''
-            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) } 6>$null
+            $target = & { Resolve-WtwTarget (Join-WtwTargetName $pos) -AdoptUntracked } 6>$null
             if (-not $target) { exit 1 }
             $p = if ($target.WorktreeEntry) { $target.WorktreeEntry.path } else { $target.RepoEntry.mainPath }
             $c = if ($target.WorktreeEntry) {
