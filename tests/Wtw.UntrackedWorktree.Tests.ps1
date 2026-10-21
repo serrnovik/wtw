@@ -75,12 +75,15 @@ Describe 'Untracked git worktrees' {
         }
     }
 
-    It 'shows untracked worktrees in wtw list and hides them with -NoUntracked' {
-        $shown = InModuleScope wtw { Get-WtwList -Wide 6>&1 | Out-String }
+    It 'lists untracked worktrees only with -All' {
+        $hidden = InModuleScope wtw { Get-WtwList -Wide 6>&1 | Out-String }
+        $hidden | Should -Not -Match 'agent-task'
+        $hidden | Should -Match 'wtw list --all'
+        $shown = InModuleScope wtw { Get-WtwList -Wide -All 6>&1 | Out-String }
         $shown | Should -Match 'agent-task'
         $shown | Should -Match 'does not track yet'
-        $hidden = InModuleScope wtw { Get-WtwList -Wide -NoUntracked 6>&1 | Out-String }
-        $hidden | Should -Not -Match 'agent-task'
+        $noUntracked = InModuleScope wtw { Get-WtwList -Wide -All -NoUntracked 6>&1 | Out-String }
+        $noUntracked | Should -Not -Match 'agent-task'
     }
 
     It 'does not adopt without -AdoptUntracked' {
@@ -118,6 +121,42 @@ Describe 'Untracked git worktrees' {
             $assigned = Get-WtwPropertyNames -Object (Get-WtwColors).assignments
             $assigned | Should -Not -Contain 'demo/tracked'
             $assigned | Should -Contain 'demo/other'
+        }
+    }
+
+    It 'reports gone worktrees in wtw list without removing them unless -Prune' {
+        git -C $script:repo worktree remove $script:tracked --force
+        InModuleScope wtw {
+            $out = Get-WtwList -Wide 6>&1 | Out-String
+            $out | Should -Match 'Git no longer has 1 tracked worktree\(s\): demo/tracked'
+            $out | Should -Match 'wtw list --prune'
+            (Get-WtwPropertyNames -Object (Get-WtwRegistry).repos.demo.worktrees) | Should -Contain 'tracked'
+
+            $pruned = Get-WtwList -Wide -Prune 6>&1 | Out-String
+            $pruned | Should -Match 'Removed from wtw \(git no longer has them\): demo/tracked'
+            (Get-WtwPropertyNames -Object (Get-WtwRegistry).repos.demo.worktrees) | Should -Not -Contain 'tracked'
+        }
+    }
+
+    It 'asks before removing gone worktrees when it can prompt' {
+        git -C $script:repo worktree remove $script:tracked --force
+        InModuleScope wtw {
+            Mock Test-WtwCanPrompt { $true }
+            Mock Read-Host { 'n' }
+            $null = Get-WtwList -Wide 6>&1 | Out-String
+            Should -Invoke Read-Host -Times 1 -Exactly
+            (Get-WtwPropertyNames -Object (Get-WtwRegistry).repos.demo.worktrees) | Should -Contain 'tracked'
+
+            Mock Read-Host { '' }
+            $null = Get-WtwList -Wide 6>&1 | Out-String
+            (Get-WtwPropertyNames -Object (Get-WtwRegistry).repos.demo.worktrees) | Should -Not -Contain 'tracked'
+        }
+    }
+
+    It 'does not ask git about repos whose registered folders all exist' {
+        InModuleScope wtw {
+            Mock Get-WtwGitWorktreeList { throw 'git should not be asked' }
+            @(Find-WtwGoneWorktree -Registry (Get-WtwRegistry)).Count | Should -Be 0
         }
     }
 

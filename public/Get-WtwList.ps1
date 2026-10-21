@@ -82,10 +82,16 @@ function Get-WtwList {
         matching worktree includes its parent repo row. Aliases: ``-f``, ``--filter``.
     .PARAMETER Detailed
         Show card-style output with clickable file links and settings paths.
+    .PARAMETER All
+        Also list git worktrees of registered repos that wtw does not track yet,
+        as Kind ``untracked``. ``wtw go <task>`` / ``wtw open <task>`` finds and
+        adds them either way. Off by default: scanning every repo is the slow
+        part of ``wtw list``. Alias: ``-a``.
+    .PARAMETER Prune
+        Remove entries git has already removed without asking. Without it an
+        interactive ``wtw list`` asks; a non-interactive one only reports them.
     .PARAMETER NoUntracked
-        Hide git worktrees of registered repos that wtw does not track yet.
-        They are listed by default with Kind ``untracked``; ``wtw go <task>`` or
-        ``wtw open <task>`` on one adds it to wtw.
+        Accepted for 0.2.50 scripts. Untracked rows are now opt-in (``-All``).
     .PARAMETER Wide
         Table mode: show every alias variant, full paths, and untruncated branches.
         Default table uses abbreviated aliases (one fuzzy target per worktree),
@@ -115,6 +121,11 @@ function Get-WtwList {
 
         [switch] $Wide,
 
+        [Alias('a')]
+        [switch] $All,
+
+        [switch] $Prune,
+
         [switch] $NoUntracked
     )
 
@@ -123,12 +134,21 @@ function Get-WtwList {
     $gitCommand = Get-WtwGitCommand
     $repoNames = (Get-WtwPropertyNames -Object $registry.repos)
 
-    # Worktrees git already removed (by another tool, or `git worktree remove`)
-    # leave wtw too, instead of lingering as MISSING rows.
+    # Worktrees git already removed (by another tool, or `git worktree remove`).
+    # --prune drops them before the table; otherwise they show as MISSING and
+    # the user is asked after it.
     $goneWorktrees = @()
+    $prunedWorktrees = @()
     if ($gitCommand) {
-        $goneWorktrees = @(Remove-WtwGoneWorktree -Registry $registry)
+        $goneWorktrees = @(Find-WtwGoneWorktree -Registry $registry)
+        if ($Prune -and $goneWorktrees.Count -gt 0) {
+            $prunedWorktrees = @(Remove-WtwGoneWorktree -Registry $registry -Gone $goneWorktrees)
+            $goneWorktrees = @()
+        }
     }
+    $scanUntracked = $gitCommand -and $All -and -not $NoUntracked -and -not $Task
+    $showProgress = $scanUntracked -and -not [Console]::IsOutputRedirected
+    $repoIndex = 0
 
     if (-not $repoNames -or $repoNames.Count -eq 0) {
         Write-WtwHost '  No repos registered. Run "wtw init" inside a repo.' -ForegroundColor Yellow
@@ -158,6 +178,11 @@ function Get-WtwList {
         $repoEntry = $registry.repos.$name
         $aliases = Get-WtwRepoAliases $repoEntry
         if ($Repo -and $Repo -notin $aliases -and $name -ne $Repo) { continue }
+        $repoIndex++
+        if ($showProgress) {
+            Write-Progress -Id 7 -Activity 'wtw list --all' -Status "Scanning git worktrees of $name" `
+                -PercentComplete ([int](100 * ($repoIndex - 1) / [Math]::Max(1, $repoNames.Count)))
+        }
 
         $wsFile = $repoEntry.templateWorkspace
         $wsDisplay = if ($wsFile -and (Test-Path $wsFile)) { Split-Path $wsFile -Leaf } else { '-' }
@@ -238,7 +263,7 @@ function Get-WtwList {
 
         # Git worktrees other tools made next to this repo. Shown until git
         # removes them; `wtw go` / `wtw open` on one adds it to wtw.
-        if ($gitCommand -and -not $Task -and -not $NoUntracked) {
+        if ($scanUntracked) {
             foreach ($untracked in @(Get-WtwUntrackedWorktree -Registry $registry -RepoName $name)) {
                 $untrackedBranch = if ($untracked.Branch) { $untracked.Branch } elseif ($untracked.Detached) { '(detached)' } else { '-' }
                 $items += [PSCustomObject]@{
@@ -260,6 +285,8 @@ function Get-WtwList {
             }
         }
     }
+
+    if ($showProgress) { Write-Progress -Id 7 -Activity 'wtw list --all' -Completed }
 
     if (-not [string]::IsNullOrWhiteSpace($Filter)) {
         $beforeFilter = @($items).Count
@@ -285,16 +312,49 @@ function Get-WtwList {
         Write-WtwHost ''
         Format-WtwTable -Items $tableRows -Columns $tableColumns
         if (@($items | Where-Object { $_.Kind -eq 'untracked' }).Count -gt 0) {
-            Write-WtwHost "  Kind 'untracked' = git worktree wtw does not track yet. wtw go <task> adds it; --no-untracked hides them." -ForegroundColor DarkGray
+            Write-WtwHost "  Kind 'untracked' = git worktree wtw does not track yet. wtw go <task> adds it." -ForegroundColor DarkGray
         }
-        if (-not $Wide) {
-            Write-WtwHost '  Tip: wtw list --wide  for full aliases, paths, workspace, and branch names.' -ForegroundColor DarkGray
+        $tips = @()
+        if (-not $Wide) { $tips += '--wide for full aliases, paths, and branch names' }
+        if (-not $scanUntracked -and -not $Task) { $tips += '--all to include git worktrees wtw does not track yet' }
+        if ($tips) {
+            Write-WtwHost "  Tip: wtw list $($tips -join '; ')." -ForegroundColor DarkGray
         }
         Write-WtwHost ''
     }
-    if ($goneWorktrees.Count -gt 0) {
-        Write-WtwHost "  Removed from wtw (git no longer has them): $($goneWorktrees -join ', ')" -ForegroundColor DarkGray
+    if ($prunedWorktrees.Count -gt 0) {
+        Write-WtwHost "  Removed from wtw (git no longer has them): $($prunedWorktrees -join ', ')" -ForegroundColor DarkGray
         Write-WtwHost ''
+    }
+    if ($goneWorktrees.Count -gt 0 -and -not $Task) {
+        Write-WtwHost "  Git no longer has $($goneWorktrees.Count) tracked worktree(s): $(@($goneWorktrees | ForEach-Object { $_.Key }) -join ', ')" -ForegroundColor Yellow
+        if (Test-WtwCanPrompt) {
+            $answer = (Read-Host '  Remove them from wtw? [Y/n]').Trim()
+            if ($answer -notin @('n', 'N', 'no')) {
+                $removed = @(Remove-WtwGoneWorktree -Registry $registry -Gone $goneWorktrees)
+                Write-WtwHost "  Removed $($removed.Count) from wtw." -ForegroundColor DarkGray
+            }
+        } else {
+            Write-WtwHost '  Remove them with: wtw list --prune' -ForegroundColor DarkGray
+        }
+        Write-WtwHost ''
+    }
+}
+
+function Test-WtwCanPrompt {
+    <#
+    .SYNOPSIS
+        True when a Read-Host would reach a person (not CI, Pester, or a pipe).
+    #>
+    [CmdletBinding()]
+    param()
+
+    if (Test-WtwTruthyEnvFlag -Value $env:CI) { return $false }
+    if (Test-WtwIsPesterRun) { return $false }
+    try {
+        return -not ([Console]::IsInputRedirected -or [Console]::IsOutputRedirected)
+    } catch {
+        return $false
     }
 }
 

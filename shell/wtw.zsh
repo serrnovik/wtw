@@ -284,7 +284,9 @@ _wtw_completion() {
                     '-d:detailed view'
                     '--detailed:detailed view'
                     '--wide:untruncated columns'
-                    '--no-untracked:hide worktrees wtw does not track'
+                    '-a:include worktrees wtw does not track'
+                    '--all:include worktrees wtw does not track'
+                    '--prune:remove entries git already removed'
                     '--repo:repository'
                 )
                 ;;

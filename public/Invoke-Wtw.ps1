@@ -18,6 +18,8 @@ function Invoke-Wtw {
     #>
     $Command = $null
     $rawArgs = @()
+    # Realpath results are reused within one command only.
+    $script:WtwRealPathCache = @{}
 
     # Host selector first: dispatch below keys off $args[0], so a leading
     # `--on <host>` would otherwise be mistaken for the subcommand.
@@ -93,7 +95,7 @@ function Invoke-Wtw {
         Write-WtwHost '    add [path|task]   Adopt an existing on-disk worktree (bare name inside it is the task)'
         Write-WtwHost '    create <task>     Create worktree + branch (--emoji for identity glyph; --branch / --adopt to attach an existing branch)'
         Write-WtwHost '    import --from <host> <name>  Check out a worktree from another machine (same git remote)'
-        Write-WtwHost '    list [repo] [-f|--filter <text>] [-d|--detailed] [--wide] [--no-untracked]  List repos/worktrees'
+        Write-WtwHost '    list [repo] [-f|--filter <text>] [-d|--detailed] [--wide] [-a|--all] [--prune]  List repos/worktrees'
         Write-WtwHost '    info <name>       Show full details for a repo or worktree  (alias: show)'
         Write-WtwHost '    go <name>         Switch to worktree (cd + session init)'
         Write-WtwHost '    open [name]       Open workspace in editor (default: current)'

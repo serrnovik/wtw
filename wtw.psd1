@@ -1,6 +1,6 @@
 @{
     RootModule        = 'wtw.psm1'
-    ModuleVersion     = '0.2.50'
+    ModuleVersion     = '0.2.51'
     GUID              = 'a3f7e8d1-4b2c-4e9a-b5d6-8c1f3a7e9d2b'
     Author            = 'Sergey Novikov'
     CompanyName       = 'logificiel'
@@ -41,7 +41,7 @@
             Tags         = @('git', 'worktree', 'vscode', 'cursor', 'workspace', 'peacock', 'devtools', 'ssh', 'remote', 'waveterm', 'herdr', 'workmux')
             LicenseUri   = 'https://github.com/serrnovik/wtw/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/serrnovik/wtw'
-            ReleaseNotes = 'New: wtw list shows git worktrees that other tools (T3 Code, Codex, Cursor, git worktree add) created next to a tracked repo, as Kind untracked (--no-untracked hides them). wtw go / open / editor shortcuts find them by folder, task or branch and add them to wtw on first use. Worktrees git has removed are dropped from wtw the next time you list.'
+            ReleaseNotes = 'wtw list is fast again: untracked git worktrees are listed only with --all (-a), with a progress bar; wtw go / open still find and adopt them. Worktrees git has removed are no longer dropped silently: an interactive wtw list asks first, --prune removes without asking. On macOS, path comparisons reuse realpath results instead of starting one process per comparison. Fixed: the first command after a wtw update no longer fails with "Join-WtwTargetName is not recognized" and now shows the real error.'
         }
     }
 }

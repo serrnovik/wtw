@@ -28,17 +28,22 @@ function Get-WtwUntrackedWorktree {
         $mainPath = Get-WtwPropertyValue -Object $repo -Name 'mainPath'
         if (-not $mainPath -or -not (Test-Path -LiteralPath $mainPath)) { continue }
 
-        $registeredMap = Get-WtwRegisteredWorktreePathMap -RepoEntry $repo
         $listed = @(Get-WtwGitWorktreeList -RepoPath $mainPath)
+        $worktrees = Get-WtwPropertyValue -Object $repo -Name 'worktrees'
+        $registeredPaths = @(foreach ($task in (Get-WtwPropertyNames -Object $worktrees)) {
+                Get-WtwPropertyValue -Object $worktrees.$task -Name 'path'
+            })
+        Initialize-WtwRealPathCache -Paths (@($mainPath) + $registeredPaths + @($listed | ForEach-Object { $_.Path }))
+        $registeredMap = Get-WtwRegisteredWorktreePathMap -RepoEntry $repo
         $index = 0
         foreach ($wt in $listed) {
             $index++
             if ($wt.Bare -or $wt.Prunable) { continue }
             if ($index -eq 1 -or (Test-WtwSamePath $wt.Path $mainPath)) { continue }
             if ($registeredMap.Contains($wt.Path)) { continue }
+            if (-not (Test-Path -LiteralPath $wt.Path)) { continue }
             $canonical = Resolve-WtwRealPath $wt.Path
             if ($canonical -and $registeredMap.Contains($canonical)) { continue }
-            if (-not (Test-Path -LiteralPath $wt.Path)) { continue }
 
             $leaf = Split-Path $wt.Path -Leaf
             $taskName = $leaf -replace "^$([regex]::Escape($name))_", ''
@@ -149,18 +154,19 @@ function Add-WtwUntrackedTarget {
     }
 }
 
-function Remove-WtwGoneWorktree {
+function Find-WtwGoneWorktree {
     <#
     .SYNOPSIS
-        Drop registry entries for worktrees git has already removed.
+        Registered worktrees git has already removed.
     .DESCRIPTION
         A registered worktree is gone when its folder no longer exists and git
-        either no longer lists it or lists it as prunable. Its registry entry,
-        color assignment, and generated workspace file are removed. A repo
-        whose main checkout is missing, or where git cannot list worktrees, is
-        left alone: there is nothing to compare against.
+        either no longer lists it or lists it as prunable. git is only asked
+        for repos that have a missing folder, so the usual case costs one
+        Test-Path per entry. A repo whose main checkout is missing, or where
+        git cannot list worktrees, is skipped: there is nothing to compare
+        against.
     .OUTPUTS
-        One "<repo>/<task>" string per removed entry.
+        PSCustomObject with RepoName, TaskName, Path, Key ("<repo>/<task>").
     #>
     [CmdletBinding()]
     param(
@@ -168,30 +174,67 @@ function Remove-WtwGoneWorktree {
         $Registry
     )
 
-    $removed = [System.Collections.Generic.List[string]]::new()
+    $gone = [System.Collections.Generic.List[object]]::new()
     foreach ($repoName in (Get-WtwPropertyNames -Object $Registry.repos)) {
         $repo = $Registry.repos.$repoName
         $worktrees = Get-WtwPropertyValue -Object $repo -Name 'worktrees'
         $taskNames = Get-WtwPropertyNames -Object $worktrees
         if (-not $taskNames) { continue }
+
+        $missing = @(foreach ($task in $taskNames) {
+                $path = Get-WtwPropertyValue -Object $worktrees.$task -Name 'path'
+                if ($path -and -not (Test-Path -LiteralPath $path)) {
+                    [pscustomobject]@{ RepoName = $repoName; TaskName = $task; Path = $path; Key = "$repoName/$task" }
+                }
+            })
+        if ($missing.Count -eq 0) { continue }
+
         $mainPath = Get-WtwPropertyValue -Object $repo -Name 'mainPath'
         if (-not $mainPath -or -not (Test-Path -LiteralPath $mainPath)) { continue }
-
         $listed = @(Get-WtwGitWorktreeList -RepoPath $mainPath)
         if ($listed.Count -eq 0) { continue }
-        $live = @($listed | Where-Object { -not $_.Prunable })
 
-        $gone = @(foreach ($task in $taskNames) {
-                $path = Get-WtwPropertyValue -Object $worktrees.$task -Name 'path'
-                if (-not $path -or (Test-Path -LiteralPath $path)) { continue }
-                $stillListed = @($live | Where-Object { Test-WtwSamePath $_.Path $path }).Count -gt 0
-                if (-not $stillListed) { $task }
-            })
-        if ($gone.Count -eq 0) { continue }
+        # A missing folder git still lists as live (an unmounted drive) stays.
+        $live = @($listed | Where-Object { -not $_.Prunable } | ForEach-Object { $_.Path })
+        Initialize-WtwRealPathCache -Paths $live
+        $liveKeys = @($live | ForEach-Object { ConvertTo-WtwPathKey $_ })
+        foreach ($item in $missing) {
+            if ($liveKeys -notcontains (ConvertTo-WtwPathKey $item.Path)) { [void]$gone.Add($item) }
+        }
+    }
+    return @($gone)
+}
 
+function Remove-WtwGoneWorktree {
+    <#
+    .SYNOPSIS
+        Drop registry entries for worktrees git has already removed.
+    .DESCRIPTION
+        Removes each entry from Find-WtwGoneWorktree (or ``-Gone``) together
+        with its color assignment and generated workspace file.
+    .OUTPUTS
+        One "<repo>/<task>" string per removed entry.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        $Registry,
+
+        [object[]] $Gone
+    )
+
+    if (-not $PSBoundParameters.ContainsKey('Gone')) {
+        $Gone = @(Find-WtwGoneWorktree -Registry $Registry)
+    }
+    $goneKeys = @($Gone | ForEach-Object { $_.Key })
+    if ($goneKeys.Count -eq 0) { return @() }
+
+    $removed = [System.Collections.Generic.List[string]]::new()
+    foreach ($repoName in @($Gone | ForEach-Object { $_.RepoName } | Select-Object -Unique)) {
+        $repo = $Registry.repos.$repoName
         $kept = [PSCustomObject]@{}
-        foreach ($prop in $worktrees.PSObject.Properties) {
-            if ($prop.Name -in $gone) {
+        foreach ($prop in $repo.worktrees.PSObject.Properties) {
+            if ("$repoName/$($prop.Name)" -in $goneKeys) {
                 $workspace = Get-WtwPropertyValue -Object $prop.Value -Name 'workspace'
                 if ($workspace -and (Test-Path -LiteralPath $workspace)) {
                     Remove-Item -LiteralPath $workspace -Force -ErrorAction SilentlyContinue

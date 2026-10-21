@@ -81,17 +81,21 @@ function Test-WtwSamePath {
         return $false
     }
 
-    $leftResolved = Resolve-WtwRealPath $Left
-    $rightResolved = Resolve-WtwRealPath $Right
-    if ($IsWindows) {
-        $leftNorm = $leftResolved.TrimEnd('\')
-        $rightNorm = $rightResolved.TrimEnd('\')
-        return $leftNorm -ieq $rightNorm
-    }
+    return (ConvertTo-WtwPathKey $Left) -ceq (ConvertTo-WtwPathKey $Right)
+}
 
-    $leftNorm = $leftResolved.TrimEnd('/')
-    $rightNorm = $rightResolved.TrimEnd('/')
-    return $leftNorm -ceq $rightNorm
+function ConvertTo-WtwPathKey {
+    <#
+    .SYNOPSIS
+        Comparable form of a path: realpath, no trailing separator, lower case on Windows.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()] [string] $Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) { return '' }
+    $resolved = Resolve-WtwRealPath $Path
+    if ($IsWindows) { return $resolved.TrimEnd('\').ToLowerInvariant() }
+    return $resolved.TrimEnd('/')
 }
 
 function Get-WtwRegisteredWorktreePathMap {

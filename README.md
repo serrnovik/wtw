@@ -233,7 +233,7 @@ branches are never force-deleted.
 | `wtw init [aliases] [--template X] [--startup-script X] [--startup-script-zsh X] [--startup-script-bash X] [--emoji X] [--sourcegit-folder]` | Register current repo with aliases, template, per-shell session scripts, optional SourceGit / list / cmux / wmux / T3 prefix, and optional SourceGit group folder |
 | `wtw add [path|task] [--repo X --task X] [--branch X] [--name X] [--alias a,b] [--emoji X] [--color X] [--sourcegit-folder]` | Adopt an existing worktree. A bare name inside it is the task. |
 | `wtw create <task> [--branch X] [--open] [--no-branch] [--alias a,b] [--emoji X]` | Create worktree + workspace + branch |
-| `wtw list [-f\|--filter text] [-d\|--detailed] [--wide] [--no-untracked] [--repo alias]` | List repos/worktrees: default **compact** table (`-f kul` = substring; `--wide` = full aliases and paths). Also lists untracked git worktrees and drops entries git removed |
+| `wtw list [-f\|--filter text] [-d\|--detailed] [--wide] [-a\|--all] [--prune] [--repo alias]` | List repos/worktrees: default **compact** table (`-f kul` = substring; `--wide` = full aliases and paths; `--all` adds untracked git worktrees; `--prune` drops entries git removed) |
 | `wtw --version` / `-v` / `version` | Print the running module version and where it was loaded from |
 | `wtw <name>` | Switch to repo/worktree — implicit `go` (cd + session init) |
 | `wtw go <name>` | Same as above, explicit |
@@ -594,17 +594,19 @@ Spaces and hyphens are equivalent. `--alias none` clears the extra names. Derive
 Agents and other tools (T3 Code, Codex, Cursor, `git worktree add`) keep creating
 worktrees of repos wtw already tracks. You do not have to `wtw add` each one:
 
-- `wtw list` shows them with Kind `untracked` (folder name as task, git branch).
-  `--no-untracked` hides them; `-f` filters them like any worktree.
+- `wtw list --all` (`-a`) shows them with Kind `untracked` (folder name as
+  task, git branch); `-f` filters them like any worktree. Plain `wtw list`
+  skips them, because scanning every repo is the slow part.
 - `wtw go <name>`, `wtw open <name>` and the editor shortcuts look at them after
   every registered name has missed (before fuzzy matching). The name matches the
   folder, the task, or the branch (exact, then prefix, then substring). One hit
   is adopted with `wtw add` (color, workspace file, editor registrations) and
   then opened. Several hits are reported as ambiguous.
 - A worktree git has removed (its folder is gone and git no longer lists it, or
-  lists it as prunable) is dropped from the registry, colors, and its workspace
-  file the next time `wtw list` runs. A folder git still lists as live (an
-  unmounted drive, say) is kept.
+  lists it as prunable) is reported after the `wtw list` table. Interactive
+  runs ask before dropping it from the registry, colors, and its workspace
+  file; `wtw list --prune` drops them without asking. A folder git still lists
+  as live (an unmounted drive, say) is kept.
 
 Only commands that act on a target adopt. Listing, terminal titles and cmux
 metadata never register anything.
@@ -736,7 +738,7 @@ Example (values abbreviated; alias cells may span several screen lines):
   wt    my-app  auth   app-auth      auth-branch  (swatch)  ~/projects/...    my-app_auth.code-workspace
 ```
 
-- **Kind**: `repo` = main repo, `wt` = worktree, `untracked` = git worktree wtw does not track yet (`--no-untracked` hides these)
+- **Kind**: `repo` = main repo, `wt` = worktree, `untracked` = git worktree wtw does not track yet (shown with `--all`)
 - **Aliases** (compact): primary match target; use `--wide` for the full cross-product list
 - **Color**: colored swatch with contrasting text
 

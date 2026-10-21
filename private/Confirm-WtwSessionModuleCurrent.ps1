@@ -236,24 +236,28 @@ function Confirm-WtwSessionModuleCurrent {
         if ($Force) {
             return $true
         }
-
-        $env:WTW_SESSION_RELOADING = '1'
-        try {
-            $invoke = Get-Command Invoke-Wtw -ErrorAction Stop
-            if (@($OriginalArgs).Count -eq 0) {
-                & $invoke
-            } else {
-                & $invoke @OriginalArgs
-            }
-        } finally {
-            Remove-Item Env:WTW_SESSION_RELOADING -ErrorAction SilentlyContinue
-        }
-
-        return $true
     } catch {
         # A failed reload must not block the command the user typed.
         return $false
     }
+
+    # Past the import, this frame belongs to the unloaded copy: its private
+    # helpers are gone. Returning $false here made Invoke-Wtw continue and die
+    # on `Join-WtwTargetName` not found, hiding the real error. Errors from the
+    # re-run reach the caller instead.
+    $env:WTW_SESSION_RELOADING = '1'
+    try {
+        $invoke = Get-Command Invoke-Wtw -ErrorAction Stop
+        if (@($OriginalArgs).Count -eq 0) {
+            & $invoke
+        } else {
+            & $invoke @OriginalArgs
+        }
+    } finally {
+        Remove-Item Env:WTW_SESSION_RELOADING -ErrorAction SilentlyContinue
+    }
+
+    return $true
 }
 
 function Invoke-WtwReloadSession {

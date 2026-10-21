@@ -151,6 +151,40 @@ Describe 'Confirm-WtwSessionModuleCurrent' {
         }
     }
 
+    It 'lets an error from the re-run reach the caller instead of falling through' {
+        # Returning $false here made the unloaded frame continue and fail on a
+        # private helper (`Join-WtwTargetName` not recognized).
+        InModuleScope wtw {
+            $oldCi = $env:CI
+            try {
+                Remove-Item Env:CI -ErrorAction SilentlyContinue
+                Mock Test-WtwIsPesterRun { $false }
+                Mock Import-WtwSessionModule {}
+                Mock Get-Command { { throw 'real go error' } }
+                Mock Test-Path { $true }
+                Mock Get-WtwSessionModuleStatus {
+                    [pscustomobject]@{
+                        Stale            = $true
+                        LoadedRoot       = 'C:\mod'
+                        ReloadRoot       = 'C:\mod'
+                        ReloadModulePath = 'C:\mod\wtw.psm1'
+                        LoadedVersion    = [version]'0.2.49'
+                        ReloadVersion    = [version]'0.2.51'
+                    }
+                }
+
+                { Confirm-WtwSessionModuleCurrent -OriginalArgs @('go', '1834') } | Should -Throw 'real go error'
+                $env:WTW_SESSION_RELOADING | Should -BeNullOrEmpty
+            } finally {
+                if ($null -eq $oldCi) {
+                    Remove-Item Env:CI -ErrorAction SilentlyContinue
+                } else {
+                    $env:CI = $oldCi
+                }
+            }
+        }
+    }
+
     It 'does not auto-switch a checkout session to ~/.wtw/module' {
         InModuleScope wtw {
             Mock Test-WtwIsPesterRun { $false }

@@ -280,8 +280,8 @@ Register-ArgumentCompleter -Native -CommandName wtw -ScriptBlock {
             'codex'  { @('--repo', '--skip-restart') }
             'claudecode' { @('--repo', '--prompt') }
             'ccode'  { @('--repo', '--prompt') }
-            'list'   { @('--repo', '--detailed', '-d', '--wide', '--no-untracked', '-f', '--filter') }
-            'ls'     { @('--repo', '--detailed', '-d', '--wide', '--no-untracked', '-f', '--filter') }
+            'list'   { @('--repo', '--detailed', '-d', '--wide', '-a', '--all', '--prune', '-f', '--filter') }
+            'ls'     { @('--repo', '--detailed', '-d', '--wide', '-a', '--all', '--prune', '-f', '--filter') }
             'sync'   { @('--all', '--repo', '--template', '--dry-run', '--color-source') }
             'color'  { @('--no-sync') }
             'sbx'    { @('--name', '--agent', '--template', '--writable', '--dry-run') }
